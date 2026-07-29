@@ -16,7 +16,14 @@
 
 import { system as systemInfo } from './board.js'
 import type { StandardAction } from './cards.js'
-import { citiesInReserve, piecesOf, planetResource, rules, slotsOf } from './control.js'
+import {
+  citiesInReserve,
+  connectedSystems,
+  piecesOf,
+  planetResource,
+  rules,
+  slotsOf,
+} from './control.js'
 import { BASE_COURT, courtSlots, hasGuild, securedCards } from './court.js'
 import { Location, parseFigureId } from './ids.js'
 import { hasLore } from './lore.js'
@@ -207,6 +214,65 @@ export function prunable(state: GameState, faction: FactionId): readonly string[
   return out
 }
 
+/**
+ * Force Beams (lore16): the legs Guide may carry ships along.
+ *
+ * A lane is a system holding a **fresh Loyal starport** paired with an adjacent system. The card
+ * reads "from a system with a fresh Loyal starport to an adjacent system, **or vice versa**", so
+ * each lane runs both ways and the ships need not be yours — only the starport does.
+ */
+export function guideLanes(
+  state: GameState,
+  faction: FactionId,
+): { from: SystemId; to: SystemId }[] {
+  const out: { from: SystemId; to: SystemId }[] = []
+  for (const port of state.board.systems) {
+    const fresh = contentsOf(state.figures, Location.system(port)).some((id) => {
+      const f = parseFigureId(id)
+      return f.color === faction && f.piece === 'Starport' && !state.damaged.includes(id)
+    })
+    if (!fresh) continue
+    for (const next of connectedSystems(state.board, port)) {
+      // Outbound only if there is something to carry, and likewise inbound.
+      if (shipsIn(state, port).length > 0) out.push({ from: port, to: next })
+      if (shipsIn(state, next).length > 0) out.push({ from: next, to: port })
+    }
+  }
+  return out
+}
+
+/** Every ship standing in a system, any colour — Guide moves rivals' ships too. */
+export function shipsIn(state: GameState, system: SystemId): string[] {
+  return contentsOf(state.figures, Location.system(system)).filter(
+    (id) => parseFigureId(id).piece === 'Ship',
+  )
+}
+
+/**
+ * Survival Overrides (lore18): the sacrifices Martyr could make.
+ *
+ * One of your fresh ships, and a ship that is **not Loyal** standing in the same system — "1 ship
+ * that is not Loyal **in its system**" ties the victim to where the martyr stands, so this is a
+ * per-system pairing rather than any two ships on the map.
+ */
+export function martyrPairs(
+  state: GameState,
+  faction: FactionId,
+): { system: SystemId; martyr: string; victims: string[] }[] {
+  const out: { system: SystemId; martyr: string; victims: string[] }[] = []
+  for (const system of state.board.systems) {
+    const here = shipsIn(state, system)
+    const victims = here.filter((id) => parseFigureId(id).color !== faction)
+    if (victims.length === 0) continue
+    for (const martyr of here) {
+      const f = parseFigureId(martyr)
+      if (f.color !== faction || state.damaged.includes(martyr)) continue
+      out.push({ system, martyr, victims })
+    }
+  }
+  return out
+}
+
 export const LORE_ALTS: readonly GuildAlt[] = [
   // Galactic Rifles — "Fire Rifles (Battle)": a ranged strike into an adjacent system.
   {
@@ -234,6 +300,26 @@ export const LORE_ALTS: readonly GuildAlt[] = [
     label: 'Prune — swap one of your buildings',
     on: 'Repair',
     available: (state, faction) => prunable(state, faction).length > 0,
+  },
+  // Force Beams — "Guide (Move): Move any number of any ships (even if not Loyal) from a system
+  // with a fresh Loyal starport to an adjacent system, or vice versa."
+  {
+    id: 'guide',
+    card: 'lore16',
+    source: 'lore',
+    label: 'Guide — carry any ships in or out of a starport system',
+    on: 'Move',
+    available: (state, faction) => guideLanes(state, faction).length > 0,
+  },
+  // Survival Overrides — "Martyr (Move): Destroy 1 fresh Loyal ship on the map to destroy 1 ship
+  // that is not Loyal in its system, taking it as a Trophy."
+  {
+    id: 'martyr',
+    card: 'lore18',
+    source: 'lore',
+    label: 'Martyr — trade a fresh ship for a rival ship',
+    on: 'Move',
+    available: (state, faction) => martyrPairs(state, faction).length > 0,
   },
 ]
 

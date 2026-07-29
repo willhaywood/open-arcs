@@ -871,3 +871,125 @@ during seating and there is no "after the fact" to inject at.
 One line is deliberately guarded but unreachable in a dealt game: Mythic refuses to fire off
 Inspiring's empty slots, which cannot co-occur since a faction has one leader. Its test dispatches
 the tax directly and says so.
+
+## 8. Expansion lore effects (15–28)
+
+All fourteen are now implemented. Of the two fan-made cards outside that range, Guild Loyalty
+(lore29) is implemented in `outrage.ts`; **Catapult Overdrive (lore30) is deliberately skipped** —
+fan-made, in neither box, and out of scope. They arrived in two batches, and the split is not the one the
+backlog predicted.
+
+### The ambition-paired ten (19–28)
+
+One batch, because they share one gate. Every card prints **"While *&lt;Ambition&gt;* is
+declared"**, so the condition is a single helper — `loreActive(state, faction, loreId)` — that is
+true when the faction holds the card *and* that ambition sits in `state.declared`. Who declared it
+does not matter; the card says "is declared", not "you declared".
+
+Five of them also print "**Prelude:** You may discard this to clear your *&lt;resource&gt;*
+Outrage". That half is deliberately **not** gated: the card prints only "Prelude" there, with no
+ambition clause, so the discard works whether or not the ambition is out. `LORE_CLEARS_OUTRAGE`
+holds the resource each one clears, and the Prelude offers it only when there is outrage to clear.
+
+**Tycoon's Ambition's "Do not place the zero marker" is about the played card, not the ambition
+marker.** Declaring normally zeroes the card you led for surpass purposes — `performDeclare` sets
+`lead.zeroed` — and the card skips exactly that step while still taking a marker like any other
+declaration. So it calls `takeAmbitionMarker` and does not zero. `performBardsDeclare` (Galactic
+Bards) already had the same shape, which is corroboration rather than coincidence: both are free
+declarations that leave the lead card at its printed strength.
+
+### The remaining four (15–18)
+
+**These are not a group.** The backlog had them down as "the battle-dice cards, to do together in
+`rules/battle.ts`". Reading the card art, only one of them is:
+
+| # | Name | Where it lives |
+| ---: | --- | --- |
+| 15 | Predictive Sensors | `rules/battle.ts` — a defender's interrupt before dice collection |
+| 16 | Force Beams | `guild-actions.ts` + `rules/standard-actions.ts` — a Move alt |
+| 17 | Raider Exosuits | `rules/battle.ts` — one line in the dice gather |
+| 18 | Survival Overrides | `guild-actions.ts` + `rules/standard-actions.ts` — a Move alt |
+
+**Raider Exosuits opens exactly one case.** The base rule allows raid dice only against defending
+buildings; the card allows one die when there are *none*. The "buildings present" case keeps its
+six. Its parenthetical — "This is not an extra die. Follow the limit of 1 die per ship" — needs no
+code, because the pool enumeration already bounds every combination by the attacking fleet, so a
+raid die taken here displaces a skirmish or assault die rather than adding to the count. Hidden
+Harbors cannot collide with it: that card needs a fresh defending *starport*, which is a building,
+so the two conditions are mutually exclusive by construction.
+
+**Predictive Sensors is asked of the defender, and asked first.** "Before the attacker collects
+dice" is the whole window, so it runs ahead of Railgun Arrays too — reinforcements pulled in should
+be standing there for the volley as well as for the dice. `belovedThen` was the precedent for
+handing an ask to someone who is not taking the turn. `openBattle` is split in two for it:
+`openBattle` offers the window, `openBattleArmed` is everything from Railgun onwards, and the
+resume path re-enters the second. Re-entering the first would re-offer the window on every decline,
+forever.
+
+It is not a move, so nothing that triggers on moving fires — no catapult, no Sprinter Drives, no
+Gate Ports toll. And like the other defence-triggered cards it stays off the Galactic Rifles path
+for free, because a rifles strike never enters `openBattle`.
+
+**Force Beams moves ships that are not yours.** "Move any number of *any* ships (*even if not
+Loyal*)" is keyed on the starport, not on the fleet: a rival's ships next to your fresh Loyal
+starport can be pushed away or dragged in. `guideLanes` enumerates lanes from the starport and runs
+each both ways, which is the card's "or vice versa".
+
+**"Ignoring move modifiers in play areas" — resolved by the publisher's FAQ.** This was recorded
+here as a divergence to check; `cards.buriedgiant.com/card/ARCS-L16` rules on it directly, and the
+implementation was right for one wrong reason:
+
+> Q: Does this trigger Gate Ports? **A: No, since this ignores move modifiers.**
+>
+> Q: Can you use Force Beams to do a Catapult Move? **A: No, Force Beams is strictly to an adjacent
+> system. It cannot start a Catapult move.**
+
+The two are off for **different reasons**. The Gate Ports toll is a move modifier — so the clause
+does reach a trigger on a lore card, not only an arithmetic cap. The catapult is off because Guide
+is *strictly one leg to an adjacent system*, which is a reach limit rather than a modifier. Both
+end up suppressed, which is what this engine already did, but the distinction is load-bearing: a
+future card granting extra reach would be stopped by "strictly adjacent", not by the modifier
+clause.
+
+**Disorganized (Rebel) is the modifier the clause is really for.** The leader card sits in a play
+area and caps a Move at two ships; lifting that cap is the card's best-known use in play. This
+engine gets it right only because Guide does not call `movableCount`, so it is now asserted by a
+test rather than left to the next person to edit that function.
+
+**One Guide carries a mixed group — and this engine had it wrong.** "Move any number of *any*
+ships" is not "any number of ships of one colour". The first implementation asked for a colour and
+a count and then ended the action, so pulling some of your ships and some of a rival's into the
+same system — the card's headline use — would have cost two Move pips instead of one. It is a loop
+along a fixed lane now: pick a colour and a count, get asked again, stop when you say so. The lane
+itself is chosen once, because "or vice versa" is a choice of direction and not something to
+re-decide per ship.
+
+**Errata:** "in play areas" was added to this card in the second printing. The art in
+`assets/images/lore/lore16.webp` carries the phrase, so this engine implements the second-printing
+text.
+
+The FAQ's third question is about Passages and the Twisted Passage — campaign content, out of scope
+by docs/04, and not implemented.
+
+**Survival Overrides asymmetrically disposes of two ships.** The martyr goes back to your reserve
+and the victim goes to your trophy pile — which is the card's "(*Your Loyal ship does not become a
+Trophy.*)" and matches how a battle already settles: your own losses go home, an enemy's become
+trophies. "Destroy" is unconditional on both sides, so a damaged victim is destroyed outright
+rather than repaired-then-hit, and a fresh one does not merely become damaged. It is not a battle
+hit. The victim must stand in the **martyr's own system** — "1 ship that is not Loyal *in its
+system*".
+
+### Tests
+
+`test/lore-ambition.test.ts` (39) and `test/lore-expansion-15-18.test.ts` (24). Both were
+mutation-tested card by card — 31 mutations, every one caught by the test that names the behavior.
+
+Two test bugs found that way and worth not repeating:
+
+- **A default parameter fires on an explicit `undefined`.** A `staged(lore = 'lore15')` helper
+  called as `staged(undefined)` to mean "without the card" quietly passed *with* it, so three
+  "only with the card" assertions were testing nothing. Helpers take an explicit boolean now.
+- **The starting board satisfies these cards by accident.** Cards keyed on "a system with a fresh
+  Loyal starport" or "a ship that is not Loyal" are met by the setup pieces scattered across the
+  map, so clearing only the system under test leaves a negative assertion passing for the wrong
+  reason. The 15–18 tests sweep the whole board first and place only what they name.

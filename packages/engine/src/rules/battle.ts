@@ -37,10 +37,13 @@ import type { ColorId, FactionId, SystemId } from '../ids.js'
 import { weaponReach } from '../guild-actions.js'
 import { hasTrait } from '../leaders.js'
 import {
+  EMPATHS_VISION,
   HIDDEN_HARBORS,
   KEEPERS_SOLIDARITY,
   KEEPERS_TRUST,
   MIRROR_PLATING,
+  PREDICTIVE_SENSORS,
+  RAIDER_EXOSUITS,
   RAILGUN_ARRAYS,
   SEEKER_TORPEDOES,
   REPAIR_DRONES,
@@ -178,7 +181,148 @@ function offerTarget(state: GameState, faction: FactionId, system: SystemId, the
  * is what tells `performFinish` this is the pre-battle volley and that it should open the dice
  * menu rather than close a battle that has not happened yet.
  */
+/**
+ * The fresh Loyal ships Predictive Sensors could pull into `system`, by the system they stand in.
+ *
+ * Empty unless the defender holds the card, so the caller can use it as the gate as well as the
+ * list. "Loyal" is your own colour and "fresh" is undamaged, the same two words every other lore
+ * card uses.
+ */
+function sensorSources(
+  state: GameState,
+  defender: FactionId,
+  system: SystemId,
+): { from: SystemId; ships: string[] }[] {
+  if (!hasLore(state, defender, PREDICTIVE_SENSORS)) return []
+  const out: { from: SystemId; ships: string[] }[] = []
+  for (const from of connectedSystems(state.board, system)) {
+    const ships = contentsOf(state.figures, Location.system(from)).filter((id) => {
+      const f = parseFigureId(id)
+      return f.color === defender && f.piece === 'Ship' && !state.damaged.includes(id)
+    })
+    if (ships.length > 0) out.push({ from, ships })
+  }
+  return out
+}
+
+/**
+ * Ask the defender which neighbours send ships. A loop, because "any number ... from systems"
+ * plural means several neighbours may each contribute, and each answer changes what is left.
+ */
+function offerSensors(
+  state: GameState,
+  defender: FactionId,
+  system: SystemId,
+  enemy: ColorId,
+  attacker: FactionId,
+  then: PipReturn,
+): Continue {
+  const sources = sensorSources(state, defender, system)
+  // Done, by exhaustion or by choice: hand the battle back to where it would have started.
+  const done: Action = {
+    type: 'battle/sensors-done',
+    faction: defender,
+    system,
+    enemy,
+    attacker,
+    then,
+    label: 'Bring in no more ships',
+  }
+  if (sources.length === 0) return C.then(done)
+
+  const options: Action[] = []
+  for (const { from, ships } of sources) {
+    for (let n = ships.length; n >= 1; n--) {
+      options.push({
+        type: 'battle/sensors-pull',
+        faction: defender,
+        system,
+        enemy,
+        attacker,
+        from,
+        count: n,
+        then,
+        label: `Bring ${n} fresh ship${n === 1 ? '' : 's'} from ${from}`,
+      })
+    }
+  }
+  return C.ask(
+    defender,
+    [...options, done],
+    `${defender} — Predictive Sensors: reinforce ${system} before ${attacker} collects dice`,
+  )
+}
+
+function performSensorsPull(
+  state: GameState,
+  defender: FactionId,
+  system: SystemId,
+  enemy: ColorId,
+  attacker: FactionId,
+  from: SystemId,
+  count: number,
+  then: PipReturn,
+): RuleResult {
+  const ships = (sensorSources(state, defender, system).find((s) => s.from === from)?.ships ??
+    []).slice(0, count)
+  if (ships.length === 0) {
+    return { state, continue: offerSensors(state, defender, system, enemy, attacker, then) }
+  }
+  let figures = state.figures
+  for (const id of ships) figures = move(figures, id, Location.system(system))
+  const next: GameState = {
+    ...state,
+    figures,
+    log: [
+      ...state.log,
+      `${defender} pulled ${ships.length} ship${ships.length === 1 ? '' : 's'} ${from} → ${system} (Predictive Sensors)`,
+    ],
+  }
+  return { state: next, continue: offerSensors(next, defender, system, enemy, attacker, then) }
+}
+
 function openBattle(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  enemy: ColorId,
+  then: PipReturn,
+): Continue {
+  const defender = defendingFaction(state, enemy)
+
+  /*
+   * Predictive Sensors (lore15): "When defending in battle, before the attacker collects dice, you
+   * may move any number of fresh Loyal ships from systems adjacent to the battle system into it."
+   *
+   * The defender's, and asked *before* Railgun Arrays as well as before the dice — "before the
+   * attacker collects dice" is the whole window, and reinforcements that arrive should be standing
+   * there for everything that follows. It matters: the dice pool is capped by the attacker's
+   * ships, not the defender's, but the ships pulled in are what the attacker's hits land on.
+   *
+   * It is not a move. Nothing that triggers on moving runs — no catapult, no Sprinter Drives, no
+   * Gate Ports toll — because the card grants a repositioning inside a battle, not a Move action.
+   */
+  if (defender !== undefined && sensorSources(state, defender, system).length > 0) {
+    return C.then({
+      type: 'battle/sensors',
+      faction: defender,
+      system,
+      enemy,
+      attacker: faction,
+      then,
+    })
+  }
+  return openBattleArmed(state, faction, system, enemy, then)
+}
+
+/**
+ * The battle from Railgun Arrays onwards — everything after the Predictive Sensors window.
+ *
+ * Split out so the resume path cannot re-enter that window: `openBattle` offers the sensors while
+ * ships remain to pull, and coming back through here instead is what ends it. Re-entering
+ * `openBattle` would offer them again on every decline, forever.
+ */
+function openBattleArmed(
   state: GameState,
   faction: FactionId,
   system: SystemId,
@@ -237,7 +381,20 @@ function offerGather(
   // Hidden Harbors (lore05) shuts the raid dice off entirely while the defender still has an
   // undamaged starport here (game-battle.scala:159). Buildings alone are no longer enough.
   const harbored = defenderHasFreshStarport(state, system, enemy)
-  const maxRaid = enemyBuildings && !harbored ? 6 : 0
+  /*
+   * Raider Exosuits (lore17): "When attacking in battle, if there are no defending buildings, you
+   * may collect up to 1 raid die. (This is not an extra die. Follow the limit of 1 die per ship.)"
+   *
+   * It opens the *one* case the base rule closes — no buildings at all — and leaves the ordinary
+   * "buildings present" case alone at six. The parenthetical needs no code: `total` already bounds
+   * every pool by the fleet, so a raid die taken here displaces a skirmish or assault die rather
+   * than adding to the count.
+   *
+   * `harbored` cannot collide with it. Hidden Harbors needs a fresh defending *starport*, which is
+   * a building, so the two conditions are mutually exclusive by construction.
+   */
+  const exosuits = !enemyBuildings && hasLore(state, faction, RAIDER_EXOSUITS) ? 1 : 0
+  const maxRaid = enemyBuildings && !harbored ? 6 : exosuits
   const wary = hasTrait(state, faction, 'Wary')
 
   const options: Action[] = []
@@ -387,7 +544,12 @@ function offerReroll(
   const source = rerollSources(state, faction, system, rolls).find((r) => !used.includes(r.id))
   if (source === undefined) return resolveRoll(state, faction, system, enemy, pool, rolls, then)
 
-  const eligible = rolls.flatMap((r, i) => (r.die === source.die ? [i] : []))
+  // `die: undefined` means the source is not fussy — Empath's Vision rerolls any of them.
+  const eligible = rolls.flatMap((r, i) =>
+    source.die === undefined || r.die === source.die ? [i] : [],
+  )
+  /** How the source names what it rerolls — "skirmish", or just "dice" when it takes any. */
+  const kind = source.die === undefined ? '' : `${source.die.toLowerCase()} `
   const spent = [...used, source.id]
   const seen = new Set<string>()
   const options: Action[] = []
@@ -407,7 +569,7 @@ function offerReroll(
       then,
       used: spent,
       source: source.name,
-      label: `Reroll ${pick.length} ${source.die.toLowerCase()} ${pick.length === 1 ? 'die' : 'dice'} (${faces.join(', ')})`,
+      label: `Reroll ${pick.length} ${kind}${pick.length === 1 ? 'die' : 'dice'} (${faces.join(', ')})`,
     })
   }
   // Nothing this source could change: spend it and let whatever is left ask.
@@ -425,14 +587,14 @@ function offerReroll(
     then,
     used: spent,
     source: source.name,
-    label: `Keep the ${source.die.toLowerCase()} dice`,
+    label: `Keep the ${kind}dice`,
   }
   return {
     state,
     continue: C.ask(
       faction,
       [...options, keep],
-      `${faction} — ${source.name}: reroll up to ${source.limit} ${source.die.toLowerCase()} ${source.limit === 1 ? 'die' : 'dice'}?`,
+      `${faction} — ${source.name}: reroll up to ${source.limit} ${kind}${source.limit === 1 ? 'die' : 'dice'}?`,
     ),
   }
 }
@@ -453,8 +615,23 @@ function rerollSources(
   faction: FactionId,
   system: SystemId,
   rolls: readonly DieRoll[],
-): { id: string; name: string; die: DieRoll['die']; limit: number }[] {
-  const out: { id: string; name: string; die: DieRoll['die']; limit: number }[] = []
+): { id: string; name: string; die: DieRoll['die'] | undefined; limit: number }[] {
+  const out: { id: string; name: string; die: DieRoll['die'] | undefined; limit: number }[] = []
+
+  /*
+   * Empath's Vision (lore19): "While Empath is declared, if you roll **any** dice (even outside
+   * battle), you may reroll any number of them once."
+   *
+   * The only source that is not tied to one die type, which is why `die` is optional — it takes
+   * the whole roll, and its limit is however many dice were thrown. "Once" is the `used` list
+   * every source already goes through.
+   *
+   * The parenthesis has nothing to model: every roll in the game goes through `performRoll`, so a
+   * Galactic Rifles volley is already covered by the same hop.
+   */
+  if (rolls.length > 0 && loreActive(state, faction, EMPATHS_VISION)) {
+    out.push({ id: EMPATHS_VISION, name: "Empath's Vision", die: undefined, limit: rolls.length })
+  }
 
   const skirmish = rolls.filter((r) => r.die === 'Skirmish').length
   if (skirmish > 0 && hasGuild(state, faction, SKIRMISHERS)) {
@@ -1063,8 +1240,9 @@ function parseResource(token: string): (typeof RESOURCES)[number] {
  *
  * **It is emphatically not a battle**, and the official ruling says so: it mimics one, so
  * defence-triggered abilities must not fire. That falls out of the shape here rather than needing
- * a guard — it never enters `offerGather` or `performRoll`, so Mirror Plating, Signal Breaker,
- * Hidden Harbors and Railgun Arrays are simply not on the path. The one thing that *would* have
+ * a guard — it never enters `openBattle`, `offerGather` or `performRoll`, so Mirror Plating,
+ * Signal Breaker, Hidden Harbors, Railgun Arrays and Predictive Sensors are simply not on the
+ * path. The one thing that *would* have
  * leaked is Repair Drones, which hangs off `performFinish`; the `rifles` flag on the context stops
  * it.
  *
@@ -1212,6 +1390,41 @@ export const BattleModule: RuleModule = {
           continue: openBattle(
             state,
             action['faction'] as FactionId,
+            action['system'] as SystemId,
+            action['enemy'] as ColorId,
+            action['then'] as PipReturn,
+          ),
+        }
+      case 'battle/sensors':
+        return {
+          state,
+          continue: offerSensors(
+            state,
+            action['faction'] as FactionId,
+            action['system'] as SystemId,
+            action['enemy'] as ColorId,
+            action['attacker'] as FactionId,
+            action['then'] as PipReturn,
+          ),
+        }
+      case 'battle/sensors-pull':
+        return performSensorsPull(
+          state,
+          action['faction'] as FactionId,
+          action['system'] as SystemId,
+          action['enemy'] as ColorId,
+          action['attacker'] as FactionId,
+          action['from'] as SystemId,
+          action['count'] as number,
+          action['then'] as PipReturn,
+        )
+      case 'battle/sensors-done':
+        // Back into the battle past the sensors window, never into `openBattle` again.
+        return {
+          state,
+          continue: openBattleArmed(
+            state,
+            action['attacker'] as FactionId,
             action['system'] as SystemId,
             action['enemy'] as ColorId,
             action['then'] as PipReturn,

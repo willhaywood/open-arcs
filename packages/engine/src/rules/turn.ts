@@ -70,7 +70,14 @@ import {
 import { TakeAction, arrangeThen, canTake, overflowThen } from './standard-actions.js'
 import type { PipReturn } from './standard-actions.js'
 import { hasTrait } from '../leaders.js'
-import { TYCOONS_CHARM, TYRANTS_EGO, WARLORDS_TERROR, loreActive, loreCard } from '../lore.js'
+import {
+  TYCOONS_AMBITION,
+  TYCOONS_CHARM,
+  TYRANTS_EGO,
+  WARLORDS_TERROR,
+  loreActive,
+  loreCard,
+} from '../lore.js'
 import { clearOutrage } from '../outrage.js'
 import { copiedOrPivoted } from '../observe.js'
 
@@ -684,6 +691,40 @@ function performPrelude(
     }
   }
 
+  /*
+   * Tycoon's Ambition (lore27): "While Tycoon is declared, before taking any other actions, you
+   * may discard all of your Material and Fuel to declare exactly 1 undeclared ambition. Do not
+   * place the zero marker."
+   *
+   * **"Do not place the zero marker" is about your played card, not the ambition marker.**
+   * Declaring normally zeroes the card you played for surpass purposes — `performDeclare` sets
+   * `lead.zeroed` — and this skips exactly that step while still taking an ambition marker like
+   * any other declaration. So it is `takeAmbitionMarker` without the zeroing.
+   *
+   * "Before taking any other actions" is where it sits: the Prelude runs before the pips.
+   */
+  const tycoon: Action[] = []
+  if (loreActive(state, faction, TYCOONS_AMBITION) && state.ambitionable.length > 0) {
+    const slots = slotsOf(state, faction)
+    const fuelish = (['Material', 'Fuel'] as const).reduce(
+      (n, r) => n + countResource(state.resources, slots, r),
+      0,
+    )
+    if (fuelish > 0) {
+      for (const a of state.ambitions) {
+        if (state.declared.some((d) => d.ambition === a)) continue
+        tycoon.push({
+          type: 'turn/prelude-tycoon',
+          faction,
+          ambition: a,
+          suit,
+          pips,
+          label: `Tycoon's Ambition — discard all Material and Fuel to declare ${a}`,
+        })
+      }
+    }
+  }
+
   const arrange: Action = {
     type: 'turn/prelude-arrange',
     faction,
@@ -696,7 +737,7 @@ function performPrelude(
     state,
     continue: C.ask(
       faction,
-      [...options, ...guild, ...lore, ...spoils, ...charm, arrange, EndPrelude(faction, suit, pips)],
+      [...options, ...guild, ...lore, ...spoils, ...charm, ...tycoon, arrange, EndPrelude(faction, suit, pips)],
       `${faction} — Prelude`,
     ),
   }
@@ -1374,6 +1415,27 @@ export const TurnModule: RuleModule = {
           action['suit'] as Suit,
           action['pips'] as number,
         )
+      case 'turn/prelude-tycoon': {
+        const faction = action['faction'] as FactionId
+        const suit = action['suit'] as Suit
+        const pips = action['pips'] as number
+        const ambition = action['ambition'] as Ambition
+        // All of both, which is the price the card names.
+        let resources = state.resources
+        const slots = slotsOf(state, faction)
+        for (const token of heldTokens(resources, slots)) {
+          const r = parseResourceToken(token).resource
+          if (r === 'Material' || r === 'Fuel') resources = spendToken(resources, token)
+        }
+        const paid: GameState = {
+          ...state,
+          resources,
+          log: [...state.log, `${faction} discarded all Material and Fuel (Tycoon's Ambition)`],
+        }
+        // Marker taken as normal; the played card is *not* zeroed.
+        const declaredNow = takeAmbitionMarker(paid, faction, ambition)
+        return { state: declaredNow, continue: C.then(Prelude(faction, suit, pips)) }
+      }
       case 'turn/prelude-charm': {
         const faction = action['faction'] as FactionId
         const suit = action['suit'] as Suit

@@ -138,8 +138,23 @@ panel meaning "the ordinary things you may do on your turn".
 
 ## 3. Content still missing
 
-- **Expansion lore 15-28** — none implemented. Base lore 01-14 are done.
-- **lore30** (Catapult Overdrive, unofficial) — data only.
+- **Expansion lore 19-28** — **done.** The ten ambition-paired cards, all gated on `loreActive`
+  (the card *and* its ambition declared, by anyone). Tests in `test/lore-ambition.test.ts`.
+- **Expansion lore 15-18** — **done.** Not the single group this list assumed: only Raider
+  Exosuits touches the dice. Predictive Sensors is a defender's interrupt before dice collection,
+  and Force Beams and Survival Overrides are Move alts in `guild-actions.ts`. Tests in
+  `test/lore-expansion-15-18.test.ts`.
+- Base lore 01-14 are done.
+- **lore30** (Catapult Overdrive) — data only, and **deliberately not being implemented.** It is
+  fan-made, printed in neither box, and out of scope for finishing the local game.
+
+  Its sibling **lore29** (Guild Loyalty) *is* implemented — it keeps your secured guilds through an
+  outrage, in `outrage.ts`. So the fan-made pair is one card done and one skipped, not two open.
+
+  Both are opt-in separately from the expansion (`unofficialLore`, off by default), so nothing
+  deals lore30 unless it is asked for. **But the New Game checkbox does not say that one of the two
+  does nothing** — ticking "Fan-made lore" can deal a card with no effect and no indication. Either
+  label it or drop lore30 from the pool before anyone plays with the box ticked.
 - Leaders 01-16: **complete** (docs/14 phases 3 and 5).
 
 ## 4. Systems not started

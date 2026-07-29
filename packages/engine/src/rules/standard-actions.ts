@@ -56,6 +56,8 @@ import { hasTrait } from '../leaders.js'
 import {
   ANCIENT_HOLDINGS,
   CLOUD_CITIES,
+  EMPATHS_BOND,
+  TYRANTS_AUTHORITY,
   WARLORDS_CRUELTY,
   GATE_PORTS,
   GATE_STATIONS,
@@ -69,8 +71,11 @@ import {
   abductableSlots,
   altsFor,
   captivesOf,
+  guideLanes,
   guildAlt,
+  martyrPairs,
   rivalAgentsOn,
+  shipsIn,
   tradeGiveOptions,
   tradeTargets,
   weaponReach,
@@ -177,9 +182,11 @@ function canCatapult(
   from: SystemId,
   to: SystemId,
 ): boolean {
+  // Empath's Bond catapults from *any* starport, on the same "like they are Loyal" grant.
+  const anyPort = loreActive(state, faction, EMPATHS_BOND)
   const hasStarport = contentsOf(state.figures, Location.system(from)).some((id) => {
     const f = parseFigureId(id)
-    return f.color === faction && f.piece === 'Starport'
+    return (anyPort || f.color === faction) && f.piece === 'Starport'
   })
   /*
    * Ancient (Shaper, leader14): "You cannot Catapult **move** from starports, but you can
@@ -259,6 +266,205 @@ function offerFleetSize(
     })
   }
   return C.ask(faction, [...options, skip(faction, then)], `Move to ${to} — how many?`)
+}
+
+/**
+ * Force Beams (lore16): "Guide (Move): Move any number of *any* ships (*even if not Loyal*) from a
+ * system with a fresh Loyal starport to an adjacent system, or vice versa, ignoring **move**
+ * modifiers in play areas."
+ *
+ * Two things make it unlike a Move, and both are the point of the card:
+ *
+ * - **The ships need not be yours.** A rival's fleet standing next to your starport can be pushed
+ *   away from it, or dragged into it. `guideLanes` is keyed on the starport, not on the ships.
+ * - **Nothing that keys on moving fires** — not the Gate Ports toll, not Sprinter Drives, not the
+ *   catapult. So this deliberately does *not* go through `performMoveShips`; it puts the ships
+ *   down and stops.
+ *
+ * The publisher's FAQ (cards.buriedgiant.com, ARCS-L16) rules on two of those three directly, and
+ * they turn out to have **different reasons**:
+ *
+ *   > Q: Does this trigger Gate Ports? A: No, since this ignores move modifiers.
+ *   > Q: Can you use Force Beams to do a Catapult Move? A: No, Force Beams is strictly to an
+ *   > adjacent system. It cannot start a Catapult move.
+ *
+ * So the toll is off because it *is* a move modifier, while the catapult is off because Guide is
+ * **strictly one leg to an adjacent system** — a reach limit, not a modifier. Sprinter Drives is
+ * not in the FAQ but is squarely a card in a play area that modifies **move**, so the first
+ * reason covers it.
+ *
+ * The distinction is worth keeping: it means "strictly adjacent" is the load-bearing rule for the
+ * catapult, and a future card that grants extra reach would not sneak past it via the modifier
+ * clause.
+ *
+ * **Disorganized (Rebel) is the modifier this clause is really for.** The leader card sits in your
+ * play area and caps a Move at two ships, and lifting that cap is the card's best-known use. It
+ * falls out here because Guide does not call `movableCount` — but *only* because of that, so it is
+ * asserted by a test rather than left to whoever next edits this function.
+ *
+ * Errata: "in play areas" was added in the second printing. The card art in `assets/images/lore`
+ * carries it, so this engine implements the second-printing text.
+ */
+function offerGuide(state: GameState, faction: FactionId, then: PipReturn): Continue {
+  const options: Action[] = []
+  for (const { from, to } of guideLanes(state, faction)) {
+    const ships = shipsIn(state, from)
+    if (ships.length === 0) continue
+    options.push({
+      type: 'action/guide-pick',
+      faction,
+      from,
+      to,
+      then,
+      label: `Guide ${from} → ${to} (${ships.length} ship${ships.length === 1 ? '' : 's'})`,
+    })
+  }
+  if (options.length === 0) return C.then(then as Action)
+  return C.ask(faction, [...options, skip(faction, then)], 'Guide — along which lane?')
+}
+
+/**
+ * Which ships travel, asked repeatedly until the player stops.
+ *
+ * **A loop, because one Guide may carry a mixed group.** "Move any number of *any* ships" is not
+ * "any number of ships of one colour" — the card's best-known use is pulling some of your own
+ * ships and some of a rival's into the same system together, so that the fight happens at odds you
+ * chose. One pick per colour ends the action; picking, then being asked again along the same lane,
+ * is what makes the group mixed while keeping each question a plain list.
+ *
+ * The lane is fixed by the time this runs, so every leg of the loop travels the same direction.
+ * "Or vice versa" is a choice of lane, not something to re-decide per ship.
+ */
+function offerGuideMore(
+  state: GameState,
+  faction: FactionId,
+  from: SystemId,
+  to: SystemId,
+  then: PipReturn,
+  moved = false,
+): Continue {
+  const ships = shipsIn(state, from)
+  // Nothing left to carry: the lane is empty, so the action is simply over.
+  if (ships.length === 0) return C.then(then as Action)
+
+  const colors = [...new Set(ships.map((id) => parseFigureId(id).color))]
+  const options: Action[] = []
+  for (const color of colors) {
+    const mine = ships.filter((id) => parseFigureId(id).color === color)
+    for (let n = mine.length; n >= 1; n--) {
+      options.push({
+        type: 'action/guide-move',
+        faction,
+        from,
+        to,
+        color,
+        count: n,
+        then,
+        label: `Guide ${n} ${color} ship${n === 1 ? '' : 's'} to ${to}`,
+      })
+    }
+  }
+  // Before anything has moved this is still a free exit; after, it is "that is the whole group".
+  const stop: Action = moved
+    ? { ...(then as Action), faction, label: `Send no more to ${to}` }
+    : skip(faction, then)
+  return C.ask(
+    faction,
+    [...options, stop],
+    `Guide ${from} → ${to} — which ships?${moved ? ' (any more?)' : ''}`,
+  )
+}
+
+function performGuide(
+  state: GameState,
+  faction: FactionId,
+  from: SystemId,
+  to: SystemId,
+  color: string,
+  count: number,
+  then: PipReturn,
+): RuleResult {
+  // Fresh before damaged, matching `fleetAt` — which ships go is not a decision the card asks for.
+  const here = shipsIn(state, from).filter((id) => parseFigureId(id).color === color)
+  const group = [
+    ...here.filter((id) => !state.damaged.includes(id)),
+    ...here.filter((id) => state.damaged.includes(id)),
+  ].slice(0, count)
+  if (group.length === 0) return { state, continue: C.then(then as Action) }
+
+  let figures = state.figures
+  for (const id of group) figures = move(figures, id, Location.system(to))
+  const next: GameState = {
+    ...state,
+    figures,
+    log: [
+      ...state.log,
+      `${faction} guided ${group.length} ${color} ship${group.length === 1 ? '' : 's'} ${from} → ${to} (Force Beams)`,
+    ],
+  }
+  // No catapult, no Sprint, no toll — but the lane stays open, so the group can be mixed.
+  return { state: next, continue: offerGuideMore(next, faction, from, to, then, true) }
+}
+
+/**
+ * Survival Overrides (lore18): "Martyr (Move): Destroy 1 fresh Loyal ship on the map to destroy 1
+ * ship that is not Loyal in its system, taking it as a Trophy. (*Your Loyal ship does not become a
+ * Trophy.*)"
+ *
+ * The parenthetical is the whole subtlety, and it matches how a battle already settles: a piece of
+ * *yours* that dies goes back to your reserve, only an enemy's becomes a trophy. So the martyr
+ * goes home and the victim goes to the trophy pile.
+ *
+ * "Destroy" is unconditional on both sides — a damaged victim is destroyed outright rather than
+ * repaired-then-hit, and a fresh one does not merely become damaged. It is not a battle hit.
+ */
+function offerMartyr(state: GameState, faction: FactionId, then: PipReturn): Continue {
+  const options: Action[] = []
+  for (const { system, martyr, victims } of martyrPairs(state, faction)) {
+    for (const victim of victims) {
+      const v = parseFigureId(victim)
+      options.push({
+        type: 'action/martyr',
+        faction,
+        system,
+        martyr,
+        victim,
+        then,
+        label: `Martyr a ship in ${system} to destroy a ${v.color} ship`,
+      })
+    }
+  }
+  if (options.length === 0) return C.then(then as Action)
+  return C.ask(faction, [...options, skip(faction, then)], 'Martyr — which ship, and whose?')
+}
+
+function performMartyr(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  martyr: string,
+  victim: string,
+  then: PipReturn,
+): RuleResult {
+  const here = contentsOf(state.figures, Location.system(system))
+  // Both must still be standing here: an offer built before some other effect moved them is stale.
+  if (!here.includes(martyr) || !here.includes(victim)) {
+    return { state, continue: C.then(then as Action) }
+  }
+  const v = parseFigureId(victim)
+  let figures = move(state.figures, martyr, Location.reserve(faction))
+  figures = move(figures, victim, Location.trophies(faction))
+  const next: GameState = {
+    ...state,
+    figures,
+    // Neither is on the board any more, so neither can still be damaged.
+    damaged: state.damaged.filter((id) => id !== martyr && id !== victim),
+    log: [
+      ...state.log,
+      `${faction} martyred a ship in ${system} to destroy a ${v.color} Ship (trophy)`,
+    ],
+  }
+  return { state: next, continue: C.then(then as Action) }
 }
 
 /**
@@ -576,6 +782,13 @@ function taxableAt(state: GameState, faction: FactionId, s: SystemId): string[] 
    * simply drops out of the filter below.
    */
   const relentless = loreActive(state, faction, WARLORDS_CRUELTY)
+  /*
+   * Empath's Bond (lore20): "you may **tax** *any* cities ... like they are Loyal." So a rival's
+   * city stops needing the system to be ruled and is taxed on the same terms as your own — which
+   * is what "like they are Loyal" means. The captive it would normally take is suppressed in
+   * `performTaxCity`; the card says "Don't take Captives" out loud.
+   */
+  const bonded = loreActive(state, faction, EMPATHS_BOND)
 
   return contentsOf(state.figures, Location.system(s)).filter((id) => {
     const f = parseFigureId(id)
@@ -588,7 +801,7 @@ function taxableAt(state: GameState, faction: FactionId, s: SystemId): string[] 
       return !hasTrait(state, faction, 'Callow') || ruled
     }
     // Only a rival's — an unowned or Empire city is not a faction and cannot be taxed for a captive.
-    return (ruled || inspired) && state.factions.includes(f.color as FactionId)
+    return (ruled || inspired || bonded) && state.factions.includes(f.color as FactionId)
   })
 }
 
@@ -717,7 +930,10 @@ function performTaxCity(
    * besides securing, and so of Tyrant scoring. A rival with no agents left simply loses nothing.
    */
   let figures = state.figures
-  const owner = cityOwner(state, faction, city)
+  // "Don't take Captives" — the Bond taxes a rival's city without the usual capture.
+  const owner = loreActive(state, faction, EMPATHS_BOND)
+    ? undefined
+    : cityOwner(state, faction, city)
   if (owner !== undefined) {
     const agent = reservePiece(state, owner, 'Agent')
     if (agent === undefined) {
@@ -869,9 +1085,11 @@ function offerBuild(state: GameState, faction: FactionId, then: PipReturn): Cont
     // A Ship may be built at a friendly Starport — but each Starport produces at most one
     // Ship per turn, so they are offered individually and used ones are withheld.
     if (hasShipPiece) {
+      // Empath's Bond builds at *any* starport, not just your own.
+      const anyPort = loreActive(state, faction, EMPATHS_BOND)
       const starports = contentsOf(state.figures, Location.system(s)).filter((id) => {
         const f = parseFigureId(id)
-        return f.color === faction && f.piece === 'Starport'
+        return (anyPort || f.color === faction) && f.piece === 'Starport'
       })
       const available = starports.filter((id) => !state.workedThisTurn.includes(id))
       if (available.length > 0) {
@@ -893,6 +1111,32 @@ function offerBuild(state: GameState, faction: FactionId, then: PipReturn): Cont
           starport: city,
           faction,
           label: `Summon Ship in ${s} (Tool Priests)`,
+        })
+      }
+    }
+
+    /*
+     * Tyrant's Authority (lore26): "Annex (Build): While Tyrant is declared, replace **any** city
+     * or starport you control with a Loyal city or starport, respectively."
+     *
+     * "You control" is ruling the system, and "any" means a rival's — annexing your own would be
+     * a no-op. The replaced piece goes home to its owner's reserve, which is what the card's
+     * "(Cities return to player boards)" says: a returned city goes back onto that player's board,
+     * covering a resource slot again, which `citiesInReserve` already models.
+     *
+     * It is a Build, so it needs a piece of the same kind in your own reserve to put down.
+     */
+    if (loreActive(state, faction, TYRANTS_AUTHORITY) && rules(state, faction, s)) {
+      for (const id of contentsOf(state.figures, Location.system(s))) {
+        const f = parseFigureId(id)
+        if (f.piece !== 'City' && f.piece !== 'Starport') continue
+        if (f.color === faction) continue
+        if (reservePiece(state, faction, f.piece) === undefined) continue
+        options.push({
+          ...BuildPiece(faction, f.piece, s, then),
+          annex: id,
+          faction,
+          label: `Annex ${f.color}'s ${f.piece} in ${s} (Tyrant's Authority)`,
         })
       }
     }
@@ -1020,6 +1264,7 @@ function performBuild(
   starport?: string,
   cloud?: boolean,
   pay?: Resource,
+  annex?: string,
 ): RuleResult {
   const id = reservePiece(state, faction, piece)
   if (id === undefined) {
@@ -1039,7 +1284,27 @@ function performBuild(
     }
     resources = spendToken(resources, token)
   }
-  const figures = move(state.figures, id, Location.system(system))
+  /*
+   * An annexed piece leaves first, so the slot it occupied is free for the replacement. Home to
+   * its owner's reserve — a city returning to that player's board is the card's own wording.
+   */
+  let figures = state.figures
+  const annexLog: string[] = []
+  if (annex !== undefined) {
+    const a = parseFigureId(annex)
+    figures = move(figures, annex, Location.reserve(a.color))
+    annexLog.push(`${faction} annexed ${a.color}'s ${a.piece} in ${system}`)
+  }
+  figures = move(figures, id, Location.system(system))
+
+  /*
+   * "Build ships damaged in Rival-controlled systems." Scoped to the Bond, because it is the
+   * parenthetical on the Bond's own grant — an ordinary build at your own starport is unaffected.
+   */
+  const contested =
+    piece === 'Ship' &&
+    loreActive(state, faction, EMPATHS_BOND) &&
+    state.factions.some((f) => f !== faction && rules(state, f, system))
   // The Starport that produced this Ship is spent for the rest of the turn.
   const workedThisTurn =
     starport === undefined ? state.workedThisTurn : [...state.workedThisTurn, starport]
@@ -1049,12 +1314,14 @@ function performBuild(
       figures,
       resources,
       workedThisTurn,
+      damaged: contested ? [...state.damaged, id] : state.damaged,
       unslotted: cloud === true ? [...state.unslotted, id] : state.unslotted,
       log: [
         ...state.log,
+        ...annexLog,
         cloud === true
           ? `${faction} built a Cloud City in ${system} (paid ${String(pay)})`
-          : `${faction} built a ${piece} in ${system}`,
+          : `${faction} built a ${piece} in ${system}${contested ? ' (damaged — Rival-controlled)' : ''}`,
       ],
     },
     // Ruthless triggers on building a Ship *at a building*, which is what `starport` names —
@@ -2029,6 +2296,12 @@ function offerGuildAlt(
       return { state, continue: offerTax(state, faction, then) }
     case 'prune':
       return { state, continue: offerPrune(state, faction, then) }
+    // Force Beams (lore16) and Survival Overrides (lore18). Both are Move alts and neither is a
+    // move: see their own flows below for what that costs them.
+    case 'guide':
+      return { state, continue: offerGuide(state, faction, then) }
+    case 'martyr':
+      return { state, continue: offerMartyr(state, faction, then) }
     // Galactic Rifles (lore02). The flow lives in the battle module, which owns the dice and the
     // hit assignment it borrows.
     case 'rifles':
@@ -2169,6 +2442,7 @@ export const StandardActionsModule: RuleModule = {
           action['starport'] as string | undefined,
           action['cloud'] as boolean | undefined,
           action['pay'] as Resource | undefined,
+          action['annex'] as string | undefined,
         )
       case 'action/lore-sprint':
         return performSprint(
@@ -2191,6 +2465,36 @@ export const StandardActionsModule: RuleModule = {
           action['faction'] as FactionId,
           action['figure'] as string,
           action['to'] as Piece,
+          action['then'] as PipReturn,
+        )
+      case 'action/guide-pick':
+        return {
+          state,
+          continue: offerGuideMore(
+            state,
+            action['faction'] as FactionId,
+            action['from'] as SystemId,
+            action['to'] as SystemId,
+            action['then'] as PipReturn,
+          ),
+        }
+      case 'action/guide-move':
+        return performGuide(
+          state,
+          action['faction'] as FactionId,
+          action['from'] as SystemId,
+          action['to'] as SystemId,
+          action['color'] as string,
+          action['count'] as number,
+          action['then'] as PipReturn,
+        )
+      case 'action/martyr':
+        return performMartyr(
+          state,
+          action['faction'] as FactionId,
+          action['system'] as SystemId,
+          action['martyr'] as string,
+          action['victim'] as string,
           action['then'] as PipReturn,
         )
       case 'action/guild-alt':

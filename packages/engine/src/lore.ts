@@ -211,6 +211,14 @@ export const SEEKER_TORPEDOES = 'lore14'
 export const RAILGUN_ARRAYS = 'lore12'
 /** Repair Drones: repairs one attacking ship after a battle. */
 export const REPAIR_DRONES = 'lore07'
+/** Predictive Sensors: defending, pulls fresh Loyal ships in from adjacent systems. */
+export const PREDICTIVE_SENSORS = 'lore15'
+/** Force Beams: Guide (Move) carries any ships in or out of a fresh Loyal starport's system. */
+export const FORCE_BEAMS = 'lore16'
+/** Raider Exosuits: attacking, allows one raid die where there are no defending buildings. */
+export const RAIDER_EXOSUITS = 'lore17'
+/** Survival Overrides: Martyr (Move) trades a fresh Loyal ship for a rival's, as a trophy. */
+export const SURVIVAL_OVERRIDES = 'lore18'
 
 /**
  * Does this faction hold `loreId`?

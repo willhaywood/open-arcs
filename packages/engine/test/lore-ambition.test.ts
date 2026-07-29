@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest'
 import {
   Location,
   advance,
+  connectedSystems,
   contentsOf,
   countResource,
   defaultRegistry,
@@ -22,6 +23,7 @@ import {
   loreActive,
   slotsOf,
   startGame,
+  system as systemInfo,
 } from '../src/index.js'
 import type { Ambition, Continue, GameState } from '../src/index.js'
 
@@ -75,6 +77,36 @@ function give(s: GameState, f: 'red' | 'yellow', r: string, n: number): GameStat
   return { ...s, resources: { ...s.resources, contents, at } }
 }
 
+/**
+ * Give several resources at once. `give` empties the slots first, so calling it twice keeps only
+ * the second lot — anything needing a mix has to place them in one pass.
+ */
+function giveMix(s: GameState, f: 'red' | 'yellow', want: Record<string, number>): GameState {
+  const contents = new Map(s.resources.contents)
+  const at = new Map(s.resources.at)
+  for (let i = 0; i < 6; i++) {
+    for (const t of contents.get(`cityslot:${f}:${i}`) ?? []) {
+      const sup = `supply:${t.slice(0, t.indexOf('#'))}`
+      contents.set(sup, [...(contents.get(sup) ?? []), t])
+      at.set(t, sup)
+    }
+    contents.set(`cityslot:${f}:${i}`, [])
+  }
+  let slot = 0
+  for (const [r, n] of Object.entries(want)) {
+    for (let i = 0; i < n; i++) {
+      const sup = `supply:${r}`
+      const token = (contents.get(sup) ?? [])[0]
+      if (token === undefined) break
+      contents.set(sup, (contents.get(sup) ?? []).filter((t) => t !== token))
+      contents.set(`cityslot:${f}:${slot}`, [token])
+      at.set(token, `cityslot:${f}:${slot}`)
+      slot++
+    }
+  }
+  return { ...s, resources: { ...s.resources, contents, at } }
+}
+
 /** Move `n` of `from`'s pieces into red's trophies or captives. */
 function take(
   s: GameState,
@@ -93,6 +125,38 @@ function take(
   for (const g of got) at.set(g, dest)
   return { ...s, figures: { ...s.figures, contents, at } }
 }
+
+/** Put `n` of a colour's pieces into a system, straight from its reserve. */
+function place(s: GameState, color: string, system: string, piece: string, n: number): GameState {
+  const contents = new Map(s.figures.contents)
+  const at = new Map(s.figures.at)
+  const from = `reserve:${color}`
+  const dest = Location.system(system as never)
+  const moved = (contents.get(from) ?? [])
+    .filter((id) => id.startsWith(`${color}/${piece}/`))
+    .slice(0, n)
+  contents.set(from, (contents.get(from) ?? []).filter((id) => !moved.includes(id)))
+  contents.set(dest, [...(contents.get(dest) ?? []), ...moved])
+  for (const id of moved) at.set(id, dest)
+  return { ...s, figures: { ...s.figures, contents, at } }
+}
+
+/** Clear a system so a test owns what stands there. */
+function clear(s: GameState, system: string): GameState {
+  const contents = new Map(s.figures.contents)
+  const at = new Map(s.figures.at)
+  const dest = Location.system(system as never)
+  for (const id of contents.get(dest) ?? []) {
+    const color = id.slice(0, id.indexOf('/'))
+    contents.set(`reserve:${color}`, [...(contents.get(`reserve:${color}`) ?? []), id])
+    at.set(id, `reserve:${color}`)
+  }
+  contents.set(dest, [])
+  return { ...s, figures: { ...s.figures, contents, at } }
+}
+
+const offer = (s: GameState, which: string): Continue =>
+  advance(s, { type: 'action/take', faction: 'red', action: which, then: STOP }, registry).continue
 
 // ---------------------------------------------------------------------------
 
@@ -311,5 +375,277 @@ describe('the outrage-clearing half — five cards, one channel', () => {
 
   it('is not offered when there is no outrage to clear', () => {
     expect(labels(prelude(withLore(fresh(), 'red', 'lore23'))).some((l) => /Cruelty/.test(l))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe("Tycoon's Ambition (lore27)", () => {
+  /*
+   * "Prelude: While Tycoon is declared, before taking any other actions, you may discard all of
+   * your Material and Fuel to declare exactly 1 undeclared ambition. Do not place the zero
+   * marker."
+   */
+  const setup = (): GameState =>
+    give(declared(withLore(fresh(), 'red', 'lore27'), 'Tycoon'), 'red', 'Material', 2)
+
+  it('offers one option per undeclared ambition, and none for Tycoon itself', () => {
+    const s = setup()
+    const offered = labels(prelude(s)).filter((l) => l.startsWith("Tycoon's Ambition"))
+    expect(offered.length).toBeGreaterThan(0)
+    expect(offered.some((l) => l.endsWith('Tycoon'))).toBe(false)
+    for (const a of s.ambitions) {
+      if (s.declared.some((d) => d.ambition === a)) continue
+      expect(offered.some((l) => l.endsWith(a))).toBe(true)
+    }
+  })
+
+  it('is not offered without Tycoon declared, nor without the card', () => {
+    const noAmbition = give(withLore(fresh(), 'red', 'lore27'), 'red', 'Material', 2)
+    expect(labels(prelude(noAmbition)).some((l) => l.startsWith("Tycoon's"))).toBe(false)
+    const noCard = give(declared(fresh(), 'Tycoon'), 'red', 'Material', 2)
+    expect(labels(prelude(noCard)).some((l) => l.startsWith("Tycoon's"))).toBe(false)
+  })
+
+  it('is not offered holding neither Material nor Fuel', () => {
+    const empty = give(declared(withLore(fresh(), 'red', 'lore27'), 'Tycoon'), 'red', 'Relic', 2)
+    expect(labels(prelude(empty)).some((l) => l.startsWith("Tycoon's Ambition"))).toBe(false)
+  })
+
+  it('discards ALL Material and Fuel, not just one, and declares the ambition', () => {
+    const mixed = giveMix(declared(withLore(fresh(), 'red', 'lore27'), 'Tycoon'), 'red', {
+      Material: 2,
+      Fuel: 1,
+    })
+    const held = (g: GameState, r: string): number =>
+      countResource(g.resources, slotsOf(g, 'red'), r as never)
+    expect(held(mixed, 'Material')).toBe(2)
+    expect(held(mixed, 'Fuel')).toBe(1)
+
+    const act = ask(prelude(mixed)).actions.find((a) =>
+      String(a['label']).startsWith("Tycoon's Ambition"),
+    )!
+    const after = advance(mixed, act, registry).state
+    expect(held(after, 'Material')).toBe(0)
+    expect(held(after, 'Fuel')).toBe(0)
+    expect(after.declared.map((d) => d.ambition)).toContain(act['ambition'])
+  })
+
+  it('does NOT zero the played card — that is the whole point of the card', () => {
+    // Needs a real lead to be worth anything: `zeroed` on an absent lead would pass vacuously.
+    const led: GameState = {
+      ...setup(),
+      lead: {
+        faction: 'red',
+        cardId: '5-Construction',
+        suit: 'Construction',
+        strength: 5,
+        pips: 1,
+        zeroed: false,
+      },
+    }
+    const act = ask(prelude(led)).actions.find((a) => a.type === 'turn/prelude-tycoon')!
+    const after = advance(led, act, registry).state
+    expect(after.lead).toBeDefined()
+    expect(after.lead?.zeroed).toBe(false)
+    // The marker was still taken — this is a real declaration, just an unzeroed one.
+    expect(after.declared.map((d) => d.ambition)).toContain(act['ambition'])
+  })
+
+  it('declares once — the ambition it took is gone from the menu on return', () => {
+    // A Relic is held back so the Prelude still has something to show; discarding all Material
+    // and Fuel otherwise empties the menu and the Prelude hands straight on to the pips.
+    const s = giveMix(declared(withLore(fresh(), 'red', 'lore27'), 'Tycoon'), 'red', {
+      Material: 1,
+      Relic: 1,
+    })
+    const first = ask(prelude(s)).actions.find((a) => a.type === 'turn/prelude-tycoon')!
+    const back = advance(s, first, registry)
+    // Still in the Prelude — the Relic survived the discard, so the menu has not emptied.
+    expect(ask(back.continue).actions.some((a) => a.type === 'turn/prelude-done')).toBe(true)
+    const still = labels(back.continue)
+    expect(still).not.toContain(String(first['label']))
+    // And no Tycoon offer at all now, since the Material that paid for it is gone.
+    expect(still.some((l) => l.startsWith("Tycoon's Ambition"))).toBe(false)
+  })
+})
+
+describe("Tyrant's Authority (lore26)", () => {
+  /*
+   * "Annex (Build): While Tyrant is declared, replace any city or starport you control with a
+   * Loyal city or starport, respectively. (Cities return to player boards.)"
+   */
+  /** A system red rules outright, holding one of yellow's buildings. */
+  const annexable = (
+    kind: 'City' | 'Starport',
+    lore = 'lore26',
+    ambition: Ambition = 'Tyrant',
+  ): { s: GameState; system: string } => {
+    const base = fresh()
+    const system = base.board.systems[0]!
+    const staged = place(place(clear(base, system), 'yellow', system, kind, 1), 'red', system, 'Ship', 3)
+    return { s: declared(withLore(staged, 'red', lore), ambition), system }
+  }
+
+  it("annexes a rival's city, and offers nothing for your own pieces", () => {
+    const { s, system } = annexable('City')
+    const offered = labels(offer(s, 'Build')).filter((l) => l.startsWith('Annex'))
+    expect(offered).toEqual([`Annex yellow's City in ${system} (Tyrant's Authority)`])
+  })
+
+  it('replaces the piece: theirs goes home, yours takes its place', () => {
+    const { s, system } = annexable('City')
+    const act = ask(offer(s, 'Build')).actions.find((a) => a['annex'] !== undefined)!
+    const after = advance(s, act, registry).state
+    const here = contentsOf(after.figures, Location.system(system as never))
+    expect(here.some((f) => f.startsWith('yellow/City/'))).toBe(false)
+    expect(here.filter((f) => f.startsWith('red/City/')).length).toBe(1)
+    // "Cities return to player boards" — back in yellow's reserve, not destroyed.
+    expect(contentsOf(after.figures, `reserve:yellow`).some((f) => f.startsWith('yellow/City/'))).toBe(
+      true,
+    )
+  })
+
+  it('replaces like for like — a Starport becomes a Starport', () => {
+    const { s, system } = annexable('Starport')
+    const act = ask(offer(s, 'Build')).actions.find((a) => a['annex'] !== undefined)!
+    expect(act['piece']).toBe('Starport')
+    const after = advance(s, act, registry).state
+    const here = contentsOf(after.figures, Location.system(system as never))
+    expect(here.filter((f) => f.startsWith('red/Starport/')).length).toBe(1)
+    expect(here.some((f) => f.startsWith('yellow/Starport/'))).toBe(false)
+  })
+
+  it('is not offered without Tyrant declared, nor without the card', () => {
+    const noAmbition = annexable('City', 'lore26', 'Empath')
+    expect(labels(offer(noAmbition.s, 'Build')).some((l) => l.startsWith('Annex'))).toBe(false)
+    const noCard = annexable('City', 'lore01')
+    expect(labels(offer(noCard.s, 'Build')).some((l) => l.startsWith('Annex'))).toBe(false)
+  })
+
+  it('is not offered in a system you do not rule', () => {
+    const base = fresh()
+    const system = base.board.systems[0]!
+    // Yellow's city plus enough yellow ships that red is present but does not rule.
+    const staged = place(
+      place(place(clear(base, system), 'yellow', system, 'City', 1), 'yellow', system, 'Ship', 4),
+      'red',
+      system,
+      'Ship',
+      1,
+    )
+    const s = declared(withLore(staged, 'red', 'lore26'), 'Tyrant')
+    expect(labels(offer(s, 'Build')).some((l) => l.startsWith('Annex'))).toBe(false)
+  })
+})
+
+describe("Empath's Bond (lore20)", () => {
+  /*
+   * "While Empath is declared, you may tax any cities, and build ships and Catapult move with any
+   * starports, like they are Loyal. (Don't take Captives. Build ships damaged in Rival-controlled
+   * systems.)"
+   */
+  /** Yellow's building in a system red is merely present in — not ruling. */
+  const rivalHeld = (
+    kind: 'City' | 'Starport',
+    lore = 'lore20',
+    ambition: Ambition = 'Empath',
+  ): { s: GameState; system: string } => {
+    const base = fresh()
+    const system = base.board.systems[0]!
+    const staged = place(
+      place(place(clear(base, system), 'yellow', system, kind, 1), 'yellow', system, 'Ship', 4),
+      'red',
+      system,
+      'Ship',
+      1,
+    )
+    return { s: declared(withLore(staged, 'red', lore), ambition), system }
+  }
+
+  it("taxes a rival's city in a system you do not rule", () => {
+    const { s, system } = rivalHeld('City')
+    expect(labels(offer(s, 'Tax')).some((l) => l.includes(system))).toBe(true)
+    const off = rivalHeld('City', 'lore20', 'Tyrant')
+    expect(labels(offer(off.s, 'Tax')).some((l) => l.includes(system))).toBe(false)
+  })
+
+  it('takes no Captive when it does — the card says so out loud', () => {
+    const { s } = rivalHeld('City')
+    const act = ask(offer(s, 'Tax')).actions.find((a) => a.type === 'action/tax-city')!
+    const after = advance(s, act, registry).state
+    expect(contentsOf(after.figures, Location.captives('red')).length).toBe(
+      contentsOf(s.figures, Location.captives('red')).length,
+    )
+  })
+
+  it("builds a ship at a rival's starport", () => {
+    const { s, system } = rivalHeld('Starport')
+    expect(labels(offer(s, 'Build'))).toContain(`Build Ship in ${system}`)
+    const off = rivalHeld('Starport', 'lore20', 'Tyrant')
+    expect(labels(offer(off.s, 'Build'))).not.toContain(`Build Ship in ${system}`)
+  })
+
+  it('and that ship arrives damaged, because a Rival controls the system', () => {
+    const { s, system } = rivalHeld('Starport')
+    const act = ask(offer(s, 'Build')).actions.find(
+      (a) => a.type === 'action/build' && a['piece'] === 'Ship',
+    )!
+    const after = advance(s, act, registry).state
+    const fresh_ = contentsOf(after.figures, Location.system(system as never)).filter((f) =>
+      f.startsWith('red/Ship/'),
+    )
+    expect(fresh_.some((f) => after.damaged.includes(f))).toBe(true)
+  })
+
+  it("Catapult moves out of a rival's starport", () => {
+    const base = fresh()
+    // A non-gate system next to a gate, cleared so only what this test places stands there.
+    const from = base.board.systems.find(
+      (id) =>
+        !systemInfo(id).isGate &&
+        connectedSystems(base.board, id).some((n) => systemInfo(n).isGate),
+    )!
+    const to = connectedSystems(base.board, from).find((id) => systemInfo(id).isGate)!
+    const staged = place(
+      place(clear(clear(base, from), to), 'yellow', from, 'Starport', 1),
+      'red',
+      from,
+      'Ship',
+      2,
+    )
+    // No red starport here — the catapult can only be the Bond's doing.
+    expect(
+      contentsOf(staged.figures, Location.system(from)).some((f) => f.startsWith('red/Starport/')),
+    ).toBe(false)
+
+    const catapults = (g: GameState): boolean =>
+      labels(offer(g, 'Move')).includes(`Move ${from} → ${to} (2 ships) — and further`)
+
+    expect(catapults(declared(withLore(staged, 'red', 'lore20'), 'Empath'))).toBe(true)
+    // Without the ambition it is an ordinary move, no catapult.
+    expect(catapults(declared(withLore(staged, 'red', 'lore20'), 'Tyrant'))).toBe(false)
+  })
+
+  it('builds undamaged where no Rival controls the system', () => {
+    const base = fresh()
+    const system = base.board.systems[0]!
+    // Red rules it, and the starport it builds from is yellow's.
+    const staged = place(
+      place(place(clear(base, system), 'yellow', system, 'Starport', 1), 'red', system, 'Ship', 4),
+      'red',
+      system,
+      'City',
+      1,
+    )
+    const s = declared(withLore(staged, 'red', 'lore20'), 'Empath')
+    const act = ask(offer(s, 'Build')).actions.find(
+      (a) => a.type === 'action/build' && a['piece'] === 'Ship' && a['starport'] !== undefined,
+    )!
+    const after = advance(s, act, registry).state
+    const ships = contentsOf(after.figures, Location.system(system as never)).filter((f) =>
+      f.startsWith('red/Ship/'),
+    )
+    expect(ships.every((f) => !after.damaged.includes(f))).toBe(true)
   })
 })
