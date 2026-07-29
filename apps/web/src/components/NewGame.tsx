@@ -60,7 +60,6 @@ export function NewGame(): JSX.Element {
   // --- Leaders and Lore ---
   const [leaders, setLeaders] = useState(false)
   const [expansion, setExpansion] = useState(false)
-  const [unofficial, setUnofficial] = useState(false)
   const [lorePer, setLorePer] = useState(1)
 
   const byName = new Map(boardsFor(players).map((b) => [b.name, b]))
@@ -70,7 +69,7 @@ export function NewGame(): JSX.Element {
    * 4 players needs 17 at x4. Rather than offer a combination that would run the deck dry when
    * it came to deal, the cap is derived from the pool actually selected (docs/14 section 4).
    */
-  const loreCap = maxLorePerPlayer(players, lorePool(expansion, unofficial).length)
+  const loreCap = maxLorePerPlayer(players, lorePool(expansion).length)
   const lorePerPlayer = Math.min(lorePer, loreCap)
 
   function deal(n: number): void {
@@ -92,7 +91,7 @@ export function NewGame(): JSX.Element {
       seed,
       // Omitted entirely for a base game, so the option's absence is what turns it off.
       ...(leaders
-        ? { leadersAndLore: { expansion, unofficialLore: unofficial, lorePerPlayer } }
+        ? { leadersAndLore: { expansion, lorePerPlayer } }
         : {}),
     })
   }
@@ -177,7 +176,7 @@ export function NewGame(): JSX.Element {
             Variant
             <em className="ng-hint">
               {leaders
-                ? `${leaderPool(expansion).length} leaders · ${lorePool(expansion, unofficial).length} lore`
+                ? `${leaderPool(expansion).length} leaders · ${lorePool(expansion).length} lore`
                 : 'base game'}
             </em>
           </span>
@@ -211,19 +210,12 @@ export function NewGame(): JSX.Element {
 
           {leaders ? (
             <div className="ng-sub">
-
-              <label className="ng-check">
-                <input
-                  type="checkbox"
-                  checked={unofficial}
-                  disabled={revealed}
-                  onChange={(e) => setUnofficial(e.target.checked)}
-                />
-                <span>
-                  Fan-made lore <em>2 cards in neither box</em>
-                </span>
-              </label>
-
+              {/*
+               * No "fan-made lore" opt-in. It offered the two cards printed in neither box, and
+               * one of them (Catapult Overdrive, lore30) has no implementation — ticking the box
+               * could deal a card that silently did nothing. The engine still honours
+               * `unofficialLore` so old saves replay, but nothing sets it.
+               */}
               <div className="ng-lore-count">
                 <span className="ng-sub-label">Lore each</span>
                 <div className="seg">

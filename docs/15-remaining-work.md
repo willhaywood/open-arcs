@@ -158,16 +158,17 @@ panel meaning "the ordinary things you may do on your turn".
   and Force Beams and Survival Overrides are Move alts in `guild-actions.ts`. Tests in
   `test/lore-expansion-15-18.test.ts`.
 - Base lore 01-14 are done.
-- **lore30** (Catapult Overdrive) — data only, and **deliberately not being implemented.** It is
-  fan-made, printed in neither box, and out of scope for finishing the local game.
+- **The two fan-made cards are out of scope, and no longer reachable.** lore30 (Catapult Overdrive)
+  was never implemented; lore29 (Guild Loyalty) *is* implemented, in `outrage.ts`. The New Game
+  screen's "Fan-made lore" checkbox has been removed rather than labelled, because a box that can
+  deal a card doing nothing is worse than no box.
 
-  Its sibling **lore29** (Guild Loyalty) *is* implemented — it keeps your secured guilds through an
-  outrage, in `outrage.ts`. So the fan-made pair is one card done and one skipped, not two open.
+  **This retires lore29 along with lore30** — it works, but it is a card printed in neither box and
+  there is no way to ask for one without the other. Its implementation and tests stay in place.
 
-  Both are opt-in separately from the expansion (`unofficialLore`, off by default), so nothing
-  deals lore30 unless it is asked for. **But the New Game checkbox does not say that one of the two
-  does nothing** — ticking "Fan-made lore" can deal a card with no effect and no indication. Either
-  label it or drop lore30 from the pool before anyone plays with the box ticked.
+  The engine keeps `unofficialLore` and the `unofficial` set on both cards, so a save written while
+  the box existed still replays exactly. Nothing sets the flag now. Reinstating the option means
+  implementing lore30 and putting the checkbox back.
 - Leaders 01-16: **complete** (docs/14 phases 3 and 5).
 
 ## 4. Systems not started

@@ -2895,29 +2895,7 @@ button {
 }
 
 /* --- variant options (leaders and lore) on the start screen --------------- */
-.ng-check {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text);
-}
-.ng-check input {
-  accent-color: var(--gold);
-  cursor: pointer;
-}
-.ng-check em {
-  color: var(--muted);
-  font-style: normal;
-  font-size: 11px;
-  margin-left: 6px;
-}
-.ng-check input:disabled,
-.ng-check input:disabled + span {
-  opacity: 0.45;
-  cursor: default;
-}
+/* `.ng-check` lived here for the fan-made-lore checkbox and went with it. */
 /* The sub-options only exist while the variant is on, so they are indented under it. */
 .ng-sub {
   display: flex;
