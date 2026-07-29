@@ -47,10 +47,28 @@ export function Battle({ state, cont }: Props): JSX.Element | null {
   // Resolution: the dice are rolled and hits are being placed. Assignment always ends on a
   // `battle/finish` confirm, so one of these two is present for the whole of it.
   const ctx = (hitOpts[0] ?? done)?.['ctx'] as Parameters<typeof DamageAssign>[0]['ctx'] | undefined
-  if (state.lastRoll !== undefined && ctx !== undefined) {
+  if (ctx !== undefined) {
+    /*
+     * A `ctx` is enough on its own; requiring `state.lastRoll` too used to deadlock the game.
+     *
+     * The Railgun Arrays volley (lore12) assigns a hit *before* the attacker collects dice, so
+     * `lastRoll` is undefined at that point — this branch fell through, no other branch matched,
+     * and `battle/hit` is hidden from the action panel because this window is supposed to own it.
+     * The result was an ask with nothing anywhere on screen able to answer it.
+     *
+     * The volley is also passed **no** roll rather than whatever `lastRoll` still holds: on any
+     * battle after the first that is the *previous* battle's dice, and showing those would be a
+     * worse bug than showing none.
+     */
     return (
       <Shell system={ctx.system} faction={ctx.faction} enemy={ctx.enemy}>
-        <DamageAssign state={state} ctx={ctx} hits={hitOpts} done={done} lastRoll={state.lastRoll} />
+        <DamageAssign
+          state={state}
+          ctx={ctx}
+          hits={hitOpts}
+          done={done}
+          lastRoll={ctx.railgun === true ? undefined : state.lastRoll}
+        />
       </Shell>
     )
   }

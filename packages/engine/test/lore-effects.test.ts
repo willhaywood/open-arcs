@@ -487,6 +487,33 @@ describe('Railgun Arrays (lore12) — a hit before the attacker collects dice', 
     expect(c.actions.every((a) => String(a['label']).includes('red Ship'))).toBe(true)
   })
 
+  /*
+   * The volley's ask is the *only* hit assignment in the game that happens with no dice on the
+   * table, and the battle window deadlocked on exactly that: it required `state.lastRoll` before
+   * it would draw an assignment, `battle/hit` is hidden from the action panel because the window
+   * owns it, and so nothing anywhere could answer the ask.
+   *
+   * Asserted here rather than in the UI because it is the engine's half of that contract: the ask
+   * carries everything needed to draw it, and `railgun` is how a caller knows there are no dice
+   * to show — on any battle after the first, `lastRoll` still holds the *previous* battle's dice.
+   */
+  it('carries a ctx and no roll, so the window must not demand dice', () => {
+    const { state, system } = field(withLore(fresh(), 'yellow', 'lore12'))
+    const r = advance(
+      state,
+      { type: 'battle/target', faction: 'red', system, enemy: 'yellow', then: STOP },
+      registry,
+    )
+    const carrier = ask(r.continue).actions.find((a) => a['ctx'] !== undefined)
+    expect(carrier).toBeDefined()
+    const ctx = carrier!['ctx'] as Record<string, unknown>
+    expect(ctx['railgun']).toBe(true)
+    expect(ctx['self']).toBe(1)
+    expect(ctx['system']).toBe(system)
+    // No dice have been collected yet, which is the whole point of the card.
+    expect(r.state.lastRoll).toBeUndefined()
+  })
+
   it('does not fire when every defending ship is already damaged', () => {
     const base = field(withLore(fresh(), 'yellow', 'lore12'))
     const hurt = damage(base.state, 'yellow', base.system, 'Ship', 2)

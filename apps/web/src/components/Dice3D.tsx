@@ -109,10 +109,17 @@ const watched = new Set<string>()
  * same faces — see `watched`.
  */
 export function useRoll(
-  lastRoll: NonNullable<GameState['lastRoll']>,
+  lastRoll: GameState['lastRoll'],
   instance: string,
-): { rolling: boolean; row: JSX.Element } {
-  const dice = lastRoll.dice
+): { rolling: boolean; row: JSX.Element | null } {
+  /*
+   * No roll at all is a real case, not a guard against a bug: the Railgun Arrays volley assigns
+   * its hit *before* the attacker collects dice. There is nothing to tumble, so there must be
+   * nothing to wait for either — reporting `rolling` here would hide the assignment behind an
+   * animation that never arrives.
+   */
+  const dice = useMemo(() => lastRoll?.dice ?? [], [lastRoll])
+  const noDice = dice.length === 0
   const signature = useMemo(
     () => `${instance}|${dice.map((d) => `${d.die}${d.face}`).join(',')}`,
     [dice, instance],
@@ -121,10 +128,10 @@ export function useRoll(
   // Start settled for a roll already watched, so there is no frame of un-armed dice before the
   // effect can catch it. `armed` otherwise flips a frame after mount so the cubes transition
   // from their start tilt to the settled face; `rolling` clears when that motion ends.
-  const [armed, setArmed] = useState(() => watched.has(signature))
-  const [rolling, setRolling] = useState(() => !watched.has(signature))
+  const [armed, setArmed] = useState(() => noDice || watched.has(signature))
+  const [rolling, setRolling] = useState(() => !noDice && !watched.has(signature))
   useEffect(() => {
-    if (watched.has(signature)) {
+    if (noDice || watched.has(signature)) {
       setArmed(true)
       setRolling(false)
       return
@@ -140,9 +147,9 @@ export function useRoll(
       cancelAnimationFrame(raf)
       clearTimeout(stop)
     }
-  }, [signature])
+  }, [signature, noDice])
 
-  const row = (
+  const row = noDice ? null : (
     <div className="bt-result three-d">
       {dice.map((d, i) => (
         <Die3D key={i} die={d.die as DieType} face={d.face} index={i} armed={armed} />

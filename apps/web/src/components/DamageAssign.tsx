@@ -40,6 +40,8 @@ interface Ctx {
   buildings: number
   keys: number
   intercepted?: number
+  /** Set for the Railgun Arrays volley, which lands its hit *before* any dice are collected. */
+  railgun?: boolean
 }
 
 interface RosterPiece {
@@ -112,7 +114,7 @@ export function DamageAssign({
   ctx: Ctx
   hits: readonly Action[]
   done: Action | undefined
-  lastRoll: NonNullable<GameState['lastRoll']>
+  lastRoll: GameState['lastRoll']
 }): JSX.Element {
   const placed = hitsThisBattle(state.journal)
   /*
@@ -122,6 +124,12 @@ export function DamageAssign({
    * since journal and hit count move together.
    */
   const rollAt = state.journal.length - placed.length - 1
+  /*
+   * `lastRoll` is absent for the Railgun Arrays volley — it strikes before the attacker collects
+   * dice, so there is no roll to show and `rollAt` points at the `battle/target` entry instead.
+   * `useRoll` renders nothing and reports settled immediately in that case, so the assignment is
+   * usable rather than waiting on a tumble that will never come.
+   */
   const { rolling, row } = useRoll(lastRoll, String(rollAt))
   const mine = rosterFor(state, ctx.system, ctx.faction, placed)
   const theirs = rosterFor(state, ctx.system, ctx.enemy, placed)
@@ -167,6 +175,11 @@ export function DamageAssign({
             {chip('Buildings', ctx.buildings)}
             {chip('Keys', ctx.keys)}
           </div>
+          {ctx.railgun === true ? (
+            <div className="da-note">
+              Railgun Arrays — {ctx.enemy} strikes first, before you collect any dice.
+            </div>
+          ) : null}
           {(ctx.intercepted ?? 0) > 0 ? (
             <div className="da-note">
               Intercepted — {ctx.intercepted} of those self-hits are {ctx.enemy} striking back.
