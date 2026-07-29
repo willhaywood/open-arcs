@@ -50,7 +50,7 @@ already built and generalise:
 | S1 | `CardShelf` | generalise from `RaidModal` | pick a card, with its text readable |
 | ~~S2~~ | `PreludeScreen` | **done** for the Prelude | pick a resource token |
 | S3 | Map targeting | extend existing click-the-map | pick a system or a piece |
-| S4 | `DiceTray` | extend `Dice3D` | pick which dice to reroll |
+| ~~S4~~ | `DiceTray` | **done** | pick which dice to reroll |
 | ~~S5~~ | `SlotBoard` | **done** | arrange tokens across your slots |
 | S6 | Confirm strip | new, small | a genuine yes/no |
 
@@ -103,12 +103,24 @@ Move and Battle already resolve by clicking the map (docs/10 §"Moving by clicki
 - Mass Uprising: choose a cluster — wants cluster highlighting, which nothing draws yet
 - Catapult continuation, Sprinter Drives, "how many ships?"
 
-### S4 — `DiceTray`: rerolls
+### ~~S4~~ — `DiceTray`: rerolls — **built**
 
-Three abilities reroll — Skirmishers (bc13), Seeker Torpedoes (lore14), Tricky (leader11) — and
-all three are offered as text: `Reroll 2 raid dice (2 keys, building)`. The dice are *right
-there*, drawn by `Dice3D` with the real face art. The reroll should be picking dice off the tray,
-with the rest greyed, since the choice is a **set** taken at once.
+Four abilities reroll — Skirmishers (bc13), Seeker Torpedoes (lore14), Tricky (leader11) and
+Empath's Vision (lore19). All four were offered as text in the action panel while the battle
+window drew *nothing*: a reroll ask carries no `battle/hit` or `battle/finish`, so `ctx` was
+undefined and every branch of `Battle.tsx` fell through. You picked "Reroll 2 dice (3, 5)" from a
+list with the dice themselves nowhere on screen, and never saw what came back.
+
+`RerollTray` draws the rolled dice and lets them be clicked, with dice the source may not touch
+shown locked rather than hidden — Seeker Torpedoes rerolls assault dice only, and the greyed
+skirmish dice beside them are what makes that legible.
+
+One thing worth knowing before touching it: **the engine enumerates reroll options by the faces
+they take, not by which physical die.** `offerReroll` dedupes on the sorted face list, so the tray
+maps a selection to an action by matching faces. Clicking either of two 4s reaches the same
+action, which is correct rather than a shortcut. The eligible set and the limit are both read off
+the offered options rather than re-derived from the card, so the tray cannot disagree with the
+engine about what is allowed.
 
 ### ~~S5~~ — `SlotBoard`: rearranging — **built**
 
@@ -131,8 +143,9 @@ panel meaning "the ordinary things you may do on your turn".
 
 1. ~~S5 + the section 1 engine work.~~ **Done.**
 2. ~~S2 for the Prelude.~~ **Done** — and it carries the arrange door, so the two landed together.
-3. **S1.** Largest group, and `RaidModal` has already proven the pattern.
-4. **S4**, then **S3**, then **S6**, plus the small token picker S2 left behind.
+3. ~~S4 — the reroll tray.~~ **Done.**
+4. **S1.** Largest group, and `RaidModal` has already proven the pattern.
+5. **S3**, then **S6**, plus the small token picker S2 left behind.
 
 ---
 

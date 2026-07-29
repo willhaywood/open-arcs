@@ -2397,6 +2397,39 @@ button {
 .cube .face.bottom {
   transform: rotateX(-90deg) translateZ(27px);
 }
+/* --- reroll tray: the rolled dice, clickable ------------------------------ */
+
+/* The dice are buttons here, so the cube needs a bare frame to sit in. */
+.rr-die {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+.rr-die:hover:not(.locked) {
+  border-color: rgba(201, 169, 97, 0.45);
+  background: rgba(201, 169, 97, 0.07);
+}
+/* Chosen dice lift toward the viewer — "these are the ones going back in the cup". */
+.rr-die.on {
+  border-color: var(--gold);
+  background: rgba(201, 169, 97, 0.14);
+  transform: translateY(-4px);
+}
+/* Not merely disabled: this source is not allowed to touch these, and that has to read at a
+   glance next to the ones it can. */
+.rr-die.locked {
+  cursor: default;
+  opacity: 0.3;
+  filter: grayscale(0.8);
+}
+/* The tray sits closer than a result row — nothing follows it but the chips and the buttons. */
+.bt-result.three-d.rr-tray {
+  padding-bottom: 10px;
+}
+
 .bt-tally {
   display: flex;
   flex-wrap: wrap;

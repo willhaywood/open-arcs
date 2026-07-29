@@ -12,6 +12,8 @@
  *   - `battle/target` on offer  — pick which enemy colour to attack (only when a system holds
  *     more than one, so the fleets are not shown yet: there is no single opponent to lay out);
  *   - `battle/roll` on offer    — gather the dice pool;
+ *   - `battle/reroll` on offer  — Skirmishers, Seeker Torpedoes, Tricky and Empath's Vision:
+ *     pick which of the dice just rolled go back in the cup;
  *   - `state.lastRoll` set      — the roll, then hit assignment (`DamageAssign.tsx`).
  *
  * `state.lastRoll` is a view of the seeded roll the engine already made; the animation is purely
@@ -25,6 +27,7 @@ import { dieArt } from '../dice-art.js'
 import { store } from '../store.js'
 import { colorOf, textOn } from '../theme.js'
 import { DamageAssign, Forces } from './DamageAssign.js'
+import { Die3D } from './Dice3D.js'
 
 const DICE: readonly DieType[] = ['Skirmish', 'Assault', 'Raid']
 
@@ -48,6 +51,29 @@ export function Battle({ state, cont }: Props): JSX.Element | null {
     return (
       <Shell system={ctx.system} faction={ctx.faction} enemy={ctx.enemy}>
         <DamageAssign state={state} ctx={ctx} hits={hitOpts} done={done} lastRoll={state.lastRoll} />
+      </Shell>
+    )
+  }
+
+  /*
+   * A reroll is a decision *about dice that are already on the table*, so it has to show them.
+   * It used to fall through every branch here and render nothing, leaving the choice as a list of
+   * "Reroll 2 dice (3, 5)" buttons in the action panel with the dice themselves nowhere on screen
+   * — you could not see what you were rerolling away, nor what you got back.
+   *
+   * It comes before the resolution branch because a reroll ask carries no `battle/hit` or
+   * `battle/finish`, so `ctx` is undefined and that branch cannot draw it either.
+   */
+  const rerollOpts = actions.filter((a) => a.type === 'battle/reroll')
+  if (rerollOpts.length > 0) {
+    const first = rerollOpts[0]!
+    return (
+      <Shell
+        system={String(first['system'])}
+        faction={String(first['faction'])}
+        enemy={String(first['enemy'])}
+      >
+        <RerollTray options={rerollOpts} prompt={cont.kind === 'ask' ? cont.prompt : undefined} />
       </Shell>
     )
   }
@@ -121,6 +147,121 @@ function Swatch({ color }: { color: string }): JSX.Element {
 }
 
 // --- gather ----------------------------------------------------------------
+
+/**
+ * Pick which dice go back in the cup.
+ *
+ * **The engine enumerates reroll options by the *faces* they take, not by which physical die.**
+ * `offerReroll` dedupes on the sorted face list, so rerolling "the 3 and the 5" is one option no
+ * matter which two dice show a 3 and a 5. This tray therefore lets you click dice, then looks up
+ * the option whose faces match the selection — clicking either of two 4s reaches the same action,
+ * which is correct rather than a shortcut.
+ *
+ * Dice this source cannot touch are shown but locked: Seeker Torpedoes rerolls assault dice only,
+ * and seeing the skirmish dice sitting there greyed is what makes that legible. The eligible set
+ * is read off the options rather than re-derived from the card, so the tray cannot disagree with
+ * the engine about what is allowed.
+ */
+function RerollTray({
+  options,
+  prompt,
+}: {
+  options: readonly Action[]
+  prompt: string | undefined
+}): JSX.Element {
+  const dice = (options[0]?.['rolls'] ?? []) as readonly { die: DieType; face: number }[]
+  const source = String(options[0]?.['source'] ?? 'Reroll')
+
+  // Which dice any option is willing to take, and the most that may go at once.
+  const { eligible, limit } = useMemo(() => {
+    const set = new Set<number>()
+    let max = 0
+    for (const o of options) {
+      const idx = (o['indices'] ?? []) as readonly number[]
+      for (const i of idx) set.add(i)
+      max = Math.max(max, idx.length)
+    }
+    return { eligible: set, limit: max }
+  }, [options])
+
+  const [picked, setPicked] = useState<readonly number[]>([])
+
+  const facesOf = (idx: readonly number[]): string =>
+    idx
+      .map((i) => dice[i]?.face ?? 0)
+      .sort((a, b) => a - b)
+      .join(',')
+
+  // The action matching the current selection — the "keep" option is simply the empty one.
+  const chosen = useMemo(() => {
+    const want = facesOf(picked)
+    return options.find((o) => facesOf((o['indices'] ?? []) as readonly number[]) === want)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options, picked, dice])
+
+  function toggle(i: number): void {
+    if (!eligible.has(i)) return
+    setPicked((cur) => {
+      if (cur.includes(i)) return cur.filter((x) => x !== i)
+      if (cur.length >= limit) return cur
+      return [...cur, i]
+    })
+  }
+
+  return (
+    <>
+      <div className="da-prompt">{prompt ?? `${source} — choose dice to reroll`}</div>
+      <div className="bt-result three-d rr-tray">
+        {dice.map((d, i) => {
+          const locked = !eligible.has(i)
+          const on = picked.includes(i)
+          return (
+            <button
+              key={i}
+              type="button"
+              className={`rr-die${on ? ' on' : ''}${locked ? ' locked' : ''}`}
+              onClick={() => toggle(i)}
+              disabled={locked}
+              title={locked ? `${d.die} — ${source} cannot reroll this` : `${d.die} — showing ${d.face}`}
+            >
+              <Die3D die={d.die} face={d.face} index={i} armed />
+            </button>
+          )
+        })}
+      </div>
+      <div className="bt-tally">
+        <span className="bt-chip">
+          <strong>{source}</strong>
+        </span>
+        <span className="bt-chip">
+          up to <strong>{limit}</strong>
+        </span>
+        <span className="bt-chip">
+          chosen <strong>{picked.length}</strong>
+        </span>
+      </div>
+      <div className="da-actions">
+        {picked.length > 0 ? (
+          <button className="da-ghost" onClick={() => setPicked([])}>
+            Clear
+          </button>
+        ) : null}
+        <span className="da-spacer" />
+        <button
+          className="da-confirm"
+          disabled={chosen === undefined}
+          onClick={() => {
+            if (chosen !== undefined) store.apply(chosen)
+          }}
+        >
+          {picked.length === 0
+            ? 'Keep these dice'
+            : `Reroll ${picked.length} ${picked.length === 1 ? 'die' : 'dice'}`}
+        </button>
+      </div>
+    </>
+  )
+}
 
 /**
  * Choose a dice pool. The engine offers every legal split as its own `battle/roll` action; this

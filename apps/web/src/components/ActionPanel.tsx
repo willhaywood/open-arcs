@@ -71,17 +71,19 @@ export function ActionPanel({ cont, onNewGame }: Props): JSX.Element {
    * on offer the panel must stay out of the way, or every step is drawn twice: the dice gather
    * alone put 56 `Roll 3S 1A 0R` buttons beside the tray that already draws them.
    *
-   * Conditional rather than a flat entry in the list above, because two battle steps have **no**
-   * window of their own and must keep the panel:
+   * Conditional rather than a flat entry in the list above, because one battle step has **no**
+   * window of its own and must keep the panel:
    *
-   *   - `battle/system` — which system to attack in, still a list until the map targets it;
-   *   - `battle/reroll` — Skirmishers, Seeker Torpedoes and Tricky, still text until the dice
-   *     tray can be clicked.
+   *   - `battle/system` — which system to attack in, still a list until the map targets it.
+   *
+   * `battle/reroll` used to be in that same boat and no longer is: the window draws the dice and
+   * lets them be clicked, so leaving it here as well would print the whole option list — one
+   * button per distinct face combination — beside the tray already showing them.
    *
    * `battle/cancel` goes with the window when the window is up (it draws its own way out) and
    * stays in the panel otherwise, where it is the only way back from the system choice.
    */
-  const BATTLE_WINDOW = ['battle/target', 'battle/roll', 'battle/hit', 'battle/finish']
+  const BATTLE_WINDOW = ['battle/target', 'battle/roll', 'battle/hit', 'battle/finish', 'battle/reroll']
   const inBattleWindow = cont.actions.some((a) => BATTLE_WINDOW.includes(a.type))
   const hidden = inBattleWindow ? [...ELSEWHERE, ...BATTLE_WINDOW, 'battle/cancel'] : ELSEWHERE
 
