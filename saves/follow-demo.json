@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "options": {
+    "board": "Board4MixUp1",
+    "factions": [
+      "red",
+      "yellow",
+      "blue",
+      "white"
+    ],
+    "seed": 9
+  },
+  "journal": [
+    "turn/lead(card=\"Aggression-5\",faction=\"red\",suit=\"Aggression\")",
+    "ambition/skip-declare(faction=\"red\",pips=2,suit=\"Aggression\")",
+    "turn/end(faction=\"red\")"
+  ]
+}

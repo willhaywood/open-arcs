@@ -1,0 +1,72 @@
+@font-face {
+    font-family: 'FMBolyar Pro 500';
+    src: url('FMBolyarPro-500.eot');
+    src: local('FMBolyarPro 500'), local('FMBolyarPro-500'),
+        url('FMBolyarPro-500.eot?#iefix') format('embedded-opentype'),
+        url('FMBolyarPro-500.woff2') format('woff2'),
+        url('FMBolyarPro-500.woff') format('woff'),
+        url('FMBolyarPro-500.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'FMBolyar Pro 900';
+    src: url('FMBolyarPro-900.eot');
+    src: local('FMBolyarPro 900'), local('FMBolyarPro-900'),
+        url('FMBolyarPro-900.eot?#iefix') format('embedded-opentype'),
+        url('FMBolyarPro-900.woff2') format('woff2'),
+        url('FMBolyarPro-900.woff') format('woff'),
+        url('FMBolyarPro-900.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'FMBolyar Pro 100';
+    src: url('FMBolyarPro-100.eot');
+    src: local('FMBolyarPro 100'), local('FMBolyarPro-100'),
+        url('FMBolyarPro-100.eot?#iefix') format('embedded-opentype'),
+        url('FMBolyarPro-100.woff2') format('woff2'),
+        url('FMBolyarPro-100.woff') format('woff'),
+        url('FMBolyarPro-100.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'FMBolyar Pro 300';
+    src: url('FMBolyarPro-300.eot');
+    src: local('FMBolyarPro 300'), local('FMBolyarPro-300'),
+        url('FMBolyarPro-300.eot?#iefix') format('embedded-opentype'),
+        url('FMBolyarPro-300.woff2') format('woff2'),
+        url('FMBolyarPro-300.woff') format('woff'),
+        url('FMBolyarPro-300.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'FMBolyar Pro 700';
+    src: url('FMBolyarPro-700.eot');
+    src: local('FMBolyarPro 700'), local('FMBolyarPro-700'),
+        url('FMBolyarPro-700.eot?#iefix') format('embedded-opentype'),
+        url('FMBolyarPro-700.woff2') format('woff2'),
+        url('FMBolyarPro-700.woff') format('woff'),
+        url('FMBolyarPro-700.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'FMBolyar Pro Ornaments';
+    src: url('FMBolyarPro-Ornaments.eot');
+    src: local('FMBolyarPro Ornaments'), local('FMBolyarPro-Ornaments'),
+        url('FMBolyarPro-Ornaments.eot?#iefix') format('embedded-opentype'),
+        url('FMBolyarPro-Ornaments.woff2') format('woff2'),
+        url('FMBolyarPro-Ornaments.woff') format('woff'),
+        url('FMBolyarPro-Ornaments.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+

@@ -1,0 +1,4096 @@
+/*
+ * Display face — FM Bolyar Pro, the game's own titling face. haunt-roll-fail sets
+ * `50px FMBolyarPro-900` for the Arcs title (arcs/ui.scala:415), so this is the real thing
+ * rather than a lookalike. Licensed to the project owner; the files are self-hosted from
+ * `apps/web/public/fonts` so nothing depends on the network.
+ *
+ * The foundry's own stylesheet ships each weight as a *separate family* ("FMBolyar Pro 700")
+ * all declared `font-weight: normal`, which means `font-weight` cannot select between them —
+ * every heading would have to name its own family. They are re-declared here as one family
+ * with real weights, so ordinary `font-weight: 700` picks the 700 cut.
+ *
+ * It is a display face only — headings, labels and figures. Body copy stays in the system sans,
+ * which is far more readable at the sizes the log and card text run at.
+ */
+@font-face {
+  font-family: 'FM Bolyar Pro';
+  src: url('/fonts/FMBolyarPro-100.woff2') format('woff2'),
+       url('/fonts/FMBolyarPro-100.woff') format('woff');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FM Bolyar Pro';
+  src: url('/fonts/FMBolyarPro-300.woff2') format('woff2'),
+       url('/fonts/FMBolyarPro-300.woff') format('woff');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FM Bolyar Pro';
+  src: url('/fonts/FMBolyarPro-500.woff2') format('woff2'),
+       url('/fonts/FMBolyarPro-500.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FM Bolyar Pro';
+  src: url('/fonts/FMBolyarPro-700.woff2') format('woff2'),
+       url('/fonts/FMBolyarPro-700.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FM Bolyar Pro';
+  src: url('/fonts/FMBolyarPro-900.woff2') format('woff2'),
+       url('/fonts/FMBolyarPro-900.woff') format('woff');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-display: 'FM Bolyar Pro', ui-serif, Georgia, 'Times New Roman', serif;
+  --bg: #14161c;
+  --panel: #1c1f28;
+  --panel-2: #232734;
+  --line: #333a4a;
+  --text: #e6e8ee;
+  --muted: #9aa2b1;
+  --accent: #6ea8ff;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* --- new game -----------------------------------------------------------
+   Black, grey and gold, like the board's own furniture — the blue UI accent
+   belongs to in-play affordances, not to the title screen. */
+.newgame {
+  max-width: 880px;
+  margin: 5vh auto 3vh;
+  background: #0b0d13;
+  border: 1px solid var(--gold-dim);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.72);
+}
+/* Full-bleed header art, faded into the panel so it does not end on a hard line. */
+.ng-banner {
+  position: relative;
+  line-height: 0;
+}
+.ng-banner img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.ng-banner::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 34%;
+  background: linear-gradient(to bottom, rgba(11, 13, 19, 0), #0b0d13);
+  pointer-events: none;
+}
+.ng-wordmark {
+  margin: 0;
+  padding: 36px 0 8px;
+  text-align: center;
+  font-size: 56px;
+  /* The cuts run 100/300/500/700/900, so 400 would resolve to the 300 light. HRF titles at 900. */
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-family: var(--font-display);
+}
+.ng-body {
+  padding: 4px 34px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.newgame .subtitle {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.05em;
+}
+.ng-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.ng-label {
+  font-family: var(--font-display);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--gold);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.ng-hint {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+.seg,
+.seed-row {
+  display: flex;
+  gap: 8px;
+}
+.seg button {
+  flex: 0 0 66px;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  font-weight: 700;
+}
+.seg button.on {
+  background: rgba(201, 169, 97, 0.16);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.seed-row input {
+  flex: 1;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  font-size: 14px;
+}
+.seed-row button {
+  padding: 9px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+}
+.seed-row button:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+/* --- setup cards --- */
+/* One column per printed setup — four at both player counts, so the deck reads as a hand. */
+.ng-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.ng-card-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+/* The card itself: a two-sided flip, face down until chosen. */
+.setup-card {
+  width: 100%;
+  aspect-ratio: 1039 / 744;
+  padding: 0;
+  border: none;
+  background: none;
+  perspective: 1100px;
+}
+.sc-inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.24, 1);
+}
+/* Chosen, but still face down: it lifts and takes a gold edge. Only Start turns it over. */
+.setup-card.picked .sc-inner {
+  transform: translateY(-8px);
+}
+.setup-card.flipped .sc-inner {
+  transform: rotateY(180deg);
+}
+.setup-card.picked.flipped .sc-inner {
+  transform: translateY(-8px) rotateY(180deg);
+}
+.setup-card:hover:not(.flipped) .sc-inner {
+  transform: translateY(-4px);
+}
+.setup-card.picked:hover:not(.flipped) .sc-inner {
+  transform: translateY(-8px);
+}
+.sc-face {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+.sc-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/*
+ * The setup deck's own back is landscape at 779x558 — a 1.396 ratio against the card's
+ * 1039/744 = 1.397 — so it simply covers the frame like the front does.
+ *
+ * It used to be the *action* deck's back, which is portrait (558x780) and needed a quarter turn
+ * plus a swapped-axis box to fill a landscape card. That workaround is gone with the right art.
+ */
+.sc-front {
+  transform: rotateY(180deg);
+}
+.setup-card.picked .sc-face {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-dim), 0 12px 26px rgba(0, 0, 0, 0.75);
+}
+/* Once one is turned over, the rest of the deck recedes. */
+.ng-cards.revealed .ng-card-slot:not(.chosen) {
+  opacity: 0.3;
+}
+.ng-cards.revealed .setup-card:not(.picked) {
+  cursor: default;
+}
+/* A board with no card art is still drawable. */
+.sc-plain {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #14161c;
+  color: var(--text);
+  text-align: center;
+  padding: 10px;
+}
+.sc-plain em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+/* Reserved even while blank, so turning a card over does not shift the row. */
+.ng-card-name {
+  font-family: var(--font-display);
+  min-height: 17px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+}
+.ng-card-note {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: -4px;
+}
+
+.ng-start {
+  font-family: var(--font-display);
+  margin-top: 4px;
+  padding: 13px;
+  background: var(--gold);
+  color: #14100a;
+  border: none;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ng-start:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  cursor: default;
+}
+/* After the reveal the screen holds: Continue enters the game, and there is a way back out. */
+.ng-go {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ng-go .ng-start {
+  margin-top: 0;
+}
+.ng-redeal {
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.ng-redeal:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+/* --- app layout --- */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+/*
+ * Above every overlay. A full-screen backdrop (the battle window, the enlarged court card) used
+ * to cover the toolbar, leaving Undo/Save/Load enabled but physically unclickable — which is how
+ * a battle could become a dead end with no way back. The app's own chrome stays reachable.
+ */
+.topbar {
+  position: relative;
+  z-index: 400;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 16px 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0)),
+    #0b0d13;
+  /* A single gold hairline. The double rule is the panels' device for *enclosing* something;
+     run flat across the top of the app it just read as the same trick used twice. */
+  border-bottom: 1px solid var(--gold-dim);
+}
+.brand {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 19px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+/* Board and act/chapter/round read as printed captions, not as debug text. */
+.board-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.turn-meta {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.toolbar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar .ghost {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--gold-dim);
+  color: var(--text);
+  padding: 6px 13px;
+  border-radius: 7px 3px 6px 2px / 3px 6px 2px 7px;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+.topbar .ghost:hover:not(:disabled) {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+.topbar .ghost:disabled {
+  opacity: 0.35;
+  border-color: var(--line);
+  cursor: default;
+}
+.newgame-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.newgame-load {
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5vh;
+  font-size: 13px;
+}
+.newgame-load .ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 8px;
+}
+.newgame-load .ghost:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+/* The side column gives ground first — it is text, and text survives being narrower than
+   the board does. */
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(220px, 21vw, 300px);
+  min-height: 0;
+}
+/* Board area: play rail | map | ambitions, with the hand on its own row beneath, so
+   nothing overlaps the map at rest. */
+/*
+ * The play area sits on the cover art. Its composition suits this exactly: the crews and ships
+ * crowd the edges and the middle is dark and near-empty, so the map lands on open space and the
+ * detail reads around it rather than behind anything that matters.
+ *
+ * `fixed` keeps the art still while panels move over it, and the scrim above it holds the
+ * contrast — the art is mid-tone in places and small gold labels sit on top.
+ */
+.board-col {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  display: grid;
+  background-image:
+    linear-gradient(rgba(8, 10, 15, 0.52), rgba(8, 10, 15, 0.7)),
+    url('/game-assets/arcs-bg.webp');
+  background-size: cover, cover;
+  background-position: center, center;
+  background-attachment: scroll, fixed;
+  /* Named so the narrow layouts below can rearrange without re-numbering every child. */
+  grid-template-columns:
+    clamp(88px, 8vw, 128px)
+    clamp(104px, 9.5vw, 150px)
+    minmax(0, 1fr)
+    clamp(104px, 9.5vw, 148px);
+  grid-template-areas:
+    "court play map ambitions"
+    "hand  hand hand hand"
+    "boards boards boards boards";
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 10px;
+}
+.board-cell {
+  grid-area: map;
+  min-width: 0;
+  min-height: 0;
+}
+/* The hand tucks *behind* the player boards: the row is shorter than a card, and `.hand`
+   hangs below it so only the top of each card shows. The boards (z 50) paint over the rest,
+   which is what makes them read as sunk rather than clipped. Buys the map ~76px of height. */
+.hand-row {
+  grid-area: hand;
+  position: relative;
+  height: 96px;
+  /*
+   * Cuts the fan off at the player boards' top edge — the row's own bottom plus the grid's 10px
+   * gap. The cards deliberately hang 110px past this (`.hand` sits at `bottom: -84px`), and what
+   * used to hide the overhang was an opaque tray drawn right across the boards row. Now that the
+   * boards float, there is no tray to hide behind, so the fan is clipped where the tray's top
+   * edge used to be and the result is unchanged. Only the bottom is clipped: the hover lift
+   * raises a card 120px and scales it, and that has to stay free.
+   */
+  clip-path: inset(-600px -600px -10px -600px);
+}
+/* Player boards, bottom-most. Above `.hand` (z 40) so their tooltips are not swallowed by
+   the hand cards' hover strips, which overhang the row — the strips only need to cover the
+   cards' own resting area, which sits inside the hand row above this. */
+.player-boards {
+  grid-area: boards;
+  /* Queried by the leader-portrait rules, which turn on for the rival boards once this row is
+     wide enough. The row's own width is the honest signal and the viewport is not: the side
+     column is `clamp(220px, 21vw, 300px)`, so the space left for the boards is not a fixed
+     offset from the window. Safe to contain — the `boards` grid area is sized by the grid's
+     `1fr` track, never by these boards' contents. */
+  container-type: inline-size;
+  container-name: boards;
+  position: relative;
+  z-index: 50;
+  display: flex;
+  align-items: stretch;
+  /* Floated in the middle of the row rather than filling it. There is no tray behind them any
+     more — the fan that the tray used to hide is clipped at `.hand-row` instead — so the boards
+     sit directly on the cover art and read as objects on the table. */
+  /* `safe` so that if the row ever does overflow, the boards fall back to flush-left rather than
+     centring their overflow off both edges, where the leftmost board becomes unreachable. */
+  justify-content: safe center;
+  gap: 10px;
+}
+/* Actions sized to content, log takes the rest and scrolls. */
+.side-col {
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+/* --- court (left rail, beside the played cards) --- */
+.court-rail {
+  grid-area: court;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.court-head {
+  font-family: var(--font-display);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: var(--gold);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+/*
+ * The court draw pile — the deck's own back, with the count standing on it. Stacked edges behind
+ * it so it reads as a pile rather than a single card; they fade out as it runs down.
+ */
+.court-draw {
+  position: relative;
+  flex: 0 0 auto;
+  aspect-ratio: 744 / 1039;
+  border-radius: 5px;
+  border: 2px solid var(--gold-dim);
+  overflow: hidden;
+  background: #0b0d13;
+  box-shadow: 2px 2px 0 -1px rgba(11, 13, 19, 0.9), 3px 3px 0 0 rgba(201, 169, 97, 0.25),
+    5px 5px 0 -1px rgba(11, 13, 19, 0.9), 6px 6px 0 0 rgba(201, 169, 97, 0.15);
+}
+.court-draw.empty {
+  border-style: dashed;
+  border-color: rgba(201, 169, 97, 0.3);
+  box-shadow: none;
+}
+.court-draw img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* The count sits on the pile, plated so it stays readable over the art. */
+.court-draw-n {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  background: rgba(9, 11, 16, 0.88);
+  border: 1px solid rgba(201, 169, 97, 0.45);
+  border-radius: 3px;
+  padding: 1px 7px;
+}
+/* Cards are buttons: the whole point of the rail is that clicking opens a readable copy. */
+.court-slot {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid var(--gold-dim);
+  border-radius: 5px;
+  overflow: hidden;
+  background: #0b0d13;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.court-slot:hover:not(:disabled) {
+  transform: translateX(3px);
+  box-shadow: 0 0 0 1px var(--gold), 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+.court-slot:disabled {
+  cursor: default;
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.court-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Anchor to the top: the card's name band is up there, and it is the one piece of text
+     worth showing at rail size. */
+  object-position: top;
+  display: block;
+}
+.court-agents {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+/*
+ * The agent token plus a count, on a dark chip so it stays readable over the card art beneath.
+ * Small on purpose: the rail is a state readout at ~74px wide, and the enlarged card is where
+ * the agents get drawn one figure each.
+ */
+.court-pip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px 1px 2px;
+  border: 1px solid;
+  border-radius: 6px 2px 5px 2px / 2px 5px 2px 6px;
+  background: rgba(6, 8, 12, 0.88);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+.court-pip-agent {
+  width: 8px;
+  height: auto;
+  display: block;
+}
+.court-pip b {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+/*
+ * Only a strict majority may secure, so only a real leader is ringed.
+ *
+ * The gold is the ring and the numeral — *not* the chip. A translucent gold fill let the card
+ * art through, and these pips sit over the lower third of the illustration, which is often
+ * cream: gold lettering on that is unreadable. The chip stays the same opaque dark as every
+ * other pip, which is what gives the gold something to read against.
+ */
+.court-pip.leads {
+  box-shadow: 0 0 0 1px var(--gold), 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+.court-pip.leads b {
+  color: var(--gold);
+}
+
+/* --- court card, enlarged --- */
+.court-modal {
+  position: fixed;
+  inset: 0;
+  /*
+   * The reader layer, shared with `.draft-reader` (320): a card being read sits above whatever
+   * opened it, including the modal layer at 300 — the raid screen opens this one. Still under the
+   * topbar at 400, so Undo/Save stay reachable while a card is open.
+   */
+  z-index: 320;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(3px);
+}
+/*
+ * Deliberately the quietest frame in the app: near-black stock, a gold hairline, and brackets
+ * barely there. Everything else here is the card art at full size, and a frame that asked to be
+ * looked at would be competing with the one thing this view exists to show.
+ */
+.court-modal-inner {
+  position: relative;
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0)),
+    #0b0d13;
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  border-radius: 8px;
+  padding: 18px;
+  max-height: 100%;
+}
+.cm-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.court-modal-inner::before,
+.court-modal-inner::after,
+.cm-frame::before,
+.cm-frame::after {
+  content: '';
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(201, 169, 97, 0.5);
+  pointer-events: none;
+}
+.court-modal-inner::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 7px 0 0 0;
+}
+.court-modal-inner::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: 0;
+  border-top: 0;
+  border-radius: 0 0 7px 0;
+}
+.cm-frame::before {
+  top: -1px;
+  right: -1px;
+  border-left: 0;
+  border-bottom: 0;
+  border-radius: 0 7px 0 0;
+}
+.cm-frame::after {
+  bottom: -1px;
+  left: -1px;
+  border-right: 0;
+  border-top: 0;
+  border-radius: 0 0 0 7px;
+}
+.court-modal-art {
+  /* Sized off the viewport so the card is as large as the screen allows — this is the
+     readable copy, and 744x1039 art needs the room. */
+  height: min(78vh, 900px);
+  width: auto;
+  max-width: 60vw;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+}
+.court-modal-side {
+  width: 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cm-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.15;
+}
+.cm-kind {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.cm-agents-head {
+  font-family: var(--font-display);
+  margin-top: 8px;
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+/*
+ * One row of agents per faction, and nothing else: the tokens carry their own colour, so naming
+ * the faction beside them said the same thing twice, and a count is redundant once the figures
+ * are there to be counted.
+ */
+.cm-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 5px;
+}
+/* Sized to be looked at, not squinted at — these are now the only thing stating the count, and
+   the agent art is tall and narrow (42x68), so a small width leaves a very small figure. The row
+   wraps so a large holding grows downward rather than overflowing the panel. */
+.cm-agent {
+  width: 30px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
+}
+.cm-none {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cm-note {
+  margin-top: auto;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.court-modal-side .ghost {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--gold-dim);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 7px 3px 6px 2px / 3px 6px 2px 7px;
+}
+.court-modal-side .ghost:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+/* --- board --- */
+.board {
+  position: relative;
+  height: 100%;
+}
+/*
+ * Chrome that sits straight on the cover art with no panel behind it. The art is mid-tone in
+ * places and shifts with the viewport crop, so these carry their own shadow rather than relying
+ * on whatever happens to be underneath. (The map's own SVG labels already stroke themselves.)
+ */
+.court-head,
+.court-draw-n,
+.slot-label {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+}
+
+/*
+ * Transparent, not black. The viewBox is fitted with `meet`, so the map art never fills its box
+ * on both axes and the leftover is usually a wide band — as a black fill that was the largest
+ * dead area on screen, and it is where the cover art now shows through.
+ */
+.board-svg {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border-radius: 10px;
+  /* Room for the plate's shadow to fall outside the map without being clipped. */
+  overflow: visible;
+}
+/* Lifts the board off the cover art. Sized in map units, so it holds at any board scale. */
+.map-plate {
+  filter: drop-shadow(0 26px 46px rgba(0, 0, 0, 0.85))
+    drop-shadow(0 0 90px rgba(0, 0, 0, 0.6));
+}
+/*
+ * Heavy gold brackets at the corners, opening into two parallel rails along each edge — the
+ * ambition track's way of framing a panel. The rails sit on the bracket's own two edges, so the
+ * bar reads as splitting rather than as a second border nearby.
+ */
+.map-frame path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Stroke and `OFF` in `MapFrame` are a pair: the rails ride on the bracket's two edges. */
+.mf-bracket {
+  stroke: var(--gold);
+  stroke-width: 11;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.75));
+}
+.mf-rail {
+  stroke: rgba(201, 169, 97, 0.55);
+  stroke-width: 3;
+}
+.edge {
+  stroke: rgba(150, 170, 210, 0.28);
+  stroke-width: 3;
+}
+/* The real map shows through; nodes are subtle rings, not opaque discs. */
+.node.planet {
+  fill: rgba(12, 16, 26, 0.15);
+  stroke: rgba(190, 205, 235, 0.7);
+  stroke-width: 3;
+}
+.node.gate {
+  fill: rgba(12, 16, 26, 0.15);
+  stroke: rgba(220, 190, 150, 0.7);
+  stroke-width: 3;
+}
+.node-label {
+  fill: #cdd4e2;
+  font-size: 32px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.85);
+  stroke-width: 5px;
+}
+.badge-count {
+  fill: var(--text);
+  font-weight: 700;
+}
+.board-turn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 10px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+/* --- round play area (left of the board, after the physical board's slots) --- */
+:root {
+  --gold: #c9a961;
+  --gold-dim: rgba(201, 169, 97, 0.45);
+}
+.play-rail {
+  grid-area: play;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Landscape footprint of a card lying on the board; the image is sized h x w then
+     rotated -90deg into it. 80 x (1039/744) ≈ 112, so the ratio stays true. */
+  --card-w: 112px;
+  --card-h: 80px;
+}
+.play-slot {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  background: rgba(10, 12, 17, 0.72);
+  border: 1px solid var(--gold-dim);
+  border-radius: 4px;
+  padding: 7px 7px 7px 22px;
+  backdrop-filter: blur(2px);
+  min-height: 100px;
+}
+/* Holds the three possible follow cards, laid flat (landscape). */
+.play-slot.tall {
+  flex: 0 1 auto;
+  height: 296px;
+  min-height: 0;
+}
+/* Label runs vertically up the left edge, as printed on the board. */
+.slot-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--gold);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  border-right: 1px solid var(--gold-dim);
+}
+.slot-cards {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  min-height: 0;
+}
+/* Follows land bottom-to-top. The rail is the physical board's row of card slots turned 90°
+   counter-clockwise, so the left-to-right order cards are laid down in there reads
+   bottom-to-top here. `align-self: stretch` is what anchors them to the foot of the box —
+   the slot is `align-items: flex-start`, so without it the group is only as tall as its
+   cards and `column-reverse` would merely flip their order at the top of the box. */
+.play-slot.tall .slot-cards {
+  flex-direction: column-reverse;
+  align-self: stretch;
+}
+/* Cards lie flat on the board: rotated 90° counter-clockwise. The card and anything
+   sitting on it share one rotated frame, so overlays can be placed in the card's own
+   (portrait) coordinates and turn with it. */
+.slot-card {
+  position: relative;
+  width: var(--card-w);
+  height: var(--card-h);
+  border: 2px solid;
+  border-radius: 5px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.65));
+}
+.slot-card-rot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--card-h);
+  height: var(--card-w);
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+.slot-card-rot .cardface {
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* The "Ambition Declared" token: a black pill laid across the top of the card with its
+   white 0 covering the printed number (which sits at ~15% across, ~9% down). */
+.ambition-token {
+  position: absolute;
+  /* Equal gutters both sides: set left AND right rather than a width. */
+  left: 4%;
+  right: 4%;
+  top: 9%;
+  height: 15%;
+  transform: translateY(-50%);
+  background: #08080a;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 5%;
+  padding: 0 4%;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  overflow: hidden;
+}
+.at-zero {
+  flex: 0 0 auto;
+  height: 74%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+.at-text {
+  color: #fff;
+  font-size: 6.5px;
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.slot-tag {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #000;
+  padding: 1px 4px;
+  border-radius: 3px 0 3px 0;
+}
+.slot-empty {
+  flex: 1;
+  min-height: 66px;
+  border: 1px dashed rgba(201, 169, 97, 0.22);
+  border-radius: 4px;
+}
+
+/* --- ambition track (right of the map, as on the board) --- */
+.ambition-track {
+  grid-area: ambitions;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  overflow-y: auto;
+}
+.ambition-panel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 431 / 1224;
+  flex: 0 0 auto;
+}
+.ambition-art {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.amb-marker {
+  position: absolute;
+  width: 25%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7));
+}
+.amb-marker.declared {
+  width: 22%;
+}
+.chapter-strip {
+  width: 100%;
+  flex: 0 0 auto;
+}
+.chapter-strip img {
+  width: 100%;
+  display: block;
+}
+.goal-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+.goal-row img {
+  width: 38px;
+  height: 38px;
+}
+.ambition-track.fallback {
+  padding: 10px;
+  background: rgba(16, 19, 26, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  align-items: stretch;
+}
+
+/* --- hand (fanned cards) --- */
+.hand {
+  position: absolute;
+  left: 50%;
+  /* Hangs past the row so the lower two thirds of each card sit behind the player boards. */
+  bottom: -84px;
+  transform: translateX(-50%);
+  height: 172px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+  z-index: 40;
+}
+.hand-card {
+  --rot: 0deg;
+  --tx: 0px;
+  --ty: 0px;
+  position: absolute;
+  bottom: 0;
+  width: 118px;
+  height: 165px;
+  transform-origin: bottom center;
+  transform: translateX(var(--tx)) translateY(var(--ty)) rotate(var(--rot));
+  transition: transform 0.16s ease;
+  pointer-events: auto;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+.hand-card:hover {
+  transform: translateX(var(--tx)) translateY(-120px) rotate(0deg) scale(1.5);
+  z-index: 100 !important;
+}
+/* The lift moves the card out from under the pointer: at rest the card's bottom sits on the
+   row's bottom edge, and hovering raises it 120px, so a pointer near the card's lower half
+   ends up *below* the raised card. Hover drops, the card collapses back under the pointer,
+   and it oscillates — you can never reach the buttons. This strip extends the hit area down
+   past the resting position so hover survives the lift. The parent's scale applies to it
+   too, so 90px covers 135px of travel against the 120px lift. The lateral overhang covers
+   the fan's outer cards, which un-rotate as they rise and so pull their edges inward. */
+.hand-card::after {
+  content: '';
+  position: absolute;
+  left: -14px;
+  right: -14px;
+  top: calc(100% - 14px);
+  height: 104px;
+}
+.hand-card.playable {
+  cursor: pointer;
+}
+.hand-card:not(.playable) {
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)) grayscale(0.5) brightness(0.7);
+}
+.cardface {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 9px;
+  display: block;
+}
+.cardface.fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+.cf-suit {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.cf-strength {
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1;
+}
+.cf-pips {
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+/* Anchored to the card's top edge with the gap as padding, so the element box stays
+   contiguous with the card. Offsetting with `top: -34px` left a dead band between button and
+   card that dropped hover as the pointer crossed it. */
+.card-plays {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 6px;
+  white-space: nowrap;
+  padding-bottom: 10px;
+}
+.hand-card:hover .card-plays {
+  display: flex;
+}
+.play-btn {
+  background: var(--accent);
+  color: #001;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.play-hint {
+  color: var(--accent);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+/* --- player boards (bottom strip) ---
+   The physical board's functional parts in the rail's gold-framed language: six key-costed
+   resource slots, the +2/+3 ambition shields, the outrage strip, trophies and captives. */
+/* The initiative marker stands in its own column at the left edge, so `.pboard` is a row of
+   [marker | everything else] and `.pb-body` is the old vertical stack. */
+/*
+ * Dark card stock with a gold rule, like the printed boards.
+ *
+ * The faction's colour used to be the panel border, which made four saturated frames compete
+ * along the bottom of a screen whose whole palette is black and gold. The border is gold on every
+ * board now and the colour lives in the nameplate instead — the same move the components make,
+ * where the board is neutral and only the pieces are coloured.
+ *
+ * Corner radii are uneven on both axes so the edge reads as cut rather than rounded; the game's
+ * printing has torn edges everywhere and a uniform radius is the one thing that never appears.
+ */
+.pboard {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0)),
+    rgba(9, 11, 16, 0.86);
+  /* A single hairline, like the header. The double rail belongs to the map, which is one
+     object you look at; four of these repeat along the bottom, and at that weight the frames
+     competed with the thing they sit under. The corner brackets carry the idiom instead. */
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  border-radius: 7px;
+  padding: 5px 8px 6px 4px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+  backdrop-filter: blur(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+/*
+ * Heavy gold brackets at the corners, the same idiom as the frame around the map: a thick corner
+ * that the double-rule edge runs out of. Four corners need four boxes and an element has only two
+ * pseudo-elements, so `.pb-frame` carries the other pair.
+ */
+.pb-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Above `.pb-portrait`, which follows it in the DOM and would otherwise paint over the
+     top-right bracket — both are positioned with `z-index: auto`, so DOM order decides. */
+  z-index: 2;
+}
+.pboard::before,
+.pboard::after,
+.pb-frame::before,
+.pb-frame::after {
+  content: '';
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(201, 169, 97, 0.62);
+  pointer-events: none;
+}
+.pboard::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 6px 0 0 0;
+}
+.pboard::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: 0;
+  border-top: 0;
+  border-radius: 0 0 6px 0;
+}
+.pb-frame::before {
+  top: -1px;
+  right: -1px;
+  border-left: 0;
+  border-bottom: 0;
+  border-radius: 0 6px 0 0;
+}
+.pb-frame::after {
+  bottom: -1px;
+  left: -1px;
+  border-right: 0;
+  border-top: 0;
+  border-radius: 0 0 0 6px;
+}
+/* Rivals are smaller, so their brackets are too. */
+.pboard.mini::before,
+.pboard.mini::after,
+.pboard.mini .pb-frame::before,
+.pboard.mini .pb-frame::after {
+  width: 8px;
+  height: 8px;
+  border-width: 1.5px;
+}
+
+/* --- the player's name, as a plate rather than a pill --- */
+.pb-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 3px 7px;
+  border: 1px solid var(--gold-dim);
+  /* Hand-cut, and specifically never a pill. */
+  border-radius: 8px 3px 7px 2px / 3px 7px 2px 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.34));
+}
+/* The faction's own ship carries the colour — the same token that identifies it on the map. */
+.pb-name-mark {
+  width: 20px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+.pb-name-text {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  /* Lifted toward white: blue at full saturation is barely legible on near-black. */
+  color: color-mix(in srgb, var(--faction) 76%, #fff);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.pb-name.mini {
+  padding: 1px 8px 2px 5px;
+  gap: 4px;
+}
+.pb-name.mini .pb-name-mark {
+  width: 15px;
+}
+.pb-name.mini .pb-name-text {
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+}
+
+/* --- what is left in the supply --- */
+.pb-supply {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+  margin-left: 10px;
+}
+.pb-sup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pb-sup-art {
+  height: auto;
+  display: block;
+  opacity: 0.9;
+}
+/* Ships are wide, agents tall — size each to its own art so they read at the same weight. */
+.pb-sup-art.ship {
+  width: 22px;
+}
+.pb-sup-art.agent {
+  width: 9px;
+}
+.pb-sup b {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+/* Empty supply is a hard constraint, not a detail — say so. */
+.pb-sup.out b {
+  color: #e0604e;
+}
+.pb-sup.out .pb-sup-art {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+.pb-supply.mini {
+  gap: 7px;
+  margin-left: 7px;
+}
+.pb-supply.mini .pb-sup-art.ship {
+  width: 17px;
+}
+.pb-supply.mini .pb-sup-art.agent {
+  width: 7px;
+}
+.pb-supply.mini .pb-sup b {
+  font-size: 11px;
+}
+.pb-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mini-boards {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+.pboard.mini {
+  padding: 6px 8px 7px;
+  gap: 5px;
+}
+.pb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* --- initiative marker ---
+   The real piece standing at the left edge — no plate, no divider, so it reads as a token
+   resting against the board rather than as another panel. Held is the plain token; a seize
+   is a claim on the *next* round, so it is tinted and dimmed rather than shown as held.
+
+   The art is 400x1100 with the piece filling the frame, so the element can be sized straight
+   to the artwork with no gutter to absorb. */
+.pb-init {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.pb-init img {
+  width: 22px;
+  height: auto;
+  max-height: 72px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 0 5px rgba(201, 169, 97, 0.55));
+}
+.pb-init-label {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pb-init.seized img {
+  filter: drop-shadow(0 0 5px rgba(255, 179, 122, 0.65));
+  opacity: 0.72;
+}
+.pb-init.seized .pb-init-label {
+  color: #ffb37a;
+}
+.pboard.mini .pb-init img {
+  width: 15px;
+  max-height: 50px;
+}
+
+/* Power reads as a printed figure: the number carries, the word is a caption. */
+.pb-power {
+  font-family: var(--font-display);
+  color: var(--muted);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.pb-power b {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--gold);
+}
+.pb-slots-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.pb-slots {
+  display: flex;
+  gap: 5px;
+}
+.pb-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+/* The orange key banner printed above each slot — its raid cost. */
+.pb-keys {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+.pb-well {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px dashed rgba(201, 169, 97, 0.4);
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pb-token {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
+}
+/* A slot past capacity still has your city standing on it — that is what covers it on the
+   physical board, and building that city is what reveals the slot. */
+.pb-slot.locked .pb-well {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.5);
+}
+.pb-slot.locked .pb-keys {
+  opacity: 0.25;
+}
+/* Slots opened by the same city are one group, with the city drawn once across them —
+   `object-fit: contain` keeps the token square and centres it over the pair, which is how the
+   physical piece straddles two slots rather than being stamped on each. */
+.pb-slot-group {
+  position: relative;
+  display: flex;
+  gap: 5px;
+}
+/* Height matches the well width, so a city painted across a two-slot group comes out the
+   same size as one sitting on a single slot — `object-fit: contain` would otherwise let the
+   wider group paint a larger token. */
+.pb-city {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 30px;
+  width: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  /* Dimmed so it reads as "still to build" rather than as a piece in play. */
+  opacity: 0.62;
+  filter: grayscale(0.25);
+}
+.pb-slots.mini .pb-slot-group {
+  gap: 3px;
+}
+.pb-slots.mini .pb-city {
+  height: 20px;
+  bottom: -1px;
+}
+.pb-slots.mini .pb-city {
+  opacity: 0.55;
+}
+/* The shields are covered by cities too — the 4th and 5th. */
+.pb-shield {
+  position: relative;
+  overflow: hidden;
+}
+.pb-shield-city {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+  opacity: 0.4;
+  filter: grayscale(0.3);
+  pointer-events: none;
+}
+.pb-shield.active .pb-shield-city {
+  display: none;
+}
+.pb-shields {
+  display: flex;
+  gap: 5px;
+}
+.pb-shield {
+  width: 57px;
+  padding: 4px 2px;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px 3px 6px 2px / 3px 6px 2px 7px;
+  text-align: center;
+  color: var(--muted);
+  opacity: 0.45;
+  line-height: 1.05;
+}
+.pb-shield b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+}
+/* FM Bolyar runs wider than the old stack: "AMBITIONS" overflowed the 52px shield by 10px. */
+.pb-shield span {
+  font-family: var(--font-display);
+  font-size: 6.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.pb-shield.active {
+  opacity: 1;
+  color: var(--gold);
+  border-color: var(--gold-dim);
+  background: rgba(201, 169, 97, 0.09);
+}
+.pb-lower {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.pb-outrage {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.pb-res {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  display: block;
+}
+/* Outraged reads as the flipped token it is at the table, plus a red ring so it is obvious
+   at a glance which type is blocked. */
+.pb-res.outraged {
+  box-shadow: 0 0 0 2px #d94b3f;
+}
+.pb-res.mini {
+  width: 15px;
+  height: 15px;
+}
+.pb-tally {
+  flex: 1;
+  min-width: 62px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 7px 3px 6px 2px / 3px 6px 2px 7px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1px;
+}
+.pb-tally-label {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pb-tally-n {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+/* --- mini variant --- */
+.pb-slots.mini {
+  gap: 3px;
+}
+.pb-slots.mini .pb-well {
+  width: 20px;
+  height: 20px;
+}
+.pb-mini-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+.pb-mini-tally {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.pb-mini-tally em {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.pb-mini-tally b {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* The faction tag on the ask header and the game-over card. Cut, not rounded — same hand-made
+   edge as the player boards, so nothing in the app reads as a web pill. */
+.swatch {
+  font-family: var(--font-display);
+  padding: 2px 10px 3px;
+  border-radius: 8px 3px 7px 2px / 3px 7px 2px 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.ambitions {
+  margin-top: 12px;
+}
+.section-title {
+  font-family: var(--font-display);
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+.ambition {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.ambition.declared {
+  color: var(--text);
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+.ambition-avail {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* --- actions --- */
+/* `overflow-y: auto` alone does nothing in an `auto` grid row — the panel just grows. A
+   long menu (a Move offers one option per origin-destination pair) then spills over the map
+   at narrow widths. The cap is what makes it actually scroll. */
+.actions {
+  padding: 12px;
+  max-height: 46vh;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+/* --- clicking the map to move ---
+   One colour, not two. Blue-for-origin and gold-for-destination read as two unrelated
+   systems of meaning on a map that already uses gold for its own frames and four faction
+   colours for pieces. Everything selectable is the UI accent; the *state* is carried by
+   weight and fill instead of hue:
+
+     available origin  thin ring, barely filled  — "you could start here"
+     selected origin   dashed ring, brighter     — "you did start here"
+     destination       solid ring, filled        — "you can go here"
+*/
+/*
+ * Selections are an **overlay on** the chart, not ink in it — kit the fleet paints over the board.
+ * So they are drawn in the vocabulary of a targeting display (brackets, swept rings, scale ticks,
+ * a crosshair) and in the game's own colours: gold for movement, the faction red for battle. The
+ * generic blue they used to wear belonged to no part of this game.
+ *
+ * `.sys-target` is the hit area and carries no paint, so the art can grow without shrinking the
+ * clickable region; every reticle part is `pointer-events: none`.
+ */
+.sys-target {
+  fill: transparent;
+  cursor: pointer;
+}
+.ret {
+  pointer-events: none;
+}
+.ret line,
+.ret path,
+.ret circle {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+/*
+ * Resting weight is deliberately light. A dozen bright rings at once is a wall rather than a menu,
+ * so at rest they only say "these are the options" and **hover** says "this one" — see below.
+ */
+.ret {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.13s ease;
+}
+/* Empty until hovered. The fill is the loudest part of the hover state. */
+.ret-disc {
+  fill: transparent;
+  transition: fill 0.13s ease;
+}
+/* The ring is the constant across all four states — and all an idle system wears. */
+.ret-ring {
+  stroke: rgba(201, 169, 97, 0.32);
+  stroke-width: 1.25;
+  transition: stroke 0.13s ease, stroke-width 0.13s ease;
+}
+/* The sweep: a short arc chasing the ring, which is what sells it as live rather than printed. */
+.ret-sweep {
+  stroke: rgba(201, 169, 97, 0.75);
+  stroke-width: 1.75;
+  stroke-dasharray: 60 460;
+  stroke-linecap: round;
+  animation: ret-sweep 2.6s linear infinite;
+  transition: stroke 0.13s ease, stroke-width 0.13s ease;
+}
+.ret-ticks line {
+  stroke: rgba(201, 169, 97, 0.4);
+  stroke-width: 1;
+  transition: stroke 0.13s ease;
+}
+@keyframes ret-sweep {
+  to {
+    stroke-dashoffset: -520;
+  }
+}
+/* A destination is the live option, so its ring carries a little more weight than an idle one. */
+.ret-dest .ret-ring {
+  stroke: rgba(201, 169, 97, 0.45);
+  stroke-width: 1.5;
+}
+/*
+ * Locked on: the origin you chose. The sweep stops — a settled choice should not still be
+ * searching — and this is the one reticle that is *not* faint at rest, because it is a statement
+ * of fact rather than an option waiting to be picked.
+ */
+.ret-locked .ret-sweep {
+  animation: none;
+  stroke-dasharray: none;
+  stroke: rgba(201, 169, 97, 0.9);
+  stroke-width: 2.5;
+}
+.ret-locked .ret-ring {
+  stroke: rgba(201, 169, 97, 0.5);
+}
+.ret-locked .ret-ticks line {
+  stroke: rgba(201, 169, 97, 0.8);
+}
+.ret-locked .ret-disc {
+  fill: rgba(201, 169, 97, 0.05);
+}
+/* Battle wears the game's red, and only battle gets the crosshair. */
+.ret-battle .ret-sweep {
+  stroke: rgba(224, 96, 78, 0.8);
+}
+.ret-battle .ret-ring {
+  stroke: rgba(224, 96, 78, 0.42);
+}
+.ret-battle .ret-ticks line {
+  stroke: rgba(224, 96, 78, 0.45);
+}
+.ret-battle .ret-cross line {
+  stroke: rgba(224, 96, 78, 0.7);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  transition: stroke 0.13s ease, stroke-width 0.13s ease;
+}
+/*
+ * Hover is where the weight went. Everything the resting state gave up comes back at once — the
+ * disc fills, the ring and sweep thicken to full colour, the ticks light, and the whole reticle
+ * lifts — so the system under the cursor is unmistakably the one you are about to pick.
+ */
+.sys-hit:hover .ret {
+  transform: scale(1.07);
+}
+.sys-hit:hover .ret-disc {
+  fill: rgba(201, 169, 97, 0.16);
+}
+.sys-hit:hover .ret-ring {
+  stroke: var(--gold);
+  stroke-width: 3;
+}
+.sys-hit:hover .ret-sweep {
+  stroke: var(--gold);
+  stroke-width: 3.5;
+}
+.sys-hit:hover .ret-ticks line {
+  stroke: var(--gold);
+}
+.sys-hit.battle:hover .ret-disc {
+  fill: rgba(224, 96, 78, 0.18);
+}
+.sys-hit.battle:hover .ret-ring,
+.sys-hit.battle:hover .ret-sweep,
+.sys-hit.battle:hover .ret-cross line {
+  stroke: #e0604e;
+}
+.sys-hit.battle:hover .ret-cross line {
+  stroke-width: 2.5;
+}
+.sys-hit.battle:hover .ret-ticks line {
+  stroke: rgba(224, 96, 78, 0.9);
+}
+
+/* --- movement routes --- */
+.route {
+  pointer-events: none;
+}
+/* A dark bed under the flowing dashes, so the route holds up over bright artwork. */
+.route-bed {
+  fill: none;
+  stroke: rgba(8, 10, 15, 0.6);
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+.route-flow {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 5.5;
+  stroke-dasharray: 13 16;
+  stroke-linecap: round;
+  animation: route-flow 0.9s linear infinite;
+}
+.route-head {
+  fill: var(--gold);
+}
+@keyframes route-flow {
+  to {
+    stroke-dashoffset: -29;
+  }
+}
+
+/* Motion is decoration here; the reticles still read by colour and weight without it. */
+@media (prefers-reduced-motion: reduce) {
+  .ret-sweep,
+  .route-flow {
+    animation: none;
+  }
+  /* The deal still resolves face up; it just does not spin to get there. */
+  .dc-inner {
+    transition: none;
+  }
+  .da-piece.selectable:hover {
+    transform: none;
+  }
+  /* The lift is motion too; the fill and the weight still carry the hover state without it. */
+  .sys-hit:hover .ret {
+    transform: none;
+  }
+}
+/*
+ * "How many ships carry on?", drawn on the map — the last step of a move, so it wears the same
+ * gold the reticles and routes do rather than the generic blue it inherited. A quiet plate at
+ * rest; the row under the cursor is the one that lights, matching how the reticles behave.
+ */
+.fp-box {
+  fill: rgba(8, 10, 16, 0.95);
+  stroke: rgba(201, 169, 97, 0.65);
+  stroke-width: 2;
+}
+.fp-row {
+  cursor: pointer;
+}
+.fp-hit {
+  fill: transparent;
+  transition: fill 0.13s ease;
+}
+.fp-row:hover .fp-hit {
+  fill: rgba(201, 169, 97, 0.18);
+}
+.fp-ship {
+  pointer-events: none;
+  transition: opacity 0.13s ease;
+}
+/* Dim the rows you are not hovering, so the row under the cursor reads as the choice. */
+.fleet-picker:hover .fp-row:not(:hover) .fp-ship {
+  opacity: 0.35;
+}
+.fp-n {
+  fill: rgba(201, 169, 97, 0.75);
+  font-family: var(--font-display);
+  font-weight: 800;
+  pointer-events: none;
+  transition: fill 0.13s ease;
+}
+.fp-row:hover .fp-n {
+  fill: var(--gold);
+}
+
+/*
+ * The instruction floating under the map. It is the caption to whatever the reticles are showing,
+ * so it wears their gold and their display face — and it is deliberately quiet: the map is doing
+ * the talking, and a bright pill under it competed with the very rings it was describing.
+ */
+.board-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  background: linear-gradient(rgba(14, 17, 24, 0.92), rgba(10, 12, 18, 0.95));
+  border: 1px solid rgba(201, 169, 97, 0.45);
+  color: var(--gold);
+  padding: 6px 18px;
+  border-radius: 3px;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+}
+/* Battle speaks in the game's red, the same split the reticles make. */
+.board-hint.battle {
+  border-color: rgba(224, 96, 78, 0.55);
+  color: #e8907f;
+}
+.ask-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.prompt {
+  color: var(--muted);
+  font-size: 14px;
+}
+.action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.action-btn {
+  text-align: left;
+  padding: 9px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+.action-btn:hover {
+  border-color: var(--accent);
+}
+.action-btn.muted {
+  color: var(--muted);
+}
+.action-btn.card {
+  border-left: 3px solid #6ea8ff;
+}
+.action-btn.ambition {
+  border-left: 3px solid #e0a92e;
+}
+.action-btn.battle {
+  border-left: 3px solid #d94b3f;
+}
+.action-btn.act {
+  border-left: 3px solid #5b8a44;
+}
+.game-over {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 0;
+}
+.go-title {
+  font-size: 26px;
+  font-weight: 800;
+}
+.go-reason {
+  color: var(--muted);
+}
+
+/* --- log --- */
+.log {
+  padding: 10px 12px;
+  overflow-y: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.log-score {
+  color: #ffd479;
+}
+.log-battle {
+  color: #ff9a8f;
+}
+.log-emph {
+  color: var(--text);
+}
+
+/* --- narrower screens ---------------------------------------------------- */
+/*
+   The board row wants four columns: court | played | map | ambitions. Two rails plus the
+   side column cost ~480px before the map gets a pixel, so below roughly a laptop width the
+   map is squeezed to nothing. Rather than shrink everything into illegibility, each
+   breakpoint gives up the least load-bearing thing left.
+*/
+
+/* Laptop. Rails are already clamped smaller; the played-cards rail loses its fixed height so
+   it takes only the room its cards need. */
+@media (max-width: 1400px) {
+  .play-slot.tall {
+    height: auto;
+    min-height: 190px;
+  }
+  .play-rail {
+    --card-w: 96px;
+    --card-h: 68px;
+  }
+  .court-slot {
+    border-width: 1px;
+  }
+}
+
+/* Small laptop. The played-cards rail goes: it is the only panel here that is purely a
+   record — every lead, surpass, copy and pivot is already written to the log — and dropping
+   it hands ~120px straight to the map. */
+@media (max-width: 1150px) {
+  .board-col {
+    grid-template-columns: clamp(80px, 9vw, 104px) minmax(0, 1fr) clamp(92px, 10vw, 116px);
+    grid-template-areas:
+      "court map ambitions"
+      "hand  hand hand"
+      "boards boards boards";
+  }
+  .play-rail {
+    display: none;
+  }
+  /* Four player boards will not fit side by side; let the row scroll instead of crushing. */
+  .player-boards {
+    overflow-x: auto;
+  }
+  .mini-boards {
+    flex: 0 0 auto;
+  }
+}
+
+/* Tablet and narrow windows. The court rail folds into a horizontal strip under the map,
+   which keeps every card reachable — the enlarged view is where they are read anyway. */
+@media (max-width: 920px) {
+  .board-col {
+    grid-template-columns: minmax(0, 1fr) clamp(84px, 12vw, 104px);
+    grid-template-areas:
+      "map ambitions"
+      "court court"
+      "hand hand"
+      "boards boards";
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
+  }
+  .court-rail {
+    flex-direction: row;
+    align-items: stretch;
+    height: 104px;
+  }
+  .court-head {
+    flex-direction: column;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    flex: 0 0 auto;
+  }
+  .court-slot {
+    flex: 0 0 74px;
+  }
+  .court-slot:hover:not(:disabled) {
+    transform: translateY(-3px);
+  }
+  .hand-card {
+    width: 96px;
+    height: 134px;
+  }
+}
+
+/* --- battle -------------------------------------------------------------- */
+
+/* The battle reticle's own colours live with the rest of the reticle rules above. */
+.sys-hit.battle circle:hover {
+  fill: rgba(224, 96, 78, 0.34);
+}
+
+/* Stepper buttons, shared by the gather cards. */
+.bt-step {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.bt-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Roll result: real 3D dice that tumble in and settle on their faces. */
+.bt-result.three-d {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 6px 0 12px;
+  padding: 14px 4px 20px;
+  perspective: 560px;
+  perspective-origin: 50% 24%;
+}
+.die3d {
+  position: relative;
+  width: 54px;
+  height: 54px;
+}
+/* Soft contact shadow so the die reads as sitting above the tray. */
+.die3d::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -9px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55), transparent 70%);
+}
+.cube {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 1s cubic-bezier(0.2, 0.7, 0.24, 1);
+  will-change: transform;
+}
+/*
+ * The face art is a disc on a transparent field covering about π/4 of the square, so the four
+ * corners come up empty and the cube reads as floating discs. The face is filled with the die's
+ * own body colour (`--die-face`, sampled from the art) to close them.
+ *
+ * Do NOT scale the image up to cover the corners instead: `overflow: hidden` does not clip a
+ * face inside a `transform-style: preserve-3d` cube, so the art spills past the die's edge.
+ *
+ * **The vignette must go over the art, not under it.** An `inset` box-shadow paints above the
+ * background but *below* child content, so shading the face that way darkened the bare corners
+ * and left the disc untouched — drawing a visible seam at the disc's edge that no amount of
+ * colour-matching could close, because the two halves were being lit differently. The art is
+ * perfectly flat (every opaque pixel of `skirmish-die-4` is `78,125,132`), so once both are lit
+ * the same the join disappears. It is an `::after` overlay now.
+ */
+.cube .face {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--die-face, #10131b);
+}
+.cube .face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 0 12px rgba(0, 0, 0, 0.35);
+}
+.cube .face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/*
+ * The cube's shape comes from shading whole faces rather than from the body colour differing
+ * from the art — the filter takes the background and the art together, so they cannot drift
+ * apart again. Lit from above: the top catches it, the bottom is in shadow.
+ */
+.cube .face.top {
+  filter: brightness(1.14);
+}
+.cube .face.right {
+  filter: brightness(0.9);
+}
+.cube .face.left {
+  filter: brightness(0.82);
+}
+.cube .face.back {
+  filter: brightness(0.76);
+}
+.cube .face.bottom {
+  filter: brightness(0.66);
+}
+.cube .face.front {
+  transform: translateZ(27px);
+}
+.cube .face.back {
+  transform: rotateY(180deg) translateZ(27px);
+}
+.cube .face.right {
+  transform: rotateY(90deg) translateZ(27px);
+}
+.cube .face.left {
+  transform: rotateY(-90deg) translateZ(27px);
+}
+.cube .face.top {
+  transform: rotateX(90deg) translateZ(27px);
+}
+.cube .face.bottom {
+  transform: rotateX(-90deg) translateZ(27px);
+}
+.bt-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+/* A readout, not a pill — the same small-caps the rest of the battle chrome uses. */
+.bt-chip {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(201, 169, 97, 0.28);
+  color: var(--muted);
+}
+.bt-chip strong {
+  color: var(--gold);
+}
+
+/* --- battle resolution modal (dice + both fleets) ------------------------- */
+
+.da-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.66);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+/*
+ * The battle window. Squarer than a web dialog and lit from the top edge, so it reads as a
+ * console the fight is being run from rather than a card floating over the page — the same
+ * chrome the map's reticles and the Prelude tray wear.
+ */
+.da-modal {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(rgba(17, 14, 16, 0.98), rgba(9, 10, 15, 0.99));
+  border: 1px solid rgba(224, 96, 78, 0.45);
+  border-radius: 10px;
+  padding: 18px 22px 20px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.75);
+}
+/* A hot filament along the top edge — the console is live. */
+.da-modal::before {
+  content: '';
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e0604e, transparent);
+}
+.da-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.da-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f0d9d2;
+}
+.da-vs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.da-vs-x {
+  color: var(--muted);
+  font-size: 12px;
+}
+.da-swatch {
+  font-family: var(--font-display);
+  padding: 2px 9px 3px;
+  border-radius: 8px 3px 7px 2px / 3px 7px 2px 8px;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+.da-tally {
+  margin: 2px 0 6px;
+}
+.da-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+/*
+ * The standing order. It was the last generic blue on this screen, which put the coldest colour
+ * in the app on the one line telling you what the battle wants — now it is gold small-caps on a
+ * square rule, matching the hint under the map that plays the same role there.
+ */
+.da-prompt {
+  margin: 6px 0 14px;
+  padding: 9px 13px;
+  border-radius: 3px;
+  background: rgba(201, 169, 97, 0.08);
+  border-left: 3px solid var(--gold);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+/* Self-damage is the one phase where you are hitting your own ships — colour it as a warning. */
+.da-prompt.warn {
+  background: rgba(224, 96, 78, 0.14);
+  border-left-color: #e0604e;
+  color: #f0a091;
+}
+
+/* --- a side's force ------------------------------------------------------- */
+.da-force {
+  margin-bottom: 12px;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+.da-force.active {
+  opacity: 1;
+}
+.da-force-head {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-left: 3px solid;
+  padding-left: 8px;
+  margin-bottom: 8px;
+}
+.da-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  min-height: 62px;
+}
+.da-empty-note {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* --- one piece ------------------------------------------------------------ */
+.da-piece {
+  position: relative;
+  width: 84px;
+  height: 58px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.da-piece.city,
+.da-piece.starport {
+  width: 62px;
+}
+.da-piece img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+/*
+ * Targetable right now — the engine is offering a hit for this piece.
+ *
+ * Same discipline as the map's reticles: **quiet at rest, unmistakable on hover**. A whole fleet
+ * of pulsing boxes is a wall rather than a menu, so at rest a target wears only corner ticks — the
+ * `conic-gradient` border draws four right-angles and nothing else — and the *hover* fills it,
+ * squares the frame and lifts it.
+ */
+.da-piece.selectable {
+  cursor: pointer;
+  border-color: rgba(224, 96, 78, 0.3);
+  background: rgba(224, 96, 78, 0.07);
+}
+/*
+ * Corner ticks, two opposite corners each. Drawn as pseudo-elements rather than a fancy border:
+ * a conic-gradient border paints wedges out from the centre, which on a box this wide crossed
+ * the ship art instead of marking its corners.
+ */
+.da-piece.selectable::before,
+.da-piece.selectable::after {
+  content: '';
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(224, 96, 78, 0.85);
+  pointer-events: none;
+  transition: border-color 0.12s ease;
+}
+.da-piece.selectable::before {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+}
+.da-piece.selectable::after {
+  right: -2px;
+  bottom: -2px;
+  border-left: none;
+  border-top: none;
+}
+.da-piece.selectable:hover {
+  transform: translateY(-3px);
+  border-color: #ff6a58;
+  background: rgba(224, 96, 78, 0.3);
+  box-shadow: 0 6px 18px rgba(224, 96, 78, 0.28);
+}
+.da-piece.selectable:hover::before,
+.da-piece.selectable:hover::after {
+  border-color: #ff8b7a;
+}
+.da-piece:disabled {
+  opacity: 0.75;
+}
+/* A destroyed piece keeps its slot, shown as the colourless silhouette. */
+.da-piece.destroyed {
+  opacity: 0.4;
+}
+.da-piece.destroyed img {
+  filter: grayscale(1);
+}
+.da-badge {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.da-badge.dmg {
+  background: #b8862a;
+  color: #1a1206;
+}
+.da-badge.gone {
+  background: #6b2020;
+  color: #ffd9d9;
+}
+
+/* --- footer --------------------------------------------------------------- */
+.da-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.da-spacer {
+  flex: 1;
+}
+/* Undo roll / start over: a way back, so it stays quiet beside the confirm. */
+.da-ghost {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border: 1px solid rgba(201, 169, 97, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.da-ghost:hover:not(:disabled) {
+  color: var(--gold);
+  border-color: rgba(201, 169, 97, 0.6);
+  background: rgba(201, 169, 97, 0.09);
+}
+.da-ghost:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+/* Settling a fight, so this one stays red where the resource screens' primary is gold. */
+.da-confirm {
+  font-family: var(--font-display);
+  padding: 9px 24px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #e0604e;
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.da-confirm:hover {
+  background: #ef7361;
+}
+.da-remaining {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* --- gather step, inside the battle window -------------------------------- */
+
+.dg-cards {
+  display: flex;
+  gap: 12px;
+  margin: 4px 0 6px;
+}
+.dg-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+/* A type with dice in the pool reads as chosen. */
+.dg-card.on {
+  border-color: rgba(224, 96, 78, 0.7);
+  background: rgba(224, 96, 78, 0.1);
+}
+.dg-die {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  opacity: 0.5;
+  transition: opacity 0.12s ease;
+}
+.dg-card.on .dg-die {
+  opacity: 1;
+}
+.dg-name {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dg-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dg-count {
+  min-width: 22px;
+  text-align: center;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.dg-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.dg-target {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 9px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+/* --- secured court cards, on the player boards --------------------------- */
+/*
+ * Named rows, not thumbnails. A picture of the card small enough to fit here was too small to
+ * identify — the art is 744x1039 and its name band ends up a few pixels tall — so it carried no
+ * more information than a count. The name identifies the card; the suit and the key cost ride
+ * alongside because those are the two numbers read at a glance (what the guild's Prelude keys
+ * off, and what a raider pays to take it). The card's text is a click away.
+ */
+.pb-guilds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 4px;
+  margin-top: 2px;
+}
+.pb-guild {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px 2px 3px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--gold-dim);
+  border-radius: 6px 2px 5px 2px / 2px 5px 2px 6px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.pb-guild:hover {
+  border-color: var(--gold);
+  background: rgba(201, 169, 97, 0.14);
+}
+.pb-guild-name {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.pb-guild-suit {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+/* The raid price, in the same key art the player board uses for its resource slots. */
+.pb-guild-keys {
+  height: 12px;
+  width: auto;
+  display: block;
+  opacity: 0.9;
+}
+.pb-guilds.mini .pb-guild {
+  gap: 3px;
+  padding: 1px 4px 1px 2px;
+}
+.pb-guilds.mini .pb-guild-name {
+  font-size: 9px;
+}
+.pb-guilds.mini .pb-guild-suit {
+  width: 11px;
+  height: 11px;
+}
+.pb-guilds.mini .pb-guild-keys {
+  height: 10px;
+}
+
+/* --- variant options (leaders and lore) on the start screen --------------- */
+.ng-check {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+}
+.ng-check input {
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.ng-check em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 11px;
+  margin-left: 6px;
+}
+.ng-check input:disabled,
+.ng-check input:disabled + span {
+  opacity: 0.45;
+  cursor: default;
+}
+/* The sub-options only exist while the variant is on, so they are indented under it. */
+.ng-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 4px 0 0 24px;
+  padding-left: 12px;
+  border-left: 1px solid var(--gold-dim);
+}
+.ng-lore-count {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ng-sub-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ng-lore-count .seg button {
+  flex: 0 0 38px;
+  padding: 6px;
+}
+.ng-lore-count .seg button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* --- the Leaders and Lore draft screen ----------------------------------- */
+/*
+ * A full screen rather than a modal: it is a phase of its own, between choosing a setup and the
+ * first turn, and it wants the whole table. Sits under the topbar (z 400) so Undo stays live.
+ */
+.draft {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  overflow-y: auto;
+  padding: 60px 32px 28px;
+  background:
+    linear-gradient(rgba(8, 10, 15, 0.9), rgba(8, 10, 15, 0.96)),
+    url('/game-assets/arcs-bg.webp') center / cover fixed;
+}
+.draft-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1500px;
+  margin: 0 auto 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--gold-dim);
+}
+.draft-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.draft-turn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.draft-who {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.draft-what {
+  color: var(--muted);
+  font-size: 11px;
+}
+/*
+ * Deliberately quiet, and last in the header: it skips the part of the game this screen exists
+ * for, so it should never be the thing your eye lands on first.
+ */
+.draft-random {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 169, 97, 0.28);
+  border-radius: 4px;
+  padding: 5px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.draft-random:hover {
+  color: var(--gold);
+  border-color: rgba(201, 169, 97, 0.6);
+  background: rgba(201, 169, 97, 0.09);
+}
+
+.draft-body {
+  max-width: 1500px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.draft-row-title {
+  margin: 0 0 9px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.draft-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+/*
+ * One card **of the draft**. `LearnedScreen` shares this screen's shell — `.draft`, `.draft-head`,
+ * `.draft-row` and the rest are chrome for a full-screen picker and are meant to be common — but
+ * its cards are `.learned-card`, because only the card's *insides* differ between the two.
+ */
+.draft-card {
+  position: relative;
+  width: 150px;
+  padding: 0;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b0d13;
+  line-height: 0;
+  cursor: pointer;
+  perspective: 1200px;
+  transition: transform 0.13s ease, box-shadow 0.13s ease, border-color 0.13s ease;
+}
+/*
+ * The deal: every card arrives face down and turns over, staggered along the row.
+ *
+ * The front image stays **in flow** and the back is laid over it, so the flip changed nothing
+ * about how a card is sized — the row still measures itself from the art the way it always did.
+ * At rest the inner is turned away from you, which is what puts the back in view.
+ */
+.dc-inner {
+  position: relative;
+  display: block;
+  transform-style: preserve-3d;
+  transform: rotateY(180deg);
+  transition: transform 0.62s cubic-bezier(0.2, 0.7, 0.24, 1);
+}
+.draft-card.face-up .dc-inner {
+  transform: rotateY(0deg);
+}
+.dc-inner > img,
+.dc-back {
+  backface-visibility: hidden;
+}
+.dc-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+.dc-back img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Direct child only: the owner ribbon has its own image and must not be stretched to card width. */
+.dc-inner > img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.draft-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--gold);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.75);
+}
+/* Available to the player picking right now. */
+.draft-card.takeable {
+  box-shadow: 0 0 0 1px var(--gold-dim);
+}
+/*
+ * Taken, but still on the table — that is the point of the screen. Dimmed enough to read as
+ * gone, bright enough to still be read.
+ */
+.draft-card.taken {
+  border-color: var(--owner);
+  cursor: pointer;
+}
+/* Dimmed enough to read as gone, light enough that the rules are still legible. */
+.draft-card.taken .dc-inner > img {
+  opacity: 0.72;
+}
+.draft-card.taken:hover .dc-inner > img {
+  opacity: 1;
+}
+/*
+ * The owner tag rides at the *top*, over the illustration. Both card types print their rules in
+ * the lower half, and a banner across the bottom hid exactly the text a rival most needs to read
+ * — which would have defeated the point of leaving taken cards on the table.
+ */
+.draft-owner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 6px 4px;
+  background: rgba(6, 8, 12, 0.9);
+  border-bottom: 2px solid var(--owner);
+  color: var(--owner);
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.draft-owner-mark {
+  width: 15px;
+  height: auto;
+  flex: 0 0 auto;
+}
+.draft-note {
+  max-width: 1500px;
+  margin: 20px auto 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* --- one card, big enough to actually read --- */
+.draft-reader {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.draft-reader-inner {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  background: #0b0d13;
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  border-radius: 8px;
+  padding: 18px;
+  max-height: 100%;
+}
+.draft-reader-art {
+  height: min(78vh, 900px);
+  width: auto;
+  max-width: 60vw;
+  object-fit: contain;
+  border-radius: 6px;
+  display: block;
+}
+.draft-reader-side {
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.draft-held {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.draft-reader-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The drafted leader and lore, on the player board. Gold-edged so they read as the variant's
+   cards rather than as secured guilds. */
+.pb-drafted.leader {
+  border-color: var(--gold);
+  background: rgba(201, 169, 97, 0.16);
+}
+.pb-drafted.leader .pb-guild-name {
+  color: var(--gold);
+}
+
+/* --- the drafted leader on the player boards ----------------------------- */
+/*
+ * Two treatments, because the two boards are read differently.
+ *
+ * The acting player's board gets a **portrait panel** down its right edge (`.pb-portrait`); the
+ * rival boards wash the art faintly behind their contents. Both crops have the same thing to
+ * avoid: a leader card's lower half is a white panel of rules text — the art ends at about 51% of
+ * the card's height — so any crop reaching past that puts printed body text and the card's own
+ * name behind the readout.
+ */
+
+/*
+ * Rivals: a wash, bounded by width.
+ *
+ * Under `cover` the art scales to the board's *width*, so how far down the card it is safe to pan
+ * depends on how wide the board is — and a mini (~200px) sees nearly half the card, leaving almost
+ * no room to move. Pinned to the top, which is safe at any width; a first attempt panned to 30%
+ * here and dragged the card's name band up into the tallies. The scrim is heavy on purpose: this
+ * is decoration behind a dense readout, and the readout wins.
+ */
+.pboard.mini.has-leader {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0)),
+    linear-gradient(180deg, rgba(9, 11, 16, 0.88) 0%, rgba(9, 11, 16, 0.93) 100%),
+    var(--leader-art);
+  background-size: auto, auto, cover;
+  background-position: center, center, center top;
+  background-repeat: no-repeat;
+}
+
+/*
+ * The acting player: a portrait panel, bounded by height.
+ *
+ * `auto 196%` scales the card so its top 51% is exactly the panel's height (1 / 0.51), and
+ * `center top` shows precisely that — the illustration, never the rules panel. This holds at any
+ * panel height, unlike the width-driven crop above. The panel is narrower than the art, so it
+ * centre-crops horizontally, which is where the illustrations put their subject.
+ *
+ * The negative margins cancel `.pboard`'s padding so the panel bleeds to the board's edge; inset
+ * from it, it read as a floating thumbnail rather than part of the board.
+ */
+.pb-portrait {
+  flex: 0 0 auto;
+  width: 76px;
+  align-self: stretch;
+  position: relative;
+  margin: -5px -8px -6px 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid rgba(201, 169, 97, 0.26);
+  border-radius: 0 6px 6px 0;
+  overflow: hidden;
+  cursor: pointer;
+  background-image: var(--leader-art);
+  background-size: auto 196%;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+/* Only enough to seat the art in the board and to sit the name on something. */
+.pb-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(9, 11, 16, 0.66) 0%,
+    rgba(9, 11, 16, 0.14) 42%,
+    rgba(9, 11, 16, 0.06) 100%
+  );
+  pointer-events: none;
+}
+.pb-portrait:hover::after {
+  background: linear-gradient(
+    90deg,
+    rgba(9, 11, 16, 0.5) 0%,
+    rgba(9, 11, 16, 0.04) 42%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+}
+/*
+ * Rival portraits are opt-in on width — see the media queries below. Hidden rather than not
+ * rendered so the whole thing is one CSS decision; the component is cheap and stateless.
+ */
+.pb-portrait.mini {
+  display: none;
+  width: 54px;
+  margin: -4px -6px -5px 0;
+}
+/*
+ * Rival portraits, once the row can pay for them.
+ *
+ * Measured rather than guessed: with every portrait shown the row needs 1002px at 3 players and
+ * 1272px at 4, so these are those numbers plus headroom for a long lore name widening a board.
+ * Below the threshold the rivals keep the wash, which costs no width at all. The two counts need
+ * separate thresholds because a fourth player adds a whole board, not just a panel.
+ */
+@container boards (min-width: 1040px) {
+  .player-boards.p3 .pb-portrait.mini {
+    display: block;
+  }
+  /* The panel replaces the wash rather than joining it. */
+  .player-boards.p3 .pboard.mini.has-leader {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0));
+  }
+}
+@container boards (min-width: 1310px) {
+  .player-boards.p4 .pb-portrait.mini {
+    display: block;
+  }
+  .player-boards.p4 .pboard.mini.has-leader {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0));
+  }
+}
+
+
+/* --- the variant boxes, as the plaques printed on them --------------------- */
+/*
+ * The Leaders & Lore Pack's box carries a cream plaque with dark letterspaced caps and a heavy
+ * dark rule around it. These toggles are the two boxes a player would own, so they are drawn as
+ * that plaque rather than as checkboxes — picking a variant reads as putting a box on the table.
+ *
+ * The checkbox itself stays in the markup and keeps working; it is only visually replaced, so the
+ * label is still clickable, focusable and announced.
+ */
+.ng-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 2px;
+}
+.ng-plaque {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 16px 6px;
+  cursor: pointer;
+  border-radius: 3px;
+  /* Aged paper: a warm cream with a faint speckle, over a dark rule. */
+  background:
+    radial-gradient(circle at 20% 30%, rgba(120, 100, 60, 0.07) 0 1px, rgba(0, 0, 0, 0) 1px),
+    radial-gradient(circle at 70% 65%, rgba(120, 100, 60, 0.06) 0 1px, rgba(0, 0, 0, 0) 1px),
+    linear-gradient(180deg, #efe7d4, #ded3ba);
+  background-size: 17px 17px, 23px 23px, auto;
+  border: 2px solid #2a2620;
+  box-shadow:
+    inset 0 0 0 1px rgba(201, 169, 97, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+  /* Unchosen boxes are still on the shelf: legible, but plainly not in play. */
+  filter: saturate(0.25) brightness(0.44);
+  transition: filter 0.14s, box-shadow 0.14s, transform 0.14s;
+}
+.ng-plaque input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.ng-plaque-text {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #1d1a15;
+  white-space: nowrap;
+}
+.ng-plaque-sub {
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  color: #5b5344;
+  white-space: nowrap;
+}
+.ng-plaque:hover {
+  filter: saturate(0.6) brightness(0.7);
+  transform: translateY(-1px);
+}
+.ng-plaque.on {
+  filter: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(201, 169, 97, 0.8),
+    0 0 0 1px rgba(201, 169, 97, 0.45),
+    0 3px 12px rgba(0, 0, 0, 0.6);
+}
+.ng-plaque.on:hover {
+  transform: translateY(-1px);
+}
+/* The expansion cannot be added without the base variant, so it reads as unavailable. */
+.ng-plaque.locked {
+  cursor: default;
+  filter: saturate(0.06) brightness(0.3);
+}
+.ng-plaque.locked:hover {
+  transform: none;
+  filter: saturate(0.06) brightness(0.3);
+}
+.ng-plaque:focus-within {
+  outline: 2px solid rgba(201, 169, 97, 0.75);
+  outline-offset: 2px;
+}
+
+/* --- the Archivist's Learned draw ------------------------------------------ */
+/*
+ * Reuses the draft's card presentation, with two differences that follow from what the choice is:
+ * a kept card is marked in place rather than dimmed (nothing has been taken from anyone), and each
+ * card carries its own reader button, because here a click keeps rather than opens.
+ */
+/*
+ * The deck a row was dealt from, drawn face down beside its cards with what is left in the box.
+ * Stacked edges behind it so it reads as a pile — the same treatment the court draw pile gets.
+ */
+.draft-pile {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: 96px;
+  border-radius: 6px;
+  border: 1px solid rgba(201, 169, 97, 0.35);
+  overflow: hidden;
+  box-shadow: 3px 3px 0 -1px rgba(11, 13, 19, 0.9), 4px 4px 0 0 rgba(201, 169, 97, 0.22),
+    7px 7px 0 -1px rgba(11, 13, 19, 0.9), 8px 8px 0 0 rgba(201, 169, 97, 0.12);
+}
+.draft-pile img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.draft-pile-n {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  background: rgba(9, 11, 16, 0.9);
+  border: 1px solid rgba(201, 169, 97, 0.5);
+  border-radius: 3px;
+  padding: 1px 8px;
+}
+
+.learned-slot {
+  position: relative;
+  display: inline-flex;
+}
+/*
+ * The Archivist's cards. Deliberately **not** `.draft-card`, though the two look alike and sit in
+ * the same shell: the draft's card has a flip wrapper inside it and this one does not, so a rule
+ * written for one structure does not fit the other. They shared a class once, and narrowing the
+ * sizing rule to the draft's wrapper left these at their natural 744x1039.
+ */
+.learned-card {
+  position: relative;
+  width: 150px;
+  padding: 0;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b0d13;
+  line-height: 0;
+  cursor: pointer;
+  transition: transform 0.13s ease, box-shadow 0.13s ease, border-color 0.13s ease;
+}
+.learned-card > img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.learned-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--gold);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.75);
+}
+.learned-card.kept {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  box-shadow: 0 0 18px rgba(201, 169, 97, 0.45);
+}
+.learned-kept {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: 4px 2px 5px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #1d1a15;
+  background: linear-gradient(180deg, rgba(201, 169, 97, 0.96), rgba(201, 169, 97, 0.78));
+  border-radius: 3px 3px 0 0;
+}
+/* Small, and over the card's own corner: reading is the secondary act here. */
+.learned-read {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--gold);
+  background: rgba(9, 11, 16, 0.82);
+  border: 1px solid rgba(201, 169, 97, 0.5);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.learned-read:hover {
+  background: rgba(9, 11, 16, 0.95);
+  border-color: var(--gold);
+}
+.draft-random:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.draft-random:disabled:hover {
+  color: var(--muted);
+  border-color: rgba(201, 169, 97, 0.28);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* --- the Prelude: tokens, and what each buys ------------------------------- */
+/*
+ * A tile per resource *type* — the token, how many you hold, what the board prints under it, and
+ * the spends it buys as chips. An outraged type keeps its place, wearing the outrage art and able
+ * to do nothing but be discarded.
+ */
+/*
+ * A tray across the bottom of the map column, not a modal: the Prelude is decided *looking at the
+ * board*, so the map, the court and your own player board stay in view.
+ *
+ * It shares the hand's grid area and paints over the fan — the card is already played, so the
+ * hand is spent for the turn. A sibling of `.hand-row` rather than a child, because that row
+ * clips its children to hide the fan's overhang and this is taller than the row.
+ */
+.pr-tray {
+  grid-area: hand;
+  align-self: end;
+  z-index: 45; /* over the hand (40), under the player boards (50) and the topbar (400) */
+  pointer-events: none;
+}
+.pr-inner {
+  pointer-events: auto;
+  background: linear-gradient(rgba(14, 17, 24, 0.93), rgba(10, 12, 18, 0.97));
+  border: 1px solid rgba(201, 169, 97, 0.5);
+  border-radius: 12px;
+  padding: 10px 14px 12px;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+}
+.pr-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.pr-who {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.pr-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+.pr-head-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pr-empty {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+/* Tiles and any guild cards on one line, so the tray stays a strip rather than a panel. */
+.pr-body {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.pr-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+/*
+ * Laid out along the row rather than down the tile: the tray shares the hand's strip, and every
+ * pixel it takes comes off the map — which is the thing you are deciding against.
+ */
+.pr-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 9px;
+  row-gap: 1px;
+  padding: 7px 11px 7px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  border-radius: 9px;
+}
+.pr-token {
+  grid-row: 1 / span 2;
+}
+.pr-tile.outraged {
+  border-color: rgba(214, 92, 74, 0.4);
+  background: rgba(214, 92, 74, 0.05);
+}
+.pr-token {
+  position: relative;
+}
+.pr-token img {
+  width: 42px;
+  height: 42px;
+  display: block;
+}
+/* How many you hold. The tile is one *choice*; the count is what backs it. */
+.pr-count {
+  position: absolute;
+  right: -6px;
+  bottom: -2px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text);
+  background: rgba(9, 11, 16, 0.9);
+  border: 1px solid rgba(201, 169, 97, 0.5);
+  border-radius: 9px;
+  padding: 0 5px;
+}
+.pr-name {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+/* The printed line is reference, not instruction — it lives in the tooltip once space is tight. */
+.pr-printed-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.pr-printed {
+  font-size: 9.5px;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pr-buys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.pr-buy {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: rgba(201, 169, 97, 0.1);
+  border: 1px solid rgba(201, 169, 97, 0.5);
+  border-radius: 4px;
+  padding: 4px 9px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.pr-buy:hover {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #14100a;
+}
+/* Spending for nothing is a real option, but it should not look like a purchase. */
+.pr-buy.discard {
+  color: var(--muted);
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.pr-buy.discard:hover {
+  color: #e8907f;
+  border-color: rgba(214, 92, 74, 0.7);
+  background: rgba(214, 92, 74, 0.12);
+}
+/* Divided off, since these spend a card rather than a token. */
+.pr-guild {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(201, 169, 97, 0.25);
+}
+.pr-guild-head {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pr-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pr-card-slot {
+  position: relative;
+  display: inline-flex;
+}
+/* Same shape as a resource tile: the thumbnail identifies the card, the magnifier reads it. */
+.pr-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  width: 210px;
+  padding: 6px 22px 6px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 169, 97, 0.3);
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s;
+}
+.pr-card:hover {
+  background: rgba(201, 169, 97, 0.1);
+  border-color: var(--gold);
+}
+.pr-card img {
+  width: 34px;
+  height: auto;
+  border-radius: 2px;
+  display: block;
+}
+.pr-card-name {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.pr-card-what {
+  font-size: 9.5px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+.pr-cards {
+  flex-direction: column;
+}
+/* Secondary to Done: a detour, not the way on. */
+.pr-arrange {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 169, 97, 0.28);
+  border-radius: 8px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.pr-arrange:hover {
+  color: var(--gold);
+  border-color: rgba(201, 169, 97, 0.6);
+  background: rgba(201, 169, 97, 0.09);
+}
+
+/* --- the resource slots, as a board you push tokens around on --------------- */
+/*
+ * The physical row, blown up: a key plate above every slot because that is what a raider pays to
+ * take what is in it, and a well below to drop into. The whole row is drawn, covered slots
+ * included, with the city that covers them sitting on top — the same picture as the player board,
+ * at a size you can drag on.
+ */
+.sb-modal {
+  width: min(760px, 100%);
+  border-color: rgba(201, 169, 97, 0.55);
+}
+.sb-tray,
+.sb-row {
+  margin-top: 14px;
+}
+.sb-tokens {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(201, 169, 97, 0.45);
+  border-radius: 8px;
+  background: rgba(201, 169, 97, 0.06);
+  min-height: 74px;
+  align-items: center;
+}
+/* The row on the left, the supply hard right: dropping there is losing it, not moving it. */
+.sb-slots {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.sb-group {
+  position: relative;
+  display: flex;
+  gap: 8px;
+}
+.sb-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.12s;
+}
+/* Covered by a city: shown so the row's length makes sense, but inert. */
+.sb-slot.locked {
+  cursor: default;
+}
+/* The plate stays readable — knowing a 3-key slot is under there is the point of drawing it. */
+.sb-slot.locked .sb-keys {
+  opacity: 0.4;
+}
+/* No dashed rim under a city: an empty well drawn through it reads as a slot you could use. */
+.sb-slot.locked .sb-well {
+  border-color: transparent;
+  background: rgba(0, 0, 0, 0.5);
+}
+/* Only while something is in the air: the row is otherwise quiet. */
+.sb-slot.legal {
+  border-color: rgba(201, 169, 97, 0.55);
+  background: rgba(201, 169, 97, 0.1);
+  transform: translateY(-2px);
+}
+/* Landing here costs the occupant, so it warns in the battle modal's red rather than in gold. */
+.sb-slot.ejects.legal {
+  border-color: rgba(214, 92, 74, 0.85);
+  background: rgba(214, 92, 74, 0.14);
+}
+.sb-keys {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+.sb-well {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px dashed rgba(201, 169, 97, 0.4);
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/*
+ * The city still standing on this group, drawn **once** across it — as on the player board, where
+ * a single wide piece covers the 5th and 6th slots. Sized to the well so it reads as a piece
+ * resting on the slot rather than a marker floating beside it.
+ */
+.sb-city {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  height: 58px;
+  margin: 0 auto;
+  width: auto;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.85));
+}
+.sb-token {
+  width: 54px;
+  height: 54px;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 0.12s, transform 0.12s;
+}
+.sb-token:hover {
+  transform: scale(1.06);
+}
+/* Lifted: it is in your hand, so the well it came from reads as empty. */
+.sb-token.held {
+  opacity: 0.3;
+}
+.sb-bin {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.sb-bin.legal {
+  border-color: rgba(214, 92, 74, 0.75);
+  background: rgba(214, 92, 74, 0.12);
+}
+.sb-well.bin {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+/*
+ * Done: the primary confirm of a *resource* decision, so it wears the gold `.ng-start` already
+ * uses for the game's other committing button — not `.da-confirm`, which is red because that one
+ * settles a fight.
+ *
+ * Disabled is a real state here rather than a dimmed button: until the row is legal there is
+ * nothing to confirm, and the label says what is missing.
+ */
+.sb-done {
+  font-family: var(--font-display);
+  padding: 9px 24px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--gold);
+  color: #14100a;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.sb-done:hover:not(:disabled) {
+  background: #dcbb74;
+}
+.sb-done:disabled {
+  background: transparent;
+  border-color: rgba(201, 169, 97, 0.3);
+  color: var(--muted);
+  cursor: default;
+}
+.sb-bin-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* The token under the cursor. Pointer-events off, or it would be its own drop target. */
+.sb-ghost {
+  position: fixed;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  pointer-events: none;
+  z-index: 400;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
+}
+
+/* --- raiding -------------------------------------------------------------- */
+/*
+ * A shop: the defender's holdings with prices on them, and the purse in the header. Keys are drawn
+ * rather than counted because the number is small and the comparison — can I afford that card? —
+ * is the whole decision.
+ */
+/*
+ * Raiding is the spoils, not the fight — so where the battle window is lit red, this one is gold,
+ * the colour it uses for keys and goods everywhere else. Same console chrome otherwise.
+ */
+.raid-modal {
+  width: min(640px, 100%);
+  border-color: rgba(201, 169, 97, 0.5);
+}
+.raid-modal::before {
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.raid-purse {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+}
+.raid-purse em {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.raid-keys {
+  display: inline-flex;
+  gap: 3px;
+}
+/* The dice that earned the keys, at the size the battle tray shows them. */
+.raid-die {
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  display: block;
+}
+/* A die whose keys have all been spent stays in place, so the roll still reads as it landed. */
+.raid-die.spent {
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+/* A card and its magnifier, the reader sitting on the corner of the card it reads. */
+.raid-slot {
+  position: relative;
+  display: inline-flex;
+}
+.raid-read {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--gold);
+  background: rgba(9, 11, 16, 0.82);
+  border: 1px solid rgba(201, 169, 97, 0.5);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.raid-read:hover {
+  background: rgba(9, 11, 16, 0.95);
+  border-color: var(--gold);
+}
+/* The price on an item: the same keys-N plate the player board stamps on a resource slot. */
+.raid-price {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+.raid-shelf {
+  margin-top: 12px;
+}
+.raid-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.raid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 12px 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 169, 97, 0.22);
+  border-radius: 4px;
+  transition: border-color 0.12s, background 0.12s, transform 0.12s, box-shadow 0.12s;
+}
+/* Same rest/hover split as the map and the battle window: quiet shelf, unmistakable pick. */
+.raid-item:hover {
+  background: rgba(201, 169, 97, 0.16);
+  border-color: var(--gold);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(201, 169, 97, 0.2);
+}
+/* The goods on offer. Scoped off the price plate, which is sized on its own terms below. */
+.raid-item img:not(.raid-price) {
+  width: 44px;
+  height: 44px;
+  display: block;
+}
+/* A card is a card: show it as one, at a size its art and title can be read. */
+.raid-item.card img:not(.raid-price) {
+  width: 84px;
+  height: auto;
+  border-radius: 3px;
+}
+.raid-name {
+  max-width: 96px;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--text);
+}

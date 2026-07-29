@@ -1,0 +1,110 @@
+/**
+ * The current player's hand, fanned along the bottom of the board. Cards are sorted by suit
+ * then strength; hovering raises a card into full view; playing happens straight from here.
+ *
+ * The panel on the right no longer lists card-play buttons — those live here now. A card may
+ * map to more than one legal play (a same-suit follow can Surpass or Copy), in which case the
+ * raised card shows a button per option; a single-option card plays on click.
+ */
+
+import { CardLocation, SUITS, contentsOf, parseCardId } from '@arcs/engine'
+import type { Action, Continue, GameState } from '@arcs/engine'
+import type { CSSProperties } from 'react'
+
+import { store } from '../store.js'
+import { CardFace } from './CardFace.js'
+
+const PLAY_TYPES = ['turn/lead', 'turn/surpass', 'turn/copy', 'turn/pivot']
+
+const PLAY_LABEL: Record<string, string> = {
+  'turn/lead': 'Lead',
+  'turn/surpass': 'Surpass',
+  'turn/copy': 'Copy',
+  'turn/pivot': 'Pivot',
+}
+
+interface Props {
+  state: GameState
+  cont: Continue
+}
+
+export function Hand({ state, cont }: Props): JSX.Element | null {
+  if (cont.kind !== 'ask') return null
+
+  const faction = cont.faction
+  const hand = contentsOf(state.cards, CardLocation.hand(faction))
+  if (hand.length === 0) return null
+
+  // Which cards can be played right now, and how.
+  const playsByCard = new Map<string, Action[]>()
+  for (const a of cont.actions) {
+    if (!PLAY_TYPES.includes(a.type)) continue
+    const id = a['card'] as string
+    const list = playsByCard.get(id) ?? []
+    list.push(a)
+    playsByCard.set(id, list)
+  }
+
+  const cards = [...hand].sort(bySuitThenStrength)
+  const n = cards.length
+  const spread = Math.min(n * 7, 34) // total fan angle
+  const step = n > 1 ? spread / (n - 1) : 0
+
+  return (
+    <div className="hand">
+      {cards.map((cardId, i) => {
+        const mid = (n - 1) / 2
+        const rot = (i - mid) * step
+        const tx = (i - mid) * 78
+        const ty = Math.abs(i - mid) ** 2 * 3
+        const plays = playsByCard.get(cardId) ?? []
+        const playable = plays.length > 0
+
+        return (
+          <div
+            key={cardId}
+            className={`hand-card${playable ? ' playable' : ''}`}
+            style={
+              {
+                '--rot': `${rot}deg`,
+                '--tx': `${tx}px`,
+                '--ty': `${ty}px`,
+                zIndex: i,
+              } as CSSProperties
+            }
+            onClick={() => {
+              if (plays.length === 1) store.apply(plays[0]!)
+            }}
+          >
+            <CardFace cardId={cardId} />
+            {playable ? (
+              <div className="card-plays">
+                {plays.map((a, j) => (
+                  <button
+                    key={j}
+                    className="play-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      store.apply(a)
+                    }}
+                  >
+                    {PLAY_LABEL[a.type] ?? 'Play'}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function bySuitThenStrength(a: string, b: string): number {
+  const ca = parseCardId(a)
+  const cb = parseCardId(b)
+  const sa = SUITS.indexOf(ca.suit)
+  const sb = SUITS.indexOf(cb.suit)
+  if (sa !== sb) return sa - sb
+  return ca.strength - cb.strength
+}

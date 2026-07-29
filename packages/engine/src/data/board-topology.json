@@ -1,0 +1,3149 @@
+{
+  "source": "haunt-roll-fail (MIT) \u2014 arcs/game.scala, arcs/game-base.scala, arcs/ui.scala; region colours decoded from map-regions*.webp",
+  "generated": "2026-07-22",
+  "mapSize": {
+    "width": 2528,
+    "height": 1776
+  },
+  "symbols": [
+    "Gate",
+    "Arrow",
+    "Crescent",
+    "Hex"
+  ],
+  "resources": [
+    "Material",
+    "Fuel",
+    "Weapon",
+    "Relic",
+    "Psionic"
+  ],
+  "systems": [
+    {
+      "id": "1-Gate",
+      "cluster": 1,
+      "symbol": "Gate",
+      "isGate": true,
+      "resource": null,
+      "buildingSlots": 0,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1300,
+          550
+        ],
+        "gateMarkers": [],
+        "regionColour": "#85707c",
+        "selectColour": "#85707c",
+        "regionCentroid": [
+          1310,
+          560
+        ],
+        "regionBBox": [
+          1062,
+          456,
+          1566,
+          696
+        ],
+        "placements": [
+          [
+            1292,
+            542
+          ],
+          [
+            1388,
+            542
+          ],
+          [
+            1228,
+            478
+          ],
+          [
+            1196,
+            574
+          ],
+          [
+            1420,
+            638
+          ],
+          [
+            1132,
+            510
+          ],
+          [
+            1484,
+            574
+          ]
+        ]
+      }
+    },
+    {
+      "id": "1-Arrow",
+      "cluster": 1,
+      "symbol": "Arrow",
+      "isGate": false,
+      "resource": "Weapon",
+      "buildingSlots": 2,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1050,
+          360
+        ],
+        "gateMarkers": [
+          [
+            1049,
+            223
+          ],
+          [
+            1166,
+            170
+          ]
+        ],
+        "regionColour": "#e46000",
+        "selectColour": "#e46000",
+        "regionCentroid": [
+          1038,
+          227
+        ],
+        "regionBBox": [
+          852,
+          58,
+          1216,
+          424
+        ],
+        "placements": [
+          [
+            1042,
+            352
+          ],
+          [
+            1138,
+            352
+          ],
+          [
+            978,
+            288
+          ],
+          [
+            978,
+            192
+          ],
+          [
+            1010,
+            96
+          ],
+          [
+            914,
+            128
+          ]
+        ]
+      }
+    },
+    {
+      "id": "1-Crescent",
+      "cluster": 1,
+      "symbol": "Crescent",
+      "isGate": false,
+      "resource": "Fuel",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1320,
+          130
+        ],
+        "gateMarkers": [
+          [
+            1434,
+            212
+          ]
+        ],
+        "regionColour": "#e4bb09",
+        "selectColour": "#e4bb09",
+        "regionCentroid": [
+          1417,
+          224
+        ],
+        "regionBBox": [
+          1284,
+          60,
+          1618,
+          436
+        ],
+        "placements": [
+          [
+            1312,
+            122
+          ],
+          [
+            1312,
+            218
+          ],
+          [
+            1408,
+            90
+          ],
+          [
+            1312,
+            314
+          ],
+          [
+            1504,
+            90
+          ],
+          [
+            1408,
+            314
+          ],
+          [
+            1568,
+            154
+          ],
+          [
+            1440,
+            410
+          ]
+        ]
+      }
+    },
+    {
+      "id": "1-Hex",
+      "cluster": 1,
+      "symbol": "Hex",
+      "isGate": false,
+      "resource": "Material",
+      "buildingSlots": 2,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1630,
+          400
+        ],
+        "gateMarkers": [
+          [
+            1745,
+            147
+          ],
+          [
+            1846,
+            228
+          ]
+        ],
+        "regionColour": "#924044",
+        "selectColour": "#924044",
+        "regionCentroid": [
+          1787,
+          275
+        ],
+        "regionBBox": [
+          1524,
+          32,
+          2074,
+          516
+        ],
+        "placements": [
+          [
+            1622,
+            392
+          ],
+          [
+            1718,
+            392
+          ],
+          [
+            1654,
+            296
+          ],
+          [
+            1782,
+            328
+          ],
+          [
+            1942,
+            232
+          ],
+          [
+            1782,
+            72
+          ],
+          [
+            1942,
+            136
+          ]
+        ]
+      }
+    },
+    {
+      "id": "2-Gate",
+      "cluster": 2,
+      "symbol": "Gate",
+      "isGate": true,
+      "resource": null,
+      "buildingSlots": 0,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1630,
+          780
+        ],
+        "gateMarkers": [],
+        "regionColour": "#737e73",
+        "selectColour": "#737e73",
+        "regionCentroid": [
+          1621,
+          793
+        ],
+        "regionBBox": [
+          1488,
+          638,
+          1732,
+          926
+        ],
+        "placements": [
+          [
+            1622,
+            772
+          ],
+          [
+            1686,
+            836
+          ],
+          [
+            1558,
+            836
+          ],
+          [
+            1622,
+            676
+          ],
+          [
+            1622,
+            900
+          ],
+          [
+            1526,
+            708
+          ]
+        ]
+      }
+    },
+    {
+      "id": "2-Arrow",
+      "cluster": 2,
+      "symbol": "Arrow",
+      "isGate": false,
+      "resource": "Psionic",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1810,
+          580
+        ],
+        "gateMarkers": [
+          [
+            2010,
+            440
+          ]
+        ],
+        "regionColour": "#9676a4",
+        "selectColour": "#9676a4",
+        "regionCentroid": [
+          2060,
+          427
+        ],
+        "regionBBox": [
+          1682,
+          210,
+          2338,
+          656
+        ],
+        "placements": [
+          [
+            1802,
+            572
+          ],
+          [
+            1866,
+            508
+          ],
+          [
+            2090,
+            316
+          ],
+          [
+            2186,
+            444
+          ],
+          [
+            2186,
+            348
+          ],
+          [
+            2186,
+            252
+          ]
+        ]
+      }
+    },
+    {
+      "id": "2-Crescent",
+      "cluster": 2,
+      "symbol": "Crescent",
+      "isGate": false,
+      "resource": "Weapon",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1920,
+          730
+        ],
+        "gateMarkers": [
+          [
+            2300,
+            618
+          ]
+        ],
+        "regionColour": "#db6000",
+        "selectColour": "#db6000",
+        "regionCentroid": [
+          2030,
+          690
+        ],
+        "regionBBox": [
+          1770,
+          560,
+          2256,
+          792
+        ],
+        "placements": [
+          [
+            1912,
+            722
+          ],
+          [
+            2008,
+            722
+          ],
+          [
+            1816,
+            754
+          ],
+          [
+            2072,
+            658
+          ],
+          [
+            2136,
+            722
+          ],
+          [
+            2168,
+            626
+          ]
+        ]
+      }
+    },
+    {
+      "id": "2-Hex",
+      "cluster": 2,
+      "symbol": "Hex",
+      "isGate": false,
+      "resource": "Relic",
+      "buildingSlots": 2,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1900,
+          900
+        ],
+        "gateMarkers": [
+          [
+            2116,
+            880
+          ],
+          [
+            2221,
+            936
+          ]
+        ],
+        "regionColour": "#b2dfcd",
+        "selectColour": "#b2dfcd",
+        "regionCentroid": [
+          2166,
+          889
+        ],
+        "regionBBox": [
+          1796,
+          786,
+          2438,
+          1004
+        ],
+        "placements": [
+          [
+            1892,
+            892
+          ],
+          [
+            1988,
+            892
+          ],
+          [
+            1796,
+            924
+          ],
+          [
+            2084,
+            956
+          ],
+          [
+            2084,
+            828
+          ],
+          [
+            2212,
+            828
+          ]
+        ]
+      }
+    },
+    {
+      "id": "3-Gate",
+      "cluster": 3,
+      "symbol": "Gate",
+      "isGate": true,
+      "resource": null,
+      "buildingSlots": 0,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1590,
+          1110
+        ],
+        "gateMarkers": [],
+        "regionColour": "#a88080",
+        "selectColour": "#a88080",
+        "regionCentroid": [
+          1576,
+          1093
+        ],
+        "regionBBox": [
+          1434,
+          948,
+          1710,
+          1248
+        ],
+        "placements": [
+          [
+            1590,
+            1110
+          ],
+          [
+            1646,
+            1054
+          ],
+          [
+            1534,
+            1166
+          ],
+          [
+            1562,
+            1026
+          ],
+          [
+            1506,
+            1082
+          ],
+          [
+            1450,
+            1138
+          ]
+        ]
+      }
+    },
+    {
+      "id": "3-Arrow",
+      "cluster": 3,
+      "symbol": "Arrow",
+      "isGate": false,
+      "resource": "Material",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1860,
+          1060
+        ],
+        "gateMarkers": [
+          [
+            2186,
+            1127
+          ]
+        ],
+        "regionColour": "#ff6db2",
+        "selectColour": "#ff6db2",
+        "regionCentroid": [
+          2139,
+          1121
+        ],
+        "regionBBox": [
+          1782,
+          986,
+          2440,
+          1298
+        ],
+        "placements": [
+          [
+            1852,
+            1052
+          ],
+          [
+            1916,
+            1116
+          ],
+          [
+            1948,
+            1020
+          ],
+          [
+            2012,
+            1084
+          ],
+          [
+            2076,
+            1148
+          ],
+          [
+            2108,
+            1052
+          ],
+          [
+            2204,
+            1052
+          ],
+          [
+            2172,
+            1212
+          ]
+        ]
+      }
+    },
+    {
+      "id": "3-Crescent",
+      "cluster": 3,
+      "symbol": "Crescent",
+      "isGate": false,
+      "resource": "Fuel",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          2110,
+          1420
+        ],
+        "gateMarkers": [
+          [
+            1846,
+            1249
+          ]
+        ],
+        "regionColour": "#ffd117",
+        "selectColour": "#ffd117",
+        "regionCentroid": [
+          2076,
+          1368
+        ],
+        "regionBBox": [
+          1710,
+          1138,
+          2310,
+          1534
+        ],
+        "placements": [
+          [
+            2102,
+            1412
+          ],
+          [
+            2166,
+            1476
+          ],
+          [
+            2166,
+            1348
+          ],
+          [
+            2038,
+            1348
+          ],
+          [
+            2230,
+            1412
+          ],
+          [
+            1942,
+            1380
+          ],
+          [
+            1782,
+            1188
+          ]
+        ]
+      }
+    },
+    {
+      "id": "3-Hex",
+      "cluster": 3,
+      "symbol": "Hex",
+      "isGate": false,
+      "resource": "Weapon",
+      "buildingSlots": 2,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1670,
+          1370
+        ],
+        "gateMarkers": [
+          [
+            1929,
+            1534
+          ],
+          [
+            1830,
+            1610
+          ]
+        ],
+        "regionColour": "#ed6905",
+        "selectColour": "#ed6905",
+        "regionCentroid": [
+          1785,
+          1472
+        ],
+        "regionBBox": [
+          1552,
+          1260,
+          2120,
+          1698
+        ],
+        "placements": [
+          [
+            1662,
+            1362
+          ],
+          [
+            1726,
+            1426
+          ],
+          [
+            1694,
+            1522
+          ],
+          [
+            1822,
+            1426
+          ],
+          [
+            1790,
+            1522
+          ],
+          [
+            2014,
+            1650
+          ]
+        ]
+      }
+    },
+    {
+      "id": "4-Gate",
+      "cluster": 4,
+      "symbol": "Gate",
+      "isGate": true,
+      "resource": null,
+      "buildingSlots": 0,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1170,
+          1260
+        ],
+        "gateMarkers": [],
+        "regionColour": "#636378",
+        "selectColour": "#636378",
+        "regionCentroid": [
+          1176,
+          1223
+        ],
+        "regionBBox": [
+          932,
+          1082,
+          1424,
+          1328
+        ],
+        "placements": [
+          [
+            1162,
+            1252
+          ],
+          [
+            1258,
+            1252
+          ],
+          [
+            1066,
+            1252
+          ],
+          [
+            1066,
+            1156
+          ],
+          [
+            1354,
+            1252
+          ],
+          [
+            970,
+            1188
+          ]
+        ]
+      }
+    },
+    {
+      "id": "4-Arrow",
+      "cluster": 4,
+      "symbol": "Arrow",
+      "isGate": false,
+      "resource": "Relic",
+      "buildingSlots": 2,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          1350,
+          1660
+        ],
+        "gateMarkers": [
+          [
+            1529,
+            1573
+          ],
+          [
+            1430,
+            1497
+          ]
+        ],
+        "regionColour": "#9bbba4",
+        "selectColour": "#9bbba4",
+        "regionCentroid": [
+          1400,
+          1589
+        ],
+        "regionBBox": [
+          1290,
+          1366,
+          1654,
+          1746
+        ],
+        "placements": [
+          [
+            1342,
+            1652
+          ],
+          [
+            1406,
+            1716
+          ],
+          [
+            1342,
+            1556
+          ],
+          [
+            1502,
+            1684
+          ],
+          [
+            1342,
+            1460
+          ],
+          [
+            1598,
+            1684
+          ],
+          [
+            1438,
+            1396
+          ]
+        ]
+      }
+    },
+    {
+      "id": "4-Crescent",
+      "cluster": 4,
+      "symbol": "Crescent",
+      "isGate": false,
+      "resource": "Fuel",
+      "buildingSlots": 2,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          940,
+          1700
+        ],
+        "gateMarkers": [
+          [
+            1060,
+            1584
+          ],
+          [
+            1159,
+            1660
+          ]
+        ],
+        "regionColour": "#edc40e",
+        "selectColour": "#edc40e",
+        "regionCentroid": [
+          1054,
+          1552
+        ],
+        "regionBBox": [
+          852,
+          1358,
+          1222,
+          1754
+        ],
+        "placements": [
+          [
+            932,
+            1692
+          ],
+          [
+            1028,
+            1724
+          ],
+          [
+            932,
+            1596
+          ],
+          [
+            996,
+            1500
+          ],
+          [
+            1092,
+            1500
+          ],
+          [
+            1188,
+            1532
+          ],
+          [
+            1028,
+            1404
+          ],
+          [
+            1156,
+            1436
+          ]
+        ]
+      }
+    },
+    {
+      "id": "4-Hex",
+      "cluster": 4,
+      "symbol": "Hex",
+      "isGate": false,
+      "resource": "Material",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          570,
+          1630
+        ],
+        "gateMarkers": [
+          [
+            776,
+            1505
+          ]
+        ],
+        "regionColour": "#d16084",
+        "selectColour": "#d16084",
+        "regionCentroid": [
+          679,
+          1529
+        ],
+        "regionBBox": [
+          324,
+          1248,
+          982,
+          1724
+        ],
+        "placements": [
+          [
+            562,
+            1622
+          ],
+          [
+            626,
+            1686
+          ],
+          [
+            498,
+            1686
+          ],
+          [
+            594,
+            1526
+          ],
+          [
+            722,
+            1686
+          ],
+          [
+            402,
+            1686
+          ],
+          [
+            722,
+            1398
+          ],
+          [
+            882,
+            1462
+          ],
+          [
+            818,
+            1366
+          ],
+          [
+            914,
+            1366
+          ]
+        ]
+      }
+    },
+    {
+      "id": "5-Gate",
+      "cluster": 5,
+      "symbol": "Gate",
+      "isGate": true,
+      "resource": null,
+      "buildingSlots": 0,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          870,
+          990
+        ],
+        "gateMarkers": [],
+        "regionColour": "#9d9d9d",
+        "selectColour": "#848484",
+        "regionCentroid": [
+          886,
+          993
+        ],
+        "regionBBox": [
+          784,
+          868,
+          1004,
+          1130
+        ],
+        "placements": [
+          [
+            870,
+            990
+          ],
+          [
+            814,
+            934
+          ],
+          [
+            926,
+            934
+          ],
+          [
+            926,
+            1046
+          ],
+          [
+            842,
+            1074
+          ],
+          [
+            870,
+            878
+          ]
+        ]
+      }
+    },
+    {
+      "id": "5-Arrow",
+      "cluster": 5,
+      "symbol": "Arrow",
+      "isGate": false,
+      "resource": "Weapon",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          640,
+          1230
+        ],
+        "gateMarkers": [
+          [
+            255,
+            1458
+          ]
+        ],
+        "regionColour": "#d65b00",
+        "selectColour": "#d65b00",
+        "regionCentroid": [
+          490,
+          1332
+        ],
+        "regionBBox": [
+          88,
+          1126,
+          826,
+          1646
+        ],
+        "placements": [
+          [
+            632,
+            1222
+          ],
+          [
+            568,
+            1286
+          ],
+          [
+            728,
+            1190
+          ],
+          [
+            472,
+            1286
+          ],
+          [
+            472,
+            1382
+          ],
+          [
+            376,
+            1350
+          ]
+        ]
+      }
+    },
+    {
+      "id": "5-Crescent",
+      "cluster": 5,
+      "symbol": "Crescent",
+      "isGate": false,
+      "resource": "Relic",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          240,
+          1160
+        ],
+        "gateMarkers": [
+          [
+            434,
+            1101
+          ]
+        ],
+        "regionColour": "#72724d",
+        "selectColour": "#72724d",
+        "regionCentroid": [
+          340,
+          1134
+        ],
+        "regionBBox": [
+          94,
+          996,
+          744,
+          1304
+        ],
+        "placements": [
+          [
+            232,
+            1152
+          ],
+          [
+            296,
+            1216
+          ],
+          [
+            296,
+            1088
+          ],
+          [
+            168,
+            1216
+          ],
+          [
+            136,
+            1120
+          ],
+          [
+            552,
+            1088
+          ]
+        ]
+      }
+    },
+    {
+      "id": "5-Hex",
+      "cluster": 5,
+      "symbol": "Hex",
+      "isGate": false,
+      "resource": "Psionic",
+      "buildingSlots": 2,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          530,
+          900
+        ],
+        "gateMarkers": [
+          [
+            223,
+            876
+          ],
+          [
+            125,
+            952
+          ]
+        ],
+        "regionColour": "#cda4fa",
+        "selectColour": "#cda4fa",
+        "regionCentroid": [
+          463,
+          898
+        ],
+        "regionBBox": [
+          228,
+          812,
+          712,
+          992
+        ],
+        "placements": [
+          [
+            522,
+            892
+          ],
+          [
+            618,
+            892
+          ],
+          [
+            458,
+            956
+          ],
+          [
+            426,
+            860
+          ],
+          [
+            362,
+            924
+          ],
+          [
+            330,
+            828
+          ],
+          [
+            266,
+            988
+          ]
+        ]
+      }
+    },
+    {
+      "id": "6-Gate",
+      "cluster": 6,
+      "symbol": "Gate",
+      "isGate": true,
+      "resource": null,
+      "buildingSlots": 0,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          910,
+          690
+        ],
+        "gateMarkers": [],
+        "regionColour": "#86866f",
+        "selectColour": "#86866f",
+        "regionCentroid": [
+          927,
+          697
+        ],
+        "regionBBox": [
+          778,
+          544,
+          1090,
+          850
+        ],
+        "placements": [
+          [
+            902,
+            682
+          ],
+          [
+            966,
+            746
+          ],
+          [
+            966,
+            618
+          ],
+          [
+            838,
+            746
+          ],
+          [
+            1030,
+            682
+          ],
+          [
+            902,
+            810
+          ]
+        ]
+      }
+    },
+    {
+      "id": "6-Arrow",
+      "cluster": 6,
+      "symbol": "Arrow",
+      "isGate": false,
+      "resource": "Material",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          630,
+          730
+        ],
+        "gateMarkers": [
+          [
+            431,
+            683
+          ]
+        ],
+        "regionColour": "#a8495b",
+        "selectColour": "#a8495b",
+        "regionCentroid": [
+          362,
+          665
+        ],
+        "regionBBox": [
+          118,
+          512,
+          724,
+          796
+        ],
+        "placements": [
+          [
+            622,
+            722
+          ],
+          [
+            686,
+            786
+          ],
+          [
+            526,
+            722
+          ],
+          [
+            334,
+            594
+          ],
+          [
+            270,
+            690
+          ],
+          [
+            238,
+            594
+          ]
+        ]
+      }
+    },
+    {
+      "id": "6-Crescent",
+      "cluster": 6,
+      "symbol": "Crescent",
+      "isGate": false,
+      "resource": "Fuel",
+      "buildingSlots": 2,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          630,
+          520
+        ],
+        "gateMarkers": [
+          [
+            397,
+            313
+          ],
+          [
+            299,
+            389
+          ]
+        ],
+        "regionColour": "#d1ad05",
+        "selectColour": "#d1ad05",
+        "regionCentroid": [
+          474,
+          446
+        ],
+        "regionBBox": [
+          140,
+          144,
+          808,
+          656
+        ],
+        "placements": [
+          [
+            622,
+            512
+          ],
+          [
+            686,
+            576
+          ],
+          [
+            558,
+            448
+          ],
+          [
+            526,
+            544
+          ],
+          [
+            782,
+            576
+          ],
+          [
+            462,
+            480
+          ],
+          [
+            302,
+            192
+          ],
+          [
+            238,
+            256
+          ]
+        ]
+      }
+    },
+    {
+      "id": "6-Hex",
+      "cluster": 6,
+      "symbol": "Hex",
+      "isGate": false,
+      "resource": "Psionic",
+      "buildingSlots": 1,
+      "fateOnly": false,
+      "render": {
+        "anchor": [
+          830,
+          450
+        ],
+        "gateMarkers": [
+          [
+            678,
+            228
+          ]
+        ],
+        "regionColour": "#b66076",
+        "selectColour": "#b66076",
+        "regionCentroid": [
+          688,
+          279
+        ],
+        "regionBBox": [
+          404,
+          84,
+          954,
+          522
+        ],
+        "placements": [
+          [
+            822,
+            442
+          ],
+          [
+            758,
+            378
+          ],
+          [
+            854,
+            346
+          ],
+          [
+            534,
+            218
+          ],
+          [
+            630,
+            122
+          ],
+          [
+            470,
+            154
+          ]
+        ]
+      }
+    },
+    {
+      "id": "7-Gate",
+      "cluster": 7,
+      "symbol": "Gate",
+      "isGate": true,
+      "resource": null,
+      "buildingSlots": 0,
+      "fateOnly": true,
+      "render": {
+        "anchor": [
+          1250,
+          894
+        ],
+        "gateMarkers": [],
+        "regionColour": "#808080",
+        "selectColour": "#000000",
+        "regionCentroid": [
+          1249,
+          893
+        ],
+        "regionBBox": [
+          1004,
+          648,
+          1494,
+          1138
+        ],
+        "placements": [
+          [
+            1242,
+            886
+          ],
+          [
+            1306,
+            950
+          ],
+          [
+            1306,
+            822
+          ],
+          [
+            1178,
+            950
+          ],
+          [
+            1178,
+            822
+          ],
+          [
+            1370,
+            886
+          ],
+          [
+            1242,
+            1014
+          ],
+          [
+            1242,
+            758
+          ],
+          [
+            1114,
+            886
+          ],
+          [
+            1370,
+            1014
+          ],
+          [
+            1370,
+            758
+          ],
+          [
+            1114,
+            1014
+          ]
+        ]
+      }
+    }
+  ],
+  "adjacencyFullBoard": {
+    "1-Gate": [
+      "1-Arrow",
+      "1-Crescent",
+      "1-Hex",
+      "2-Gate",
+      "6-Gate"
+    ],
+    "1-Crescent": [
+      "1-Arrow",
+      "1-Gate",
+      "1-Hex"
+    ],
+    "1-Arrow": [
+      "1-Crescent",
+      "1-Gate"
+    ],
+    "1-Hex": [
+      "1-Crescent",
+      "1-Gate"
+    ],
+    "2-Gate": [
+      "1-Gate",
+      "2-Arrow",
+      "2-Crescent",
+      "2-Hex",
+      "3-Gate"
+    ],
+    "2-Crescent": [
+      "2-Arrow",
+      "2-Gate",
+      "2-Hex"
+    ],
+    "2-Arrow": [
+      "2-Crescent",
+      "2-Gate"
+    ],
+    "2-Hex": [
+      "2-Crescent",
+      "2-Gate",
+      "3-Arrow"
+    ],
+    "3-Gate": [
+      "2-Gate",
+      "3-Arrow",
+      "3-Crescent",
+      "3-Hex",
+      "4-Gate"
+    ],
+    "3-Crescent": [
+      "3-Arrow",
+      "3-Gate",
+      "3-Hex"
+    ],
+    "3-Arrow": [
+      "2-Hex",
+      "3-Crescent",
+      "3-Gate"
+    ],
+    "3-Hex": [
+      "3-Crescent",
+      "3-Gate"
+    ],
+    "4-Gate": [
+      "3-Gate",
+      "4-Arrow",
+      "4-Crescent",
+      "4-Hex",
+      "5-Gate"
+    ],
+    "4-Crescent": [
+      "4-Arrow",
+      "4-Gate",
+      "4-Hex"
+    ],
+    "4-Arrow": [
+      "4-Crescent",
+      "4-Gate"
+    ],
+    "4-Hex": [
+      "4-Crescent",
+      "4-Gate"
+    ],
+    "5-Gate": [
+      "4-Gate",
+      "5-Arrow",
+      "5-Crescent",
+      "5-Hex",
+      "6-Gate"
+    ],
+    "5-Crescent": [
+      "5-Arrow",
+      "5-Gate",
+      "5-Hex"
+    ],
+    "5-Arrow": [
+      "5-Crescent",
+      "5-Gate"
+    ],
+    "5-Hex": [
+      "5-Crescent",
+      "5-Gate",
+      "6-Arrow"
+    ],
+    "6-Gate": [
+      "1-Gate",
+      "5-Gate",
+      "6-Arrow",
+      "6-Crescent",
+      "6-Hex"
+    ],
+    "6-Crescent": [
+      "6-Arrow",
+      "6-Gate",
+      "6-Hex"
+    ],
+    "6-Arrow": [
+      "5-Hex",
+      "6-Crescent",
+      "6-Gate"
+    ],
+    "6-Hex": [
+      "6-Crescent",
+      "6-Gate"
+    ]
+  },
+  "adjacencySymmetric": true,
+  "boards": {
+    "Board3MixUp": {
+      "players": 3,
+      "clusters": [
+        2,
+        3,
+        5,
+        6
+      ],
+      "starting": [
+        [
+          [
+            3,
+            "Hex"
+          ],
+          [
+            5,
+            "Crescent"
+          ],
+          [
+            [
+              2,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            2,
+            "Arrow"
+          ],
+          [
+            5,
+            "Hex"
+          ],
+          [
+            [
+              3,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            2,
+            "Hex"
+          ],
+          [
+            3,
+            "Arrow"
+          ],
+          [
+            [
+              5,
+              "Gate"
+            ]
+          ]
+        ]
+      ],
+      "adjacency": {
+        "2-Gate": [
+          "2-Arrow",
+          "2-Crescent",
+          "2-Hex",
+          "3-Gate",
+          "6-Gate"
+        ],
+        "2-Crescent": [
+          "2-Arrow",
+          "2-Gate",
+          "2-Hex"
+        ],
+        "2-Arrow": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "2-Hex": [
+          "2-Crescent",
+          "2-Gate",
+          "3-Arrow"
+        ],
+        "3-Gate": [
+          "2-Gate",
+          "3-Arrow",
+          "3-Crescent",
+          "3-Hex",
+          "5-Gate"
+        ],
+        "3-Crescent": [
+          "3-Arrow",
+          "3-Gate",
+          "3-Hex"
+        ],
+        "3-Arrow": [
+          "2-Hex",
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "3-Hex": [
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "5-Gate": [
+          "3-Gate",
+          "5-Arrow",
+          "5-Crescent",
+          "5-Hex",
+          "6-Gate"
+        ],
+        "5-Crescent": [
+          "5-Arrow",
+          "5-Gate",
+          "5-Hex"
+        ],
+        "5-Arrow": [
+          "5-Crescent",
+          "5-Gate"
+        ],
+        "5-Hex": [
+          "5-Crescent",
+          "5-Gate",
+          "6-Arrow"
+        ],
+        "6-Gate": [
+          "2-Gate",
+          "5-Gate",
+          "6-Arrow",
+          "6-Crescent",
+          "6-Hex"
+        ],
+        "6-Crescent": [
+          "6-Arrow",
+          "6-Gate",
+          "6-Hex"
+        ],
+        "6-Arrow": [
+          "5-Hex",
+          "6-Crescent",
+          "6-Gate"
+        ],
+        "6-Hex": [
+          "6-Crescent",
+          "6-Gate"
+        ]
+      }
+    },
+    "Board3Frontiers": {
+      "players": 3,
+      "clusters": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "starting": [
+        [
+          [
+            1,
+            "Hex"
+          ],
+          [
+            4,
+            "Hex"
+          ],
+          [
+            [
+              6,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            5,
+            "Hex"
+          ],
+          [
+            1,
+            "Crescent"
+          ],
+          [
+            [
+              5,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            4,
+            "Crescent"
+          ],
+          [
+            6,
+            "Arrow"
+          ],
+          [
+            [
+              1,
+              "Gate"
+            ]
+          ]
+        ]
+      ],
+      "adjacency": {
+        "1-Gate": [
+          "1-Arrow",
+          "1-Crescent",
+          "1-Hex",
+          "4-Gate",
+          "6-Gate"
+        ],
+        "1-Crescent": [
+          "1-Arrow",
+          "1-Gate",
+          "1-Hex"
+        ],
+        "1-Arrow": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "1-Hex": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "4-Gate": [
+          "1-Gate",
+          "4-Arrow",
+          "4-Crescent",
+          "4-Hex",
+          "5-Gate"
+        ],
+        "4-Crescent": [
+          "4-Arrow",
+          "4-Gate",
+          "4-Hex"
+        ],
+        "4-Arrow": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "4-Hex": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "5-Gate": [
+          "4-Gate",
+          "5-Arrow",
+          "5-Crescent",
+          "5-Hex",
+          "6-Gate"
+        ],
+        "5-Crescent": [
+          "5-Arrow",
+          "5-Gate",
+          "5-Hex"
+        ],
+        "5-Arrow": [
+          "5-Crescent",
+          "5-Gate"
+        ],
+        "5-Hex": [
+          "5-Crescent",
+          "5-Gate",
+          "6-Arrow"
+        ],
+        "6-Gate": [
+          "1-Gate",
+          "5-Gate",
+          "6-Arrow",
+          "6-Crescent",
+          "6-Hex"
+        ],
+        "6-Crescent": [
+          "6-Arrow",
+          "6-Gate",
+          "6-Hex"
+        ],
+        "6-Arrow": [
+          "5-Hex",
+          "6-Crescent",
+          "6-Gate"
+        ],
+        "6-Hex": [
+          "6-Crescent",
+          "6-Gate"
+        ]
+      }
+    },
+    "Board3CoreConflict": {
+      "players": 3,
+      "clusters": [
+        1,
+        2,
+        4,
+        5
+      ],
+      "starting": [
+        [
+          [
+            1,
+            "Hex"
+          ],
+          [
+            2,
+            "Crescent"
+          ],
+          [
+            [
+              1,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            2,
+            "Hex"
+          ],
+          [
+            1,
+            "Crescent"
+          ],
+          [
+            [
+              2,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            1,
+            "Arrow"
+          ],
+          [
+            2,
+            "Arrow"
+          ],
+          [
+            [
+              4,
+              "Gate"
+            ]
+          ]
+        ]
+      ],
+      "adjacency": {
+        "1-Gate": [
+          "1-Arrow",
+          "1-Crescent",
+          "1-Hex",
+          "2-Gate",
+          "5-Gate"
+        ],
+        "1-Crescent": [
+          "1-Arrow",
+          "1-Gate",
+          "1-Hex"
+        ],
+        "1-Arrow": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "1-Hex": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "2-Gate": [
+          "1-Gate",
+          "2-Arrow",
+          "2-Crescent",
+          "2-Hex",
+          "4-Gate"
+        ],
+        "2-Crescent": [
+          "2-Arrow",
+          "2-Gate",
+          "2-Hex"
+        ],
+        "2-Arrow": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "2-Hex": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "4-Gate": [
+          "2-Gate",
+          "4-Arrow",
+          "4-Crescent",
+          "4-Hex",
+          "5-Gate"
+        ],
+        "4-Crescent": [
+          "4-Arrow",
+          "4-Gate",
+          "4-Hex"
+        ],
+        "4-Arrow": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "4-Hex": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "5-Gate": [
+          "1-Gate",
+          "4-Gate",
+          "5-Arrow",
+          "5-Crescent",
+          "5-Hex"
+        ],
+        "5-Crescent": [
+          "5-Arrow",
+          "5-Gate",
+          "5-Hex"
+        ],
+        "5-Arrow": [
+          "5-Crescent",
+          "5-Gate"
+        ],
+        "5-Hex": [
+          "5-Crescent",
+          "5-Gate"
+        ]
+      }
+    },
+    "Board3Homelands": {
+      "players": 3,
+      "clusters": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "starting": [
+        [
+          [
+            2,
+            "Hex"
+          ],
+          [
+            3,
+            "Crescent"
+          ],
+          [
+            [
+              3,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            1,
+            "Hex"
+          ],
+          [
+            2,
+            "Arrow"
+          ],
+          [
+            [
+              2,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            1,
+            "Arrow"
+          ],
+          [
+            4,
+            "Hex"
+          ],
+          [
+            [
+              4,
+              "Gate"
+            ]
+          ]
+        ]
+      ],
+      "adjacency": {
+        "1-Gate": [
+          "1-Arrow",
+          "1-Crescent",
+          "1-Hex",
+          "2-Gate",
+          "4-Gate"
+        ],
+        "1-Crescent": [
+          "1-Arrow",
+          "1-Gate",
+          "1-Hex"
+        ],
+        "1-Arrow": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "1-Hex": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "2-Gate": [
+          "1-Gate",
+          "2-Arrow",
+          "2-Crescent",
+          "2-Hex",
+          "3-Gate"
+        ],
+        "2-Crescent": [
+          "2-Arrow",
+          "2-Gate",
+          "2-Hex"
+        ],
+        "2-Arrow": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "2-Hex": [
+          "2-Crescent",
+          "2-Gate",
+          "3-Arrow"
+        ],
+        "3-Gate": [
+          "2-Gate",
+          "3-Arrow",
+          "3-Crescent",
+          "3-Hex",
+          "4-Gate"
+        ],
+        "3-Crescent": [
+          "3-Arrow",
+          "3-Gate",
+          "3-Hex"
+        ],
+        "3-Arrow": [
+          "2-Hex",
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "3-Hex": [
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "4-Gate": [
+          "1-Gate",
+          "3-Gate",
+          "4-Arrow",
+          "4-Crescent",
+          "4-Hex"
+        ],
+        "4-Crescent": [
+          "4-Arrow",
+          "4-Gate",
+          "4-Hex"
+        ],
+        "4-Arrow": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "4-Hex": [
+          "4-Crescent",
+          "4-Gate"
+        ]
+      }
+    },
+    "Board4MixUp1": {
+      "players": 4,
+      "clusters": [
+        1,
+        2,
+        4,
+        5,
+        6
+      ],
+      "starting": [
+        [
+          [
+            4,
+            "Arrow"
+          ],
+          [
+            6,
+            "Hex"
+          ],
+          [
+            [
+              1,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            4,
+            "Hex"
+          ],
+          [
+            5,
+            "Hex"
+          ],
+          [
+            [
+              6,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            5,
+            "Arrow"
+          ],
+          [
+            1,
+            "Hex"
+          ],
+          [
+            [
+              4,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            6,
+            "Arrow"
+          ],
+          [
+            1,
+            "Arrow"
+          ],
+          [
+            [
+              5,
+              "Gate"
+            ]
+          ]
+        ]
+      ],
+      "adjacency": {
+        "1-Gate": [
+          "1-Arrow",
+          "1-Crescent",
+          "1-Hex",
+          "2-Gate",
+          "6-Gate"
+        ],
+        "1-Crescent": [
+          "1-Arrow",
+          "1-Gate",
+          "1-Hex"
+        ],
+        "1-Arrow": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "1-Hex": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "2-Gate": [
+          "1-Gate",
+          "2-Arrow",
+          "2-Crescent",
+          "2-Hex",
+          "4-Gate"
+        ],
+        "2-Crescent": [
+          "2-Arrow",
+          "2-Gate",
+          "2-Hex"
+        ],
+        "2-Arrow": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "2-Hex": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "4-Gate": [
+          "2-Gate",
+          "4-Arrow",
+          "4-Crescent",
+          "4-Hex",
+          "5-Gate"
+        ],
+        "4-Crescent": [
+          "4-Arrow",
+          "4-Gate",
+          "4-Hex"
+        ],
+        "4-Arrow": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "4-Hex": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "5-Gate": [
+          "4-Gate",
+          "5-Arrow",
+          "5-Crescent",
+          "5-Hex",
+          "6-Gate"
+        ],
+        "5-Crescent": [
+          "5-Arrow",
+          "5-Gate",
+          "5-Hex"
+        ],
+        "5-Arrow": [
+          "5-Crescent",
+          "5-Gate"
+        ],
+        "5-Hex": [
+          "5-Crescent",
+          "5-Gate",
+          "6-Arrow"
+        ],
+        "6-Gate": [
+          "1-Gate",
+          "5-Gate",
+          "6-Arrow",
+          "6-Crescent",
+          "6-Hex"
+        ],
+        "6-Crescent": [
+          "6-Arrow",
+          "6-Gate",
+          "6-Hex"
+        ],
+        "6-Arrow": [
+          "5-Hex",
+          "6-Crescent",
+          "6-Gate"
+        ],
+        "6-Hex": [
+          "6-Crescent",
+          "6-Gate"
+        ]
+      }
+    },
+    "Board4MixUp2": {
+      "players": 4,
+      "clusters": [
+        1,
+        2,
+        3,
+        5,
+        6
+      ],
+      "starting": [
+        [
+          [
+            5,
+            "Hex"
+          ],
+          [
+            3,
+            "Arrow"
+          ],
+          [
+            [
+              2,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            3,
+            "Hex"
+          ],
+          [
+            5,
+            "Crescent"
+          ],
+          [
+            [
+              1,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            2,
+            "Hex"
+          ],
+          [
+            1,
+            "Hex"
+          ],
+          [
+            [
+              3,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            1,
+            "Arrow"
+          ],
+          [
+            2,
+            "Arrow"
+          ],
+          [
+            [
+              5,
+              "Gate"
+            ]
+          ]
+        ]
+      ],
+      "adjacency": {
+        "1-Gate": [
+          "1-Arrow",
+          "1-Crescent",
+          "1-Hex",
+          "2-Gate",
+          "6-Gate"
+        ],
+        "1-Crescent": [
+          "1-Arrow",
+          "1-Gate",
+          "1-Hex"
+        ],
+        "1-Arrow": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "1-Hex": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "2-Gate": [
+          "1-Gate",
+          "2-Arrow",
+          "2-Crescent",
+          "2-Hex",
+          "3-Gate"
+        ],
+        "2-Crescent": [
+          "2-Arrow",
+          "2-Gate",
+          "2-Hex"
+        ],
+        "2-Arrow": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "2-Hex": [
+          "2-Crescent",
+          "2-Gate",
+          "3-Arrow"
+        ],
+        "3-Gate": [
+          "2-Gate",
+          "3-Arrow",
+          "3-Crescent",
+          "3-Hex",
+          "5-Gate"
+        ],
+        "3-Crescent": [
+          "3-Arrow",
+          "3-Gate",
+          "3-Hex"
+        ],
+        "3-Arrow": [
+          "2-Hex",
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "3-Hex": [
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "5-Gate": [
+          "3-Gate",
+          "5-Arrow",
+          "5-Crescent",
+          "5-Hex",
+          "6-Gate"
+        ],
+        "5-Crescent": [
+          "5-Arrow",
+          "5-Gate",
+          "5-Hex"
+        ],
+        "5-Arrow": [
+          "5-Crescent",
+          "5-Gate"
+        ],
+        "5-Hex": [
+          "5-Crescent",
+          "5-Gate",
+          "6-Arrow"
+        ],
+        "6-Gate": [
+          "1-Gate",
+          "5-Gate",
+          "6-Arrow",
+          "6-Crescent",
+          "6-Hex"
+        ],
+        "6-Crescent": [
+          "6-Arrow",
+          "6-Gate",
+          "6-Hex"
+        ],
+        "6-Arrow": [
+          "5-Hex",
+          "6-Crescent",
+          "6-Gate"
+        ],
+        "6-Hex": [
+          "6-Crescent",
+          "6-Gate"
+        ]
+      }
+    },
+    "Board4Frontiers": {
+      "players": 4,
+      "clusters": [
+        1,
+        2,
+        3,
+        4,
+        6
+      ],
+      "starting": [
+        [
+          [
+            1,
+            "Hex"
+          ],
+          [
+            3,
+            "Crescent"
+          ],
+          [
+            [
+              2,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            2,
+            "Hex"
+          ],
+          [
+            6,
+            "Hex"
+          ],
+          [
+            [
+              3,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            4,
+            "Crescent"
+          ],
+          [
+            2,
+            "Arrow"
+          ],
+          [
+            [
+              6,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            1,
+            "Arrow"
+          ],
+          [
+            6,
+            "Arrow"
+          ],
+          [
+            [
+              4,
+              "Gate"
+            ]
+          ]
+        ]
+      ],
+      "adjacency": {
+        "1-Gate": [
+          "1-Arrow",
+          "1-Crescent",
+          "1-Hex",
+          "2-Gate",
+          "6-Gate"
+        ],
+        "1-Crescent": [
+          "1-Arrow",
+          "1-Gate",
+          "1-Hex"
+        ],
+        "1-Arrow": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "1-Hex": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "2-Gate": [
+          "1-Gate",
+          "2-Arrow",
+          "2-Crescent",
+          "2-Hex",
+          "3-Gate"
+        ],
+        "2-Crescent": [
+          "2-Arrow",
+          "2-Gate",
+          "2-Hex"
+        ],
+        "2-Arrow": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "2-Hex": [
+          "2-Crescent",
+          "2-Gate",
+          "3-Arrow"
+        ],
+        "3-Gate": [
+          "2-Gate",
+          "3-Arrow",
+          "3-Crescent",
+          "3-Hex",
+          "4-Gate"
+        ],
+        "3-Crescent": [
+          "3-Arrow",
+          "3-Gate",
+          "3-Hex"
+        ],
+        "3-Arrow": [
+          "2-Hex",
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "3-Hex": [
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "4-Gate": [
+          "3-Gate",
+          "4-Arrow",
+          "4-Crescent",
+          "4-Hex",
+          "6-Gate"
+        ],
+        "4-Crescent": [
+          "4-Arrow",
+          "4-Gate",
+          "4-Hex"
+        ],
+        "4-Arrow": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "4-Hex": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "6-Gate": [
+          "1-Gate",
+          "4-Gate",
+          "6-Arrow",
+          "6-Crescent",
+          "6-Hex"
+        ],
+        "6-Crescent": [
+          "6-Arrow",
+          "6-Gate",
+          "6-Hex"
+        ],
+        "6-Arrow": [
+          "6-Crescent",
+          "6-Gate"
+        ],
+        "6-Hex": [
+          "6-Crescent",
+          "6-Gate"
+        ]
+      }
+    },
+    "Board4MixUp3": {
+      "players": 4,
+      "clusters": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "starting": [
+        [
+          [
+            3,
+            "Hex"
+          ],
+          [
+            5,
+            "Crescent"
+          ],
+          [
+            [
+              1,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            1,
+            "Arrow"
+          ],
+          [
+            3,
+            "Arrow"
+          ],
+          [
+            [
+              2,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            1,
+            "Hex"
+          ],
+          [
+            4,
+            "Hex"
+          ],
+          [
+            [
+              3,
+              "Gate"
+            ]
+          ]
+        ],
+        [
+          [
+            4,
+            "Arrow"
+          ],
+          [
+            2,
+            "Crescent"
+          ],
+          [
+            [
+              5,
+              "Gate"
+            ]
+          ]
+        ]
+      ],
+      "adjacency": {
+        "1-Gate": [
+          "1-Arrow",
+          "1-Crescent",
+          "1-Hex",
+          "2-Gate",
+          "5-Gate"
+        ],
+        "1-Crescent": [
+          "1-Arrow",
+          "1-Gate",
+          "1-Hex"
+        ],
+        "1-Arrow": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "1-Hex": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "2-Gate": [
+          "1-Gate",
+          "2-Arrow",
+          "2-Crescent",
+          "2-Hex",
+          "3-Gate"
+        ],
+        "2-Crescent": [
+          "2-Arrow",
+          "2-Gate",
+          "2-Hex"
+        ],
+        "2-Arrow": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "2-Hex": [
+          "2-Crescent",
+          "2-Gate",
+          "3-Arrow"
+        ],
+        "3-Gate": [
+          "2-Gate",
+          "3-Arrow",
+          "3-Crescent",
+          "3-Hex",
+          "4-Gate"
+        ],
+        "3-Crescent": [
+          "3-Arrow",
+          "3-Gate",
+          "3-Hex"
+        ],
+        "3-Arrow": [
+          "2-Hex",
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "3-Hex": [
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "4-Gate": [
+          "3-Gate",
+          "4-Arrow",
+          "4-Crescent",
+          "4-Hex",
+          "5-Gate"
+        ],
+        "4-Crescent": [
+          "4-Arrow",
+          "4-Gate",
+          "4-Hex"
+        ],
+        "4-Arrow": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "4-Hex": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "5-Gate": [
+          "1-Gate",
+          "4-Gate",
+          "5-Arrow",
+          "5-Crescent",
+          "5-Hex"
+        ],
+        "5-Crescent": [
+          "5-Arrow",
+          "5-Gate",
+          "5-Hex"
+        ],
+        "5-Arrow": [
+          "5-Crescent",
+          "5-Gate"
+        ],
+        "5-Hex": [
+          "5-Crescent",
+          "5-Gate"
+        ]
+      }
+    },
+    "BoardFull": {
+      "players": 0,
+      "clusters": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "starting": [],
+      "campaign_only": true,
+      "adjacency": {
+        "1-Gate": [
+          "1-Arrow",
+          "1-Crescent",
+          "1-Hex",
+          "2-Gate",
+          "6-Gate"
+        ],
+        "1-Crescent": [
+          "1-Arrow",
+          "1-Gate",
+          "1-Hex"
+        ],
+        "1-Arrow": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "1-Hex": [
+          "1-Crescent",
+          "1-Gate"
+        ],
+        "2-Gate": [
+          "1-Gate",
+          "2-Arrow",
+          "2-Crescent",
+          "2-Hex",
+          "3-Gate"
+        ],
+        "2-Crescent": [
+          "2-Arrow",
+          "2-Gate",
+          "2-Hex"
+        ],
+        "2-Arrow": [
+          "2-Crescent",
+          "2-Gate"
+        ],
+        "2-Hex": [
+          "2-Crescent",
+          "2-Gate",
+          "3-Arrow"
+        ],
+        "3-Gate": [
+          "2-Gate",
+          "3-Arrow",
+          "3-Crescent",
+          "3-Hex",
+          "4-Gate"
+        ],
+        "3-Crescent": [
+          "3-Arrow",
+          "3-Gate",
+          "3-Hex"
+        ],
+        "3-Arrow": [
+          "2-Hex",
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "3-Hex": [
+          "3-Crescent",
+          "3-Gate"
+        ],
+        "4-Gate": [
+          "3-Gate",
+          "4-Arrow",
+          "4-Crescent",
+          "4-Hex",
+          "5-Gate"
+        ],
+        "4-Crescent": [
+          "4-Arrow",
+          "4-Gate",
+          "4-Hex"
+        ],
+        "4-Arrow": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "4-Hex": [
+          "4-Crescent",
+          "4-Gate"
+        ],
+        "5-Gate": [
+          "4-Gate",
+          "5-Arrow",
+          "5-Crescent",
+          "5-Hex",
+          "6-Gate"
+        ],
+        "5-Crescent": [
+          "5-Arrow",
+          "5-Gate",
+          "5-Hex"
+        ],
+        "5-Arrow": [
+          "5-Crescent",
+          "5-Gate"
+        ],
+        "5-Hex": [
+          "5-Crescent",
+          "5-Gate",
+          "6-Arrow"
+        ],
+        "6-Gate": [
+          "1-Gate",
+          "5-Gate",
+          "6-Arrow",
+          "6-Crescent",
+          "6-Hex"
+        ],
+        "6-Crescent": [
+          "6-Arrow",
+          "6-Gate",
+          "6-Hex"
+        ],
+        "6-Arrow": [
+          "5-Hex",
+          "6-Crescent",
+          "6-Gate"
+        ],
+        "6-Hex": [
+          "6-Crescent",
+          "6-Gate"
+        ]
+      }
+    }
+  }
+}

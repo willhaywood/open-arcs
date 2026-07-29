@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No "DOM". Reaching for a browser API from the engine is a compile error, not a
+    // subtle coupling discovered when the arena or a Worker fails to run.
+    "lib": ["ES2022"],
+    "types": [],
+    "outDir": "dist",
+    "rootDir": ".",
+    "composite": true
+  },
+  "include": ["src/**/*", "src/**/*.json", "test/**/*"]
+}
