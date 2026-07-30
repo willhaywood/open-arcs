@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  system as systemInfo,
   CardLocation,
   Continue as C,
   CourtPile,
@@ -110,48 +111,120 @@ describe('Populist Demands (bc27) — a free ambition declaration', () => {
   })
 })
 
-describe('Mass Uprising (bc26) — up to four ships in one cluster', () => {
-  it('offers a cluster, then places one ship at a time within it', () => {
+describe('Mass Uprising (bc26) — one ship in each system of a cluster', () => {
+  /*
+   * "Choose a cluster on the map. You place 1 ship in each system of that cluster."
+   *
+   * A divergence from HRF, which enumerates combinations of systems as though four ships were a
+   * budget to spend where you liked. That allows two ships in one system and none in another,
+   * which the card forbids, and asks a question the card never asks. These tests assert the
+   * printed rule.
+   */
+  const clusterOf = (s: GameState, n: number): string[] =>
+    s.board.systems.filter((id) => systemInfo(id).cluster === n)
+
+  it('fills every system of the cluster, one each, without asking which', () => {
     const state = putCard(fresh(), 'bc26', CourtPile.discard())
     const c = fire(state, 'bc26').continue
-    expect(labels(c).some((l) => /^Rise up in cluster \d+ \(4 ships\)/.test(l))).toBe(true)
+    const label = labels(c).find((l) => l.startsWith('Rise up'))!
+    const cluster = Number(/cluster (\d+)/.exec(label)![1])
+    const systems = clusterOf(state, cluster)
+    expect(systems.length).toBeGreaterThan(1)
+    // With a full reserve the label promises one per system rather than a budget.
+    expect(label).toContain(`1 ship in each of ${systems.length} systems`)
 
-    const cluster = Number(/cluster (\d+)/.exec(labels(c).find((l) => l.startsWith('Rise up'))!)![1])
-    const chosen = advance(
+    const before = new Map(
+      systems.map((id) => [
+        id,
+        contentsOf(state.figures, Location.system(id)).filter((f) => f.startsWith('red/Ship/'))
+          .length,
+      ]),
+    )
+    let r = advance(
       state,
-      { type: 'vox/uprising', faction: 'red', cluster, left: 4, card: 'bc26', then: STOP },
+      { type: 'vox/uprising', faction: 'red', cluster, left: systems.length, card: 'bc26', then: STOP },
       registry,
     )
-    // Every option is a system of that cluster.
-    const opts = labels(chosen.continue).filter((l) => l.startsWith('Place a ship'))
-    expect(opts.length).toBeGreaterThan(0)
-    for (const l of opts) expect(l).toMatch(new RegExp(`Place a ship in ${cluster}-`))
+    /*
+     * No *decision* is offered while the reserve can fill the cluster — asserted directly, because
+     * checking only the final board passes either way: a version that asks which system each time
+     * still ends up filling them all if the test answers every prompt.
+     */
+    let guard = 0
+    while (r.continue.kind === 'ask' && guard++ < 10) {
+      const places = r.continue.actions.filter((a) => a.type === 'vox/uprising-place')
+      if (places.length === 0) break
+      expect(places.length).toBe(1)
+      r = advance(r.state, places[0]!, registry)
+    }
+    for (const id of systems) {
+      const now = contentsOf(r.state.figures, Location.system(id)).filter((f) =>
+        f.startsWith('red/Ship/'),
+      ).length
+      expect(now).toBe((before.get(id) ?? 0) + 1)
+    }
   })
 
-  it('places a ship and decrements the budget', () => {
+  it('never puts two ships in the same system', () => {
     const state = putCard(fresh(), 'bc26', CourtPile.discard())
-    const system = state.board.systems[0]!
-    const before = contentsOf(state.figures, Location.system(system)).filter((id) =>
-      id.startsWith('red/Ship/'),
-    ).length
+    const cluster = systemInfo(state.board.systems[0]!).cluster
+    const systems = clusterOf(state, cluster)
+    const first = systems[0]!
 
     const step = advance(
       state,
       {
         type: 'vox/uprising-place',
         faction: 'red',
-        cluster: Number(system.split('-')[0]),
-        left: 4,
-        system,
+        cluster,
+        left: systems.length,
+        system: first,
+        placed: [],
         card: 'bc26',
         then: STOP,
       },
       registry,
     )
-    expect(
-      contentsOf(step.state.figures, Location.system(system)).filter((id) => id.startsWith('red/Ship/')),
-    ).toHaveLength(before + 1)
-    expect(labels(step.continue).some((l) => /\(3 left\)/.test(l))).toBe(true)
+    // Whatever comes next, the system just filled is no longer on offer.
+    if (step.continue.kind === 'ask') {
+      const offered = step.continue.actions
+        .filter((a) => a.type === 'vox/uprising-place')
+        .map((a) => a['system'])
+      expect(offered).not.toContain(first)
+    }
+    const next = step.continue
+    expect(JSON.stringify(next)).not.toContain(`"system":"${first}"`)
+  })
+
+  it('asks which systems only when the reserve cannot fill the cluster', () => {
+    const base = putCard(fresh(), 'bc26', CourtPile.discard())
+    const cluster = systemInfo(base.board.systems[0]!).cluster
+    const systems = clusterOf(base, cluster)
+
+    // Strip red's reserve to one ship, so a genuine choice exists.
+    const reserve = contentsOf(base.figures, `reserve:red`).filter((id) =>
+      id.startsWith('red/Ship/'),
+    )
+    const contents = new Map(base.figures.contents)
+    const at = new Map(base.figures.at)
+    const keep = reserve.slice(0, 1)
+    contents.set('reserve:red', [
+      ...(contents.get('reserve:red') ?? []).filter((id) => !reserve.includes(id)),
+      ...keep,
+    ])
+    for (const id of reserve.slice(1)) at.delete(id)
+    const short: GameState = { ...base, figures: { ...base.figures, contents, at } }
+
+    const r = advance(
+      short,
+      { type: 'vox/uprising', faction: 'red', cluster, left: 1, card: 'bc26', then: STOP },
+      registry,
+    )
+    expect(r.continue.kind).toBe('ask')
+    if (r.continue.kind === 'ask') {
+      const offered = r.continue.actions.filter((a) => a.type === 'vox/uprising-place')
+      expect(offered.length).toBe(systems.length)
+    }
   })
 })
 

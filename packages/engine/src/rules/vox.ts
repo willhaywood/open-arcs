@@ -104,27 +104,50 @@ function populistDemands(state: GameState, faction: FactionId, card: string, the
 }
 
 /**
- * Mass Uprising (bc26): place up to four ships across the systems of **one** cluster.
+ * Mass Uprising (bc26): "Choose a cluster on the map. **You place 1 ship in each system of that
+ * cluster.** Discard this card."
  *
- * HRF enumerates every combination of systems in the cluster; this asks for a cluster and
- * then places one ship at a time, which is the same set of outcomes without the combinatorics.
+ * **One per system, and not a choice of systems** — a divergence from HRF, which enumerates every
+ * combination of systems in the cluster as though you were spending a budget of four ships
+ * wherever you liked. That reading lets you stack two ships in one system and leave another empty,
+ * which "1 ship in each system" forbids, and it asks a question the card never asks.
+ *
+ * The only genuine decision is when your reserve cannot fill the cluster: the card does not say
+ * what happens then, so the systems that get one are the player's choice. That is the sole case
+ * that still prompts — see `uprisingPlacement`, which excludes systems already given a ship.
  */
 function massUprising(state: GameState, faction: FactionId, card: string, then: unknown): Continue {
-  const budget = Math.min(4, shipsInReserve(state, faction).length)
-  if (budget === 0) return C.then(Done(faction, card, then))
+  if (shipsInReserve(state, faction).length === 0) return C.then(Done(faction, card, then))
   const clusters = [...new Set(state.board.systems.map((s) => systemInfo(s).cluster))].sort()
-  const options: Action[] = clusters.map((n) => ({
-    type: 'vox/uprising',
-    faction,
-    cluster: n,
-    left: budget,
-    card,
-    then,
-    label: `Rise up in cluster ${n} (${budget} ship${budget === 1 ? '' : 's'})`,
-  }))
+  const options: Action[] = clusters.map((n) => {
+    const size = state.board.systems.filter((s) => systemInfo(s).cluster === n).length
+    const ships = Math.min(size, shipsInReserve(state, faction).length)
+    return {
+      type: 'vox/uprising',
+      faction,
+      cluster: n,
+      left: ships,
+      card,
+      then,
+      label:
+        ships < size
+          ? `Rise up in cluster ${n} (only ${ships} ship${ships === 1 ? '' : 's'} in reserve)`
+          : `Rise up in cluster ${n} (1 ship in each of ${size} systems)`,
+    }
+  })
   return C.ask(faction, [...options, skip(faction, card, then)], 'Mass Uprising — choose a cluster')
 }
 
+/**
+ * Fill the cluster, one ship per system.
+ *
+ * `placed` is the systems already given a ship by this card, and excluding them is what enforces
+ * "1 ship in **each** system" — without it the same system could take the whole reserve.
+ *
+ * With enough ships there is nothing to decide, so nothing is asked: the remaining systems are
+ * filled outright. A prompt appears only when the reserve is short, which the card does not cover
+ * and where the player must therefore pick.
+ */
 function uprisingPlacement(
   state: GameState,
   faction: FactionId,
@@ -132,23 +155,41 @@ function uprisingPlacement(
   left: number,
   card: string,
   then: unknown,
+  placed: readonly string[] = [],
 ): Continue {
-  if (left <= 0 || shipsInReserve(state, faction).length === 0) {
+  const remaining = state.board.systems.filter(
+    (s) => systemInfo(s).cluster === cluster && !placed.includes(s),
+  )
+  const ships = shipsInReserve(state, faction).length
+  if (left <= 0 || ships === 0 || remaining.length === 0) {
     return C.then(Done(faction, card, then))
   }
-  const options: Action[] = state.board.systems
-    .filter((s) => systemInfo(s).cluster === cluster)
-    .map((s) => ({
+
+  // Enough to fill what is left: no decision, so take the next system rather than ask.
+  if (ships >= remaining.length && left >= remaining.length) {
+    return C.then({
       type: 'vox/uprising-place',
       faction,
       cluster,
       left,
-      system: s,
+      system: remaining[0]!,
+      placed: [...placed],
       card,
       then,
-      label: `Place a ship in ${s} (${left} left)`,
-    }))
-  if (options.length === 0) return C.then(Done(faction, card, then))
+    })
+  }
+
+  const options: Action[] = remaining.map((s) => ({
+    type: 'vox/uprising-place',
+    faction,
+    cluster,
+    left,
+    system: s,
+    placed: [...placed],
+    card,
+    then,
+    label: `Place a ship in ${s} (${left} left, one per system)`,
+  }))
   return C.ask(faction, [...options, skip(faction, card, then)], `Mass Uprising — cluster ${cluster}`)
 }
 
@@ -326,9 +367,18 @@ export const VoxModule: RuleModule = {
           figures: move(state.figures, ship, Location.system(system)),
           log: [...state.log, `${faction} rose up — a ship placed in ${system}`],
         }
+        const placed = [...((action['placed'] as readonly string[] | undefined) ?? []), system]
         return {
           state: next,
-          continue: uprisingPlacement(next, faction, action['cluster'] as number, left, card, then),
+          continue: uprisingPlacement(
+            next,
+            faction,
+            action['cluster'] as number,
+            left,
+            card,
+            then,
+            placed,
+          ),
         }
       }
 

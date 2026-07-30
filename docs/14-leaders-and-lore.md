@@ -766,6 +766,28 @@ the 2024 FAQ/errata PDFs) is still the best available text but is the previous p
   on the sprint's own arrival, so that was already the behaviour — but it is now the *stated*
   reason, rather than resting on HRF's per-turn `used` flag.
 
+### Mass Uprising (bc26) — corrected against HRF
+
+The card: *"Choose a cluster on the map. **You place 1 ship in each system of that cluster.**
+Discard this card."*
+
+HRF enumerates every combination of systems in the cluster, as though four ships were a budget to
+spend wherever you liked, and this engine copied that reading. Two things wrong with it:
+
+- **It allows stacking.** Two ships into one system and none into another is a legal outcome of a
+  budget and an illegal outcome of "1 ship in each system".
+- **It asks a question the card never asks.** With a full reserve there is no decision at all — the
+  cluster is simply filled.
+
+Now: one ship per system, every system, no prompt. The single genuine decision is when the reserve
+cannot fill the cluster, which the card does not cover — there the player picks which systems get
+one, still capped at one each.
+
+**Found by a player, not a test.** The prompt had just been moved onto the map, and seeing the
+cluster light up made "why am I choosing systems?" obvious in a way the old button list never did.
+That is the second card where HRF's reading diverged from the printed text — Force Beams was the
+first — and it is the argument for docs/18's saves: some bugs are only visible in a running game.
+
 ### Known divergence, not yet implemented
 
 - **"Max 1 per gate" counts only buildings placed *by that card*.** The ruling says the limit does
