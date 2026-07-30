@@ -4113,3 +4113,191 @@ button {
   text-align: center;
   color: var(--text);
 }
+
+/* --- action tray: the pip menu, grouped by where each option comes from ---- */
+
+/* Shares the hand's grid area with the Prelude tray — only one is ever up. */
+.at-tray {
+  grid-area: hand;
+  align-self: end;
+  z-index: 45;
+  pointer-events: none;
+}
+.at-inner {
+  pointer-events: auto;
+  background: linear-gradient(rgba(14, 17, 24, 0.93), rgba(10, 12, 18, 0.97));
+  border: 1px solid rgba(201, 169, 97, 0.5);
+  border-radius: 12px;
+  padding: 9px 14px 10px;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+}
+.at-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(201, 169, 97, 0.16);
+}
+.at-who {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.at-title {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.at-pips {
+  display: inline-flex;
+  gap: 4px;
+  align-self: center;
+}
+/*
+ * The pip diamond the action cards print, not a dot — same motif, so the count in the tray reads
+ * as the same thing as the pips on the card that was played. Spent pips stay in place and go
+ * hollow, so what the last action cost is visible rather than merely absent.
+ */
+.at-pip {
+  width: 7px;
+  height: 7px;
+  transform: rotate(45deg);
+  border: 1px solid rgba(201, 169, 97, 0.45);
+}
+.at-pip.on {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.at-pips {
+  padding: 0 1px;
+}
+.at-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* One grid, so every rail label lines up and the rows read as a table of sources. */
+/*
+ * The rail sizes to its widest label rather than a guessed width, capped so a long card name
+ * cannot crowd out the actions. A fixed 116px clipped "Living Structures" straight across the
+ * column divider — card names run from "Annex" to "Tycoon's Ambition", so the column has to be
+ * measured, not assumed.
+ */
+.at-rows {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
+}
+.at-row {
+  display: contents;
+}
+.at-rail,
+.at-entries {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.at-row:last-child .at-rail,
+.at-row:last-child .at-entries {
+  border-bottom: 0;
+}
+.at-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding-right: 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+/* The pill is content here, not chrome: it must wrap and stay inside its column. */
+.at-rail > .pb-guild {
+  max-width: 168px;
+  align-items: flex-start;
+}
+.at-rail > .pb-guild .pb-guild-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  text-align: left;
+}
+.at-rail-name {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.at-rail-note {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.34);
+}
+.at-entries {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding-left: 12px;
+}
+.at-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.at-btn {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 6px 13px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.at-btn:hover:not(.off) {
+  border-color: var(--gold);
+  background: rgba(201, 169, 97, 0.12);
+}
+/* Shown, not hidden: "the suit allows this, the board does not" is worth saying. */
+.at-btn.off {
+  color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.07);
+  background: none;
+  cursor: default;
+}
+/* Which pip the option spends — the thing the flat list never said. */
+.at-cost {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.34);
+}
+.at-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 9px;
+}
+.at-hint {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.3);
+}
+.at-end {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: none;
+  border: 1px solid rgba(201, 169, 97, 0.55);
+  border-radius: 6px;
+  padding: 6px 15px;
+  cursor: pointer;
+}
+.at-end:hover {
+  background: rgba(201, 169, 97, 0.14);
+}

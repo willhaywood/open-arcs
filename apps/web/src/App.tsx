@@ -7,6 +7,7 @@ import { Board } from './components/Board.js'
 import { CourtPanel } from './components/CourtPanel.js'
 import { DraftScreen } from './components/DraftScreen.js'
 import { LearnedScreen } from './components/LearnedScreen.js'
+import { ActionTray } from './components/ActionTray.js'
 import { PreludeScreen } from './components/PreludeScreen.js'
 import { SlotBoard } from './components/SlotBoard.js'
 import { RaidModal } from './components/RaidModal.js'
@@ -110,6 +111,8 @@ export function App(): JSX.Element {
           </div>
           {/* Shares the hand's grid area, as a sibling: `.hand-row` clips its own children. */}
           <PreludeScreen state={state} cont={cont} />
+          {/* The action phase, on the same terms as the Prelude: over the hand, map still visible. */}
+          <ActionTray state={state} cont={cont} />
           <PlayerBoards state={state} current={current} />
         </section>
         <aside className="side-col">

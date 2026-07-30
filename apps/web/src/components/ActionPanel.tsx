@@ -1,6 +1,7 @@
 import type { Continue } from '@arcs/engine'
 
 import { store } from '../store.js'
+import { trayOwns } from './ActionTray.js'
 import { colorOf, textOn } from '../theme.js'
 
 interface Props {
@@ -8,7 +9,7 @@ interface Props {
   onNewGame: () => void
 }
 
-export function ActionPanel({ cont, onNewGame }: Props): JSX.Element {
+export function ActionPanel({ cont, onNewGame }: Props): JSX.Element | null {
   if (cont.kind === 'gameOver') {
     return (
       <div className="actions">
@@ -86,6 +87,14 @@ export function ActionPanel({ cont, onNewGame }: Props): JSX.Element {
   const BATTLE_WINDOW = ['battle/target', 'battle/roll', 'battle/hit', 'battle/finish', 'battle/reroll']
   const inBattleWindow = cont.actions.some((a) => BATTLE_WINDOW.includes(a.type))
   const hidden = inBattleWindow ? [...ELSEWHERE, ...BATTLE_WINDOW, 'battle/cancel'] : ELSEWHERE
+
+  /*
+   * Menus the tray draws are drawn *only* there — asked through the same predicate the tray uses,
+   * so the two cannot disagree about who owns one. A flat copy beside the grouped one would say
+   * the same options twice while losing the source of each, which is the whole reason the tray
+   * exists.
+   */
+  if (trayOwns(cont)) return null
 
   const actions = cont.actions.filter((a) => !hidden.includes(a.type))
   const playPhase = cont.actions.some((a) => CARD_PLAYS.includes(a.type))
