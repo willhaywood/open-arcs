@@ -22,13 +22,14 @@
  * buildings) and the Cities-only-when-buildings-are-hit rule honest.
  */
 
-import { Location, contentsOf, parseFigureId } from '@arcs/engine'
-import type { Action, GameState } from '@arcs/engine'
+import { Location, RAILGUN_ARRAYS, contentsOf, parseFigureId } from '@arcs/engine'
+import type { Action, FactionId, GameState } from '@arcs/engine'
 
 
 import { store } from '../store.js'
 import { colorOf, figureArt } from '../theme.js'
 import { useRoll } from './Dice3D.js'
+import { CardPill } from './LeaderCardReader.js'
 
 /** The battle context the hit/finish actions carry. */
 interface Ctx {
@@ -176,8 +177,14 @@ export function DamageAssign({
             {chip('Keys', ctx.keys)}
           </div>
           {ctx.railgun === true ? (
-            <div className="da-note">
-              Railgun Arrays — {ctx.enemy} strikes first, before you collect any dice.
+            /*
+             * The card itself, not a sentence about it. A player told "Railgun Arrays struck
+             * first" mid-battle has no way to check what that means without leaving the battle,
+             * and the pill is already how a held card is opened everywhere else.
+             */
+            <div className="da-note da-note-card">
+              <CardPill id={RAILGUN_ARRAYS} kind="lore" owner={ctx.enemy as FactionId} />
+              <span>{ctx.enemy} strikes first, before you collect any dice.</span>
             </div>
           ) : null}
           {(ctx.intercepted ?? 0) > 0 ? (

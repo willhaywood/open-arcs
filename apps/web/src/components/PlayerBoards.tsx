@@ -32,7 +32,7 @@ import { useState } from 'react'
 
 import { colorOf, figureArt } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
-import { LeaderCardReader, cardArt, cardName } from './LeaderCardReader.js'
+import { CardPill, LeaderCardReader, cardArt, cardName } from './LeaderCardReader.js'
 import type { DraftKind } from './LeaderCardReader.js'
 
 /**
@@ -483,7 +483,6 @@ function leaderBackdrop(board: FactionBoard): React.CSSProperties | undefined {
  * cannot be identified — and clicking opens the same reader the draft used.
  */
 function Drafted({ board, mini = false }: { board: FactionBoard; mini?: boolean }): JSX.Element | null {
-  const [open, setOpen] = useState<{ id: string; kind: DraftKind } | null>(null)
   if (board.leader === undefined && board.lore.length === 0) return null
 
   const rows: { id: string; kind: DraftKind }[] = [
@@ -494,19 +493,8 @@ function Drafted({ board, mini = false }: { board: FactionBoard; mini?: boolean 
   return (
     <div className={`pb-guilds${mini ? ' mini' : ''}`}>
       {rows.map(({ id, kind }) => (
-        <button
-          key={id}
-          type="button"
-          className={`pb-guild pb-drafted ${kind}`}
-          title={`${cardName(id, kind)} — ${kind === 'leader' ? 'your leader' : 'lore'}, click to read`}
-          onClick={() => setOpen({ id, kind })}
-        >
-          <span className="pb-guild-name">{cardName(id, kind)}</span>
-        </button>
+        <CardPill key={id} id={id} kind={kind} owner={board.faction} />
       ))}
-      {open !== null ? (
-        <LeaderCardReader id={open.id} kind={open.kind} onClose={() => setOpen(null)} />
-      ) : null}
     </div>
   )
 }

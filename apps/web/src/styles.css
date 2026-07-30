@@ -2430,6 +2430,14 @@ button {
   padding-bottom: 10px;
 }
 
+/* A note that leads with a card pill rather than plain prose. */
+.da-note.da-note-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
 .bt-tally {
   display: flex;
   flex-wrap: wrap;

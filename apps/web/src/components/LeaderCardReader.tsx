@@ -12,7 +12,7 @@
 
 import { leaderCard, loreCard } from '@arcs/engine'
 import type { Action, FactionId } from '@arcs/engine'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { store } from '../store.js'
@@ -26,6 +26,50 @@ export function cardArt(id: string, kind: DraftKind): string {
 
 export function cardName(id: string, kind: DraftKind): string {
   return kind === 'leader' ? leaderCard(id).name : loreCard(id).name
+}
+
+/**
+ * A named, clickable card reference — the pill the player boards use for drafted cards.
+ *
+ * Lives here rather than in `PlayerBoards` because it is not about player boards: it is "a card
+ * mentioned somewhere, readable in place". Anywhere the rules fire off a held card, the card
+ * should be reachable from the thing it just did rather than by hunting for the board that holds
+ * it. Battle interrupts are the case that forced this out: being told *Railgun Arrays* struck
+ * first is no use if you cannot read Railgun Arrays without leaving the battle.
+ *
+ * The reader it opens is a portal, so a pill works inside a modal without being clipped by it.
+ */
+export function CardPill({
+  id,
+  kind,
+  owner,
+}: {
+  id: string
+  kind: DraftKind
+  owner?: FactionId | undefined
+}): JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        className={`pb-guild pb-drafted ${kind}`}
+        /*
+         * Names the holder when there is one. The old player-board title said "your leader", which
+         * was wrong on a rival's board; naming the faction is right everywhere, and this pill now
+         * appears in places where whose card it is carries the meaning — a battle interrupt is
+         * only comprehensible if you know which side owns the card that fired.
+         */
+        title={`${cardName(id, kind)} — ${owner === undefined ? kind : `${owner}'s ${kind}`}, click to read`}
+        onClick={() => setOpen(true)}
+      >
+        <span className="pb-guild-name">{cardName(id, kind)}</span>
+      </button>
+      {open ? (
+        <LeaderCardReader id={id} kind={kind} owner={owner} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  )
 }
 
 export function LeaderCardReader({
