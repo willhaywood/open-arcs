@@ -122,14 +122,15 @@ action, which is correct rather than a shortcut. The eligible set and the limit 
 the offered options rather than re-derived from the card, so the tray cannot disagree with the
 engine about what is allowed.
 
-### ~~S5~~ — `SlotBoard`: rearranging — **built, with one slot missing**
+### ~~S5~~ — `SlotBoard`: rearranging — **built**
 
 Your slots as the row, key plate above each, tokens dragged between wells; swap on a full slot,
 eject when an *arriving* token lands on one. Forced when the row is illegal, optional from the
 Prelude. Pointer-based so it works under touch, with click-to-lift as the accessible path.
 
-**It draws six city slots and no card slot**, so Ancient Holdings' extra slot is invisible — see
-section 5. The row is derived from `CITY_SLOT_KEYS`, which structurally cannot produce a seventh.
+It drew six city slots and no card slot until Ancient Holdings' seventh was added — the row is
+built from `CITY_SLOT_KEYS` for the board's own slots and from `slotsOf` for anything a card grants.
+See section 5.
 
 ### S6 — Confirm strip: two-option trait prompts
 
@@ -196,31 +197,22 @@ and the one invariant still worth adding.
 
 ## 5. Smaller known items
 
-- **Ancient Holdings' resource slot is invisible in the UI**, which makes an implemented card
-  unusable — the largest item in this section, kept here only because the fix is contained.
-
-  The engine is right: `control.ts` gives the holder a `cardslot:<faction>:lore13` on top of their
-  city slots, `slotKeys` prices it at four keys, and `slotsOf` returns it. The UI never draws it.
-  `apps/web/src/slots.ts` builds the row from `CITY_SLOT_KEYS`, which has six entries and no
-  concept of a seventh; **nothing in `apps/web/src` references `cardslot` at all.** So both the
-  player board and `SlotBoard` show six wells whatever the engine says.
-
-  What that costs: a token in the card slot cannot be seen, dragged or spent, capacity reads one
-  low, and the four-key raid price never appears. Silent in every case — the row simply looks
+- **Ancient Holdings' resource slot — fixed.** Kept here because the shape of the bug is worth
+  remembering: the engine had the slot all along (`control.ts` adds a `cardslot:<faction>:lore13`,
+  `slotKeys` prices it at four keys, `slotsOf` returns it) and the UI never drew it, because
+  `slotRow` iterated `CITY_SLOT_KEYS` — six entries, no concept of a seventh. A token there could
+  not be seen, dragged or spent, and capacity read one low. Nothing failed; the row just looked
   ordinary.
 
-  Reproduce with `saves/lore/lore13-ancient-holdings--the-extra-slot.json`: open the arrange screen
-  and count the wells against `slotsOf(state, 'blue')`, which returns five usable slots including
-  the card slot.
+  `slotRow` now appends whatever `slotsOf` reports outside the board, priced by `slotKeys`. The card
+  slot is appended rather than folded in, because the two halves mean different things: the city
+  slots include the ones still **covered by unbuilt cities**, which is the physical idea the row
+  exists to show and precisely what `slotsOf` omits. The card slot is never covered.
 
-  Fixing it means `slotRow` deriving the row from `slotsOf` rather than iterating
-  `CITY_SLOT_KEYS`, and taking each price from `slotKeys` rather than indexing that array — both
-  are exported and neither is imported there yet. The two surfaces that draw the row already share
-  `slotRow`, so they would change together.
-
-  This is the same category as the Railgun deadlock and the invisible rerolls: **the engine is
-  correct and no surface draws what it says.** docs/18 section 4 names the invariant that would
-  catch the class.
+  `apps/web/test/slots.test.ts` locks in the invariant — every usable slot the engine reports has a
+  well drawn for it, and nothing extra — stated against `slotsOf` rather than a count, so a future
+  card granting a slot is covered without touching the test. Mutation-verified: restoring the old
+  row fails four of its five cases.
 - **Gate Ports "max 1 per gate"** — provenance divergence recorded in docs/14 and unresolved:
   Cloud Cities counts card-placed cities, Gate Ports uses a per-faction count.
 - **`multiAsk` is a placeholder** — summits will need a real simultaneous-decision UI.

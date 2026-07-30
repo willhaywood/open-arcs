@@ -24,6 +24,8 @@ import {
   contentsOf,
   parseResourceToken,
   slotCapacity,
+  slotKeys,
+  slotsOf,
 } from '@arcs/engine'
 import type { FactionId, GameState, Resource } from '@arcs/engine'
 
@@ -49,10 +51,27 @@ export function citiesToUnlock(slot: number, total: number): number {
   return total
 }
 
-/** Every one of a faction's six city slots, open or covered. */
+/**
+ * A faction's resource slots: the six city slots, open or covered, then any slot living on a card.
+ *
+ * **Ancient Holdings (lore13) prints a seventh slot on the card itself**, and this row used to be a
+ * bare iteration of `CITY_SLOT_KEYS` — six entries, no concept of a seventh — so that slot was
+ * drawn by neither the player board nor `SlotBoard`. The engine had it all along: `control.ts` adds
+ * a `cardslot:<faction>:lore13`, `slotKeys` prices it at four keys, and `slotsOf` returns it. A
+ * token there simply could not be seen, dragged or spent, and capacity read one low.
+ *
+ * The card slot is *appended* rather than folded into the six, and the row is not derived from
+ * `slotsOf` wholesale, because the two halves mean different things. The city slots include the
+ * ones still **covered by unbuilt cities** — which is the physical idea the row exists to show, and
+ * exactly what `slotsOf` leaves out, since a covered slot is not usable. The card slot is never
+ * covered: it is on the card, not the board, so it needs no cities off it and cannot be locked.
+ *
+ * Which slots exist comes from `slotsOf` and the price from `slotKeys`, so the card that grants it
+ * stays the engine's business — nothing here needs to know the string `lore13`.
+ */
 export function slotRow(state: GameState, faction: FactionId): SlotInfo[] {
   const capacity = slotCapacity(citiesInReserve(state, faction))
-  return Array.from({ length: CITY_SLOT_COUNT }, (_, i) => {
+  const city = Array.from({ length: CITY_SLOT_COUNT }, (_, i) => {
     const id = ResourceSlot.citySlot(faction, i)
     const held = contentsOf(state.resources, id)[0]
     return {
@@ -64,6 +83,22 @@ export function slotRow(state: GameState, faction: FactionId): SlotInfo[] {
       needs: citiesToUnlock(i, CITIES_PER_FACTION),
     }
   })
+
+  const onCards = slotsOf(state, faction)
+    .filter((id) => id.startsWith('cardslot:'))
+    .map((id) => {
+      const held = contentsOf(state.resources, id)[0]
+      return {
+        id,
+        keys: slotKeys(id),
+        locked: false,
+        resource: held === undefined ? undefined : parseResourceToken(held).resource,
+        token: held,
+        needs: 0,
+      }
+    })
+
+  return [...city, ...onCards]
 }
 
 export interface SlotGroupInfo {
