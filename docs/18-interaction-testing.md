@@ -116,17 +116,40 @@ still replays to a playable position. That catches the one way they rot — an a
 argument-shape change quietly invalidating every save written before it. Verified by mutation:
 renaming `action/move-ships` in a journal fails the test.
 
-**The gap worth closing next is the renderability invariant**, because it is the one that would
-have caught two of the three bugs above automatically. The property is:
+**The renderability invariant — done.** It was the gap worth closing, because it is the one that
+would have caught two of the three bugs above automatically. The property:
 
-> For every Ask the engine can produce, at least one of its actions is reachable in the UI.
+> For every Ask the engine can produce, at least one surface draws it.
 
-Today that is split across two files that do not know about each other: `ActionPanel` hides action
-types it believes a window owns, and `Battle.tsx` decides whether that window draws. Railgun Arrays
-fell into the space between them. Making it testable means extracting the decision into one
-predicate — roughly `surfaceFor(ask, state)` returning which component claims an Ask, with
-`undefined` meaning nobody — and asserting over many random games that it is never `undefined`.
-That is a real refactor of the two components, not a test to bolt on, which is why it is recorded
-here rather than done.
+`apps/web/src/surfaces.ts` states ownership **once**, as a table from action type to surface, and
+every component asks it rather than re-deriving. That divergence was the bug: `ActionPanel` hid
+types it *believed* the battle window owned, the window decided independently whether to render, and
+where the two disagreed the Ask fell through. `apps/web/test/surfaces.test.ts` plays 80 games across
+two configurations plus every checked-in save, and asserts nothing comes back unowned.
+
+Three things learned building it, all worth keeping:
+
+- **The first version could not fail.** `surfaceFor` ended `return 'panel'`, on the reasoning that
+  the panel can render anything as a labelled button. True — and it made the assertion worthless,
+  since `undefined` was unreachable. A check that cannot fail is worse than none, because it reads
+  as coverage. The panel now claims a list like every other surface.
+- **The sweep immediately found 13 unclaimed action types**, including all nine Vox actions, two
+  leader prompts and the catapult continuation. None was a crash — they were being drawn by the old
+  panel's catch-all. But nothing *said* the panel owned them, so any future component claiming one
+  would have silently taken it away, which is precisely how the Railgun deadlock happened.
+- **A claim is only as good as the surface behind it.** `Battle.tsx` returned `null` when no branch
+  matched, which is what deadlocked the game: the panel steps aside for anything the window claims,
+  so a claim it cannot draw leaves nothing. It now falls back to a plain list of the Asks's actions —
+  deliberately ugly, because a battle step drawn as bare buttons is a bug worth noticing, but
+  *playable*, which is the difference that matters.
+
+Ownership is per **Ask**, not per action type: a surface draws the whole Ask, and every surface is
+total over what it claims. So an unclaimed type inside an Ask whose other types *are* claimed is not
+a hole — verified by mutation, where unclaiming `vox/outrage` correctly does not fail, while
+unclaiming `battle/hit` or `battle/reroll` does.
+
+What this still does not check is whether the surface draws the Ask *well*. The reroll was "handled"
+by the panel for months — owned, rendered, and useless, because the dice were not on screen. That
+judgement needs eyes, which is what the saves in section 2 are for.
 
 Until then: the saves plus the batches in section 2 are the coverage, and they need eyes.

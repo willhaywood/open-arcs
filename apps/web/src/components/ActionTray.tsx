@@ -33,6 +33,7 @@ import { SUIT_ACTIONS, courtCard, guildAlt } from '@arcs/engine'
 import type { Action, Continue, GameState, StandardAction, Suit } from '@arcs/engine'
 
 import { store } from '../store.js'
+import { owns } from '../surfaces.js'
 import { colorOf } from '../theme.js'
 import { CardPill } from './LeaderCardReader.js'
 
@@ -51,12 +52,12 @@ const ESCAPES = ['turn/end', 'action/skip', 'action/cancel', 'battle/cancel']
  * `withAlts` is called inside `offerBuild` and `offerMove`, so you commit the pip to Build and are
  * then offered Nurture alongside the ordinary build targets. Showing the card rows therefore means
  * owning those sub-menus too, not just the top.
+ *
+ * Kept as a named wrapper over the shared table so the tray reads in its own vocabulary while the
+ * answer still comes from `surfaces.ts`.
  */
 export function trayOwns(cont: Continue): boolean {
-  if (cont.kind !== 'ask') return false
-  const types = new Set(cont.actions.map((a) => a.type))
-  if (types.has('action/guild-alt')) return true
-  return types.has('action/take') && types.has('turn/end')
+  return owns('tray', cont)
 }
 
 /** One row of the tray: a source, and what it is offering. */

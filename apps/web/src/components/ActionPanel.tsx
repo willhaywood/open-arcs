@@ -1,7 +1,7 @@
 import type { Continue } from '@arcs/engine'
 
 import { store } from '../store.js'
-import { trayOwns } from './ActionTray.js'
+import { surfaceFor } from '../surfaces.js'
 import { colorOf, textOn } from '../theme.js'
 
 interface Props {
@@ -43,60 +43,24 @@ export function ActionPanel({ cont, onNewGame }: Props): JSX.Element | null {
     return <div className="actions">Engine is working…</div>
   }
 
-  // Card plays live in the fanned hand at the bottom, and the Leaders and Lore draft has its
-  // own screen — neither belongs in a list of buttons.
+  /*
+   * Which surface draws this Ask is decided in one place — `surfaces.ts` — and asked, not
+   * re-derived. This used to be two lists here (types that live elsewhere, plus a conditional
+   * battle-window set) reasoning independently of what the battle window would actually render.
+   * Where the two disagreed, the Ask fell through: Railgun Arrays hid `battle/hit` here while the
+   * window declined to draw it, and the game stopped.
+   */
+  /*
+   * Draws what it is claimed for — and anything claimed by nobody, so a missing entry in the table
+   * is a failing test rather than an unplayable game. `surfaces.test.ts` asserts `undefined` never
+   * happens in real play; this makes sure that if it ever does, the turn can still be taken.
+   */
+  const surface = surfaceFor(cont)
+  if (surface !== 'panel' && surface !== undefined) return null
+
   const CARD_PLAYS = ['turn/lead', 'turn/surpass', 'turn/copy', 'turn/pivot']
-  // Both draft-style choices have their own screen; listing them here too would duplicate them.
-  const ELSEWHERE = [
-    ...CARD_PLAYS,
-    'leaders/take',
-    'leaders/learned',
-    'battle/raid-take',
-    'battle/settle',
-    // The resource slots are a board you push tokens around on, not a list of moves.
-    'resources/arrange-move',
-    'resources/arrange-discard',
-    'resources/arrange-done',
-    // The Prelude is a choice between tokens, so it gets the tokens.
-    'turn/prelude-spend',
-    'turn/prelude-battle',
-    'turn/prelude-discard',
-    'turn/prelude-guild',
-    'turn/prelude-arrange',
-    'turn/prelude-done',
-  ]
 
-  /*
-   * The battle window (`Battle.tsx`) owns four of the battle's steps: choosing a target, gathering
-   * the dice, and placing hits — which ends on the `battle/finish` confirm. While any of those is
-   * on offer the panel must stay out of the way, or every step is drawn twice: the dice gather
-   * alone put 56 `Roll 3S 1A 0R` buttons beside the tray that already draws them.
-   *
-   * Conditional rather than a flat entry in the list above, because one battle step has **no**
-   * window of its own and must keep the panel:
-   *
-   *   - `battle/system` — which system to attack in, still a list until the map targets it.
-   *
-   * `battle/reroll` used to be in that same boat and no longer is: the window draws the dice and
-   * lets them be clicked, so leaving it here as well would print the whole option list — one
-   * button per distinct face combination — beside the tray already showing them.
-   *
-   * `battle/cancel` goes with the window when the window is up (it draws its own way out) and
-   * stays in the panel otherwise, where it is the only way back from the system choice.
-   */
-  const BATTLE_WINDOW = ['battle/target', 'battle/roll', 'battle/hit', 'battle/finish', 'battle/reroll']
-  const inBattleWindow = cont.actions.some((a) => BATTLE_WINDOW.includes(a.type))
-  const hidden = inBattleWindow ? [...ELSEWHERE, ...BATTLE_WINDOW, 'battle/cancel'] : ELSEWHERE
-
-  /*
-   * Menus the tray draws are drawn *only* there — asked through the same predicate the tray uses,
-   * so the two cannot disagree about who owns one. A flat copy beside the grouped one would say
-   * the same options twice while losing the source of each, which is the whole reason the tray
-   * exists.
-   */
-  if (trayOwns(cont)) return null
-
-  const actions = cont.actions.filter((a) => !hidden.includes(a.type))
+  const actions = cont.actions
   const playPhase = cont.actions.some((a) => CARD_PLAYS.includes(a.type))
 
   return (

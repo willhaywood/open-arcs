@@ -26,6 +26,7 @@ import { useMemo, useState } from 'react'
 import { dieArt } from '../dice-art.js'
 import { store } from '../store.js'
 import { colorOf, textOn } from '../theme.js'
+import { owns } from '../surfaces.js'
 import { DamageAssign, Forces } from './DamageAssign.js'
 import { Die3D } from './Dice3D.js'
 
@@ -37,6 +38,7 @@ interface Props {
 }
 
 export function Battle({ state, cont }: Props): JSX.Element | null {
+  if (!owns('battle', cont)) return null
   const actions = cont.kind === 'ask' ? cont.actions : []
   const rollOpts = actions.filter((a) => a.type === 'battle/roll')
   const targetOpts = actions.filter((a) => a.type === 'battle/target')
@@ -119,7 +121,31 @@ export function Battle({ state, cont }: Props): JSX.Element | null {
     )
   }
 
-  return null
+  /*
+   * The table says this window owns the Ask, and no branch above matched.
+   *
+   * **Returning null here is what deadlocked the game once already.** `ActionPanel` steps aside for
+   * anything this window claims, so a claim it cannot draw leaves the Ask with no surface at all and
+   * the turn cannot be advanced. Railgun Arrays reached exactly this state: an assignment with no
+   * roll, which every branch declined.
+   *
+   * So the last resort is a plain list of whatever is on offer. It is deliberately ugly — a battle
+   * step drawn as bare buttons is a bug worth noticing — but it is *playable*, which is the
+   * difference that matters. `test/surfaces.test.ts` asserts every Ask has an owner; this makes
+   * sure the owner always draws something.
+   */
+  return (
+    <Shell system={undefined} faction={cont.kind === 'ask' ? cont.faction : undefined} enemy={undefined}>
+      <div className="da-prompt">{cont.kind === 'ask' ? cont.prompt : 'Battle'}</div>
+      <div className="da-fallback">
+        {actions.map((a, i) => (
+          <button key={`${a.type}-${i}`} className="da-ghost" onClick={() => store.apply(a)}>
+            {String(a['label'] ?? a.type)}
+          </button>
+        ))}
+      </div>
+    </Shell>
+  )
 }
 
 /** The window itself: backdrop, frame, and the "who is fighting where" header. */
@@ -129,8 +155,9 @@ function Shell({
   enemy,
   children,
 }: {
-  system: string
-  faction: string
+  /** Absent in the fallback, which has no single system to name. */
+  system: string | undefined
+  faction: string | undefined
   /** Absent until a target is chosen. */
   enemy: string | undefined
   children: React.ReactNode
@@ -139,9 +166,9 @@ function Shell({
     <div className="da-backdrop">
       <div className="da-modal">
         <div className="da-head">
-          <span className="da-title">Battle in {system}</span>
+          <span className="da-title">{system === undefined ? 'Battle' : `Battle in ${system}`}</span>
           <span className="da-vs">
-            <Swatch color={faction} />
+            {faction !== undefined ? <Swatch color={faction} /> : null}
             {enemy !== undefined ? (
               <>
                 <span className="da-vs-x">vs</span>

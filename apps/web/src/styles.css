@@ -4301,3 +4301,11 @@ button {
 .at-end:hover {
   background: rgba(201, 169, 97, 0.14);
 }
+
+/* Last-resort list when the battle window owns an Ask no branch draws — see Battle.tsx. */
+.da-fallback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
