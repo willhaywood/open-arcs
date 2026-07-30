@@ -26,7 +26,13 @@ import {
 } from './control.js'
 import { BASE_COURT, courtSlots, hasGuild, securedCards } from './court.js'
 import { Location, parseFigureId } from './ids.js'
-import { hasLore } from './lore.js'
+import {
+  FORCE_BEAMS,
+  GALACTIC_RIFLES,
+  LIVING_STRUCTURES,
+  SURVIVAL_OVERRIDES,
+  hasLore,
+} from './lore.js'
 import { riflesSources } from './rules/battle.js'
 import type { FactionId, SystemId } from './ids.js'
 import { countResource, slotCapacity } from './resources.js'
@@ -277,7 +283,7 @@ export const LORE_ALTS: readonly GuildAlt[] = [
   // Galactic Rifles — "Fire Rifles (Battle)": a ranged strike into an adjacent system.
   {
     id: 'rifles',
-    card: 'lore02',
+    card: GALACTIC_RIFLES,
     source: 'lore',
     label: 'Fire Rifles — strike an adjacent system',
     on: 'Battle',
@@ -286,7 +292,7 @@ export const LORE_ALTS: readonly GuildAlt[] = [
   // Living Structures — "Nurture (Build): Tax a Loyal city."
   {
     id: 'nurture',
-    card: 'lore10',
+    card: LIVING_STRUCTURES,
     source: 'lore',
     label: 'Nurture — tax one of your cities',
     on: 'Build',
@@ -295,7 +301,7 @@ export const LORE_ALTS: readonly GuildAlt[] = [
   // Living Structures — "Prune (Repair): Replace a Loyal starport with a Loyal city or vice versa."
   {
     id: 'prune',
-    card: 'lore10',
+    card: LIVING_STRUCTURES,
     source: 'lore',
     label: 'Prune — swap one of your buildings',
     on: 'Repair',
@@ -305,7 +311,7 @@ export const LORE_ALTS: readonly GuildAlt[] = [
   // with a fresh Loyal starport to an adjacent system, or vice versa."
   {
     id: 'guide',
-    card: 'lore16',
+    card: FORCE_BEAMS,
     source: 'lore',
     label: 'Guide — carry any ships in or out of a starport system',
     on: 'Move',
@@ -315,7 +321,7 @@ export const LORE_ALTS: readonly GuildAlt[] = [
   // that is not Loyal in its system, taking it as a Trophy."
   {
     id: 'martyr',
-    card: 'lore18',
+    card: SURVIVAL_OVERRIDES,
     source: 'lore',
     label: 'Martyr — trade a fresh ship for a rival ship',
     on: 'Move',
