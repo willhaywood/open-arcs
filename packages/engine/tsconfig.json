@@ -9,5 +9,10 @@
     "rootDir": ".",
     "composite": true
   },
-  "include": ["src/**/*", "src/**/*.json", "test/**/*"]
+  "include": ["src/**/*", "src/**/*.json", "test/**/*"],
+  // `saves-replay.test.ts` reads files, so it needs Node's types — and adding those here would
+  // also let `src` import `node:fs` and compile, quietly undoing the "lib" and "types" guards
+  // above. Excluded instead: it still runs under vitest, which does not typecheck. Giving it
+  // types properly means a separate Node-side test project plus @types/node (docs/18 section 4).
+  "exclude": ["test/saves-replay.test.ts"]
 }

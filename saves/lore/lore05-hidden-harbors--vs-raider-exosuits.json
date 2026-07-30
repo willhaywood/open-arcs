@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "options": {
+    "board": "Board3MixUp",
+    "factions": [
+      "red",
+      "yellow",
+      "blue"
+    ],
+    "seed": 2,
+    "leadersAndLore": {
+      "expansion": true,
+      "lorePerPlayer": 3
+    }
+  },
+  "journal": [
+    "leaders/take(card=\"lore17\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"lore05\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"leader04\",faction=\"red\",kind=\"leader\")",
+    "leaders/take(card=\"leader12\",faction=\"blue\",kind=\"leader\")",
+    "leaders/take(card=\"leader15\",faction=\"yellow\",kind=\"leader\")",
+    "leaders/take(card=\"lore07\",faction=\"red\",kind=\"lore\")",
+    "leaders/take(card=\"lore14\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"lore25\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"lore23\",faction=\"red\",kind=\"lore\")",
+    "leaders/take(card=\"lore06\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"lore19\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"lore03\",faction=\"red\",kind=\"lore\")",
+    "turn/lead(card=\"Aggression-4\",faction=\"red\",suit=\"Aggression\")",
+    "ambition/declare(ambition=\"Warlord\",faction=\"red\",pips=2,suit=\"Aggression\")",
+    "leaders/ambitious-gain(faction=\"red\",pips=2,resource=\"Material\",suit=\"Aggression\",used=[])",
+    "turn/prelude-spend(action=\"Move\",faction=\"red\",pips=2,resource=\"Psionic\",suit=\"Aggression\")",
+    "action/move-pick(faction=\"red\",from=\"2-Gate\",then={\"type\":\"turn/prelude\",\"faction\":\"red\",\"suit\":\"Aggression\",\"pips\":2},to=\"2-Arrow\")",
+    "action/move-ships(count=2,faction=\"red\",from=\"2-Gate\",then={\"type\":\"turn/prelude\",\"faction\":\"red\",\"suit\":\"Aggression\",\"pips\":2},to=\"2-Arrow\")",
+    "action/lore-sprint(faction=\"red\",from=\"2-Arrow\",rest=[],ships=[\"red/Ship/8\",\"red/Ship/9\"],then={\"type\":\"turn/prelude\",\"faction\":\"red\",\"suit\":\"Aggression\",\"pips\":2},to=\"2-Crescent\")",
+    "turn/prelude-spend(action=\"Build\",faction=\"red\",pips=2,resource=\"Material\",suit=\"Aggression\")",
+    "action/build(faction=\"red\",piece=\"City\",system=\"2-Crescent\",then={\"type\":\"turn/prelude\",\"faction\":\"red\",\"suit\":\"Aggression\",\"pips\":2})",
+    "turn/prelude-spend(action=\"Build\",faction=\"red\",pips=2,resource=\"Material\",suit=\"Aggression\")",
+    "action/build(faction=\"red\",piece=\"City\",system=\"3-Hex\",then={\"type\":\"turn/prelude\",\"faction\":\"red\",\"suit\":\"Aggression\",\"pips\":2})",
+    "action/take(action=\"Move\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Aggression\",\"done\":1,\"total\":2})",
+    "action/move-pick(faction=\"red\",from=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Aggression\",\"done\":1,\"total\":2},to=\"2-Arrow\")",
+    "action/move-ships(count=2,faction=\"red\",from=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Aggression\",\"done\":1,\"total\":2},to=\"2-Arrow\")",
+    "action/take(action=\"Battle\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Aggression\",\"done\":2,\"total\":2})",
+    "battle/system(faction=\"red\",system=\"2-Arrow\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Aggression\",\"done\":2,\"total\":2})"
+  ]
+}

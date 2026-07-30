@@ -171,6 +171,15 @@ panel meaning "the ordinary things you may do on your turn".
   implementing lore30 and putting the checkbox back.
 - Leaders 01-16: **complete** (docs/14 phases 3 and 5).
 
+## 3a. Testing card interactions
+
+Every lore bug that reached the screen was an interaction the unit tests could not see — a valid
+Ask no UI would draw, or a decision shown without the thing it was about. `saves/lore/` now holds a
+game per interaction, parked on the decision and **named after the cards it exercises**, with
+`npm run saves:build` to regenerate and `saves/lore/README.md` as the index — whose coverage table
+lists every implemented lore card against its saves. **17 of 28 covered; the other 11 are named.** **docs/18** has the approach, the two traps found building it,
+and the one invariant still worth adding.
+
 ## 4. Systems not started
 
 - **AI.** docs/03 is a locked plan; no code exists.

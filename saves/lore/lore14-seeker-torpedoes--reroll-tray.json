@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "options": {
+    "board": "Board3MixUp",
+    "factions": [
+      "red",
+      "yellow",
+      "blue"
+    ],
+    "seed": 1,
+    "leadersAndLore": {
+      "expansion": true,
+      "lorePerPlayer": 2
+    }
+  },
+  "journal": [
+    "leaders/take(card=\"lore14\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"leader04\",faction=\"yellow\",kind=\"leader\")",
+    "leaders/take(card=\"leader05\",faction=\"red\",kind=\"leader\")",
+    "leaders/take(card=\"leader16\",faction=\"blue\",kind=\"leader\")",
+    "leaders/take(card=\"lore19\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"lore10\",faction=\"red\",kind=\"lore\")",
+    "leaders/take(card=\"lore20\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"lore05\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"lore28\",faction=\"red\",kind=\"lore\")",
+    "turn/lead(card=\"Administration-5\",faction=\"red\",suit=\"Administration\")",
+    "ambition/declare(ambition=\"Keeper\",faction=\"red\",pips=3,suit=\"Administration\")",
+    "turn/prelude-spend(action=\"Build\",faction=\"red\",pips=3,resource=\"Material\",suit=\"Administration\")",
+    "action/build(faction=\"red\",piece=\"City\",system=\"3-Hex\",then={\"type\":\"turn/prelude\",\"faction\":\"red\",\"suit\":\"Administration\",\"pips\":3})",
+    "turn/prelude-battle(faction=\"red\",pips=3,resource=\"Weapon\",suit=\"Administration\")",
+    "action/take(action=\"Tax\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":1,\"total\":3})",
+    "action/tax-city(city=\"red/City/1\",faction=\"red\",system=\"3-Hex\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":1,\"total\":3})",
+    "action/take(action=\"Repair\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":2,\"total\":3})",
+    "action/guild-alt(alt=\"prune\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":2,\"total\":3})",
+    "action/lore-prune(faction=\"red\",figure=\"red/Starport/1\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":2,\"total\":3},to=\"City\")",
+    "action/take(action=\"Tax\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":3,\"total\":3})",
+    "action/tax-city(city=\"red/City/2\",faction=\"red\",system=\"3-Hex\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":3,\"total\":3})",
+    "turn/pivot(card=\"Aggression-6\",faction=\"yellow\",suit=\"Aggression\")",
+    "turn/seize(card=\"Mobilization-2\",faction=\"yellow\",pips=1,suit=\"Aggression\")",
+    "turn/prelude-spend(action=\"Tax\",faction=\"yellow\",pips=1,resource=\"Psionic\",suit=\"Aggression\")",
+    "action/tax-city(city=\"yellow/City/1\",faction=\"yellow\",system=\"2-Arrow\",then={\"type\":\"turn/prelude\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"pips\":1})",
+    "turn/prelude-spend(action=\"Influence\",faction=\"yellow\",pips=1,resource=\"Psionic\",suit=\"Aggression\")",
+    "action/influence(faction=\"yellow\",slot=1,then={\"type\":\"turn/prelude\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"pips\":1})",
+    "turn/prelude-spend(action=\"Build\",faction=\"yellow\",pips=1,resource=\"Material\",suit=\"Aggression\")",
+    "action/build(faction=\"yellow\",piece=\"City\",system=\"5-Hex\",then={\"type\":\"turn/prelude\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"pips\":1})",
+    "action/take(action=\"Move\",faction=\"yellow\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1})",
+    "action/move-pick(faction=\"yellow\",from=\"2-Arrow\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1},to=\"2-Crescent\")",
+    "action/move-ships(count=4,faction=\"yellow\",from=\"2-Arrow\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1},to=\"2-Crescent\")",
+    "turn/copy(card=\"Administration-6\",faction=\"blue\")",
+    "turn/prelude-spend(action=\"Move\",faction=\"blue\",pips=1,resource=\"Fuel\",suit=\"Administration\")",
+    "action/move-pick(faction=\"blue\",from=\"2-Hex\",then={\"type\":\"turn/prelude\",\"faction\":\"blue\",\"suit\":\"Administration\",\"pips\":1},to=\"2-Crescent\")",
+    "action/move-ships(count=4,faction=\"blue\",from=\"2-Hex\",then={\"type\":\"turn/prelude\",\"faction\":\"blue\",\"suit\":\"Administration\",\"pips\":1},to=\"2-Crescent\")",
+    "turn/prelude-battle(faction=\"blue\",pips=1,resource=\"Weapon\",suit=\"Administration\")",
+    "action/take(action=\"Battle\",faction=\"blue\",then={\"type\":\"turn/pips\",\"faction\":\"blue\",\"suit\":\"Administration\",\"done\":1,\"total\":1})",
+    "battle/system(faction=\"blue\",system=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"blue\",\"suit\":\"Administration\",\"done\":1,\"total\":1})",
+    "battle/roll(assault=4,enemy=\"yellow\",faction=\"blue\",raid=0,skirmish=0,system=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"blue\",\"suit\":\"Administration\",\"done\":1,\"total\":1})"
+  ]
+}

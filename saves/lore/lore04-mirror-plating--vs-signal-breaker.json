@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "options": {
+    "board": "Board3MixUp",
+    "factions": [
+      "red",
+      "yellow",
+      "blue"
+    ],
+    "seed": 3,
+    "leadersAndLore": {
+      "expansion": true,
+      "lorePerPlayer": 3
+    }
+  },
+  "journal": [
+    "leaders/take(card=\"lore04\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"lore06\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"leader07\",faction=\"red\",kind=\"leader\")",
+    "leaders/take(card=\"leader05\",faction=\"blue\",kind=\"leader\")",
+    "leaders/take(card=\"leader02\",faction=\"yellow\",kind=\"leader\")",
+    "leaders/take(card=\"lore11\",faction=\"red\",kind=\"lore\")",
+    "leaders/take(card=\"lore17\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"lore02\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"lore03\",faction=\"red\",kind=\"lore\")",
+    "leaders/take(card=\"lore07\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"lore05\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"lore15\",faction=\"red\",kind=\"lore\")",
+    "turn/lead(card=\"Mobilization-6\",faction=\"red\",suit=\"Mobilization\")",
+    "ambition/declare(ambition=\"Empath\",faction=\"red\",pips=2,suit=\"Mobilization\")",
+    "ambition/skip-declare(faction=\"red\",pips=2,suit=\"Mobilization\")",
+    "turn/prelude-spend(action=\"Build\",faction=\"red\",pips=2,resource=\"Material\",suit=\"Mobilization\")",
+    "action/build(faction=\"red\",piece=\"City\",system=\"2-Gate\",then={\"type\":\"turn/prelude\",\"faction\":\"red\",\"suit\":\"Mobilization\",\"pips\":2})",
+    "turn/prelude-discard(faction=\"red\",pips=2,resource=\"Relic\",suit=\"Mobilization\")",
+    "action/take(action=\"Move\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Mobilization\",\"done\":1,\"total\":2})",
+    "action/move-pick(faction=\"red\",from=\"2-Gate\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Mobilization\",\"done\":1,\"total\":2},to=\"2-Arrow\")",
+    "action/move-ships(count=3,faction=\"red\",from=\"2-Gate\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Mobilization\",\"done\":1,\"total\":2},to=\"2-Arrow\")",
+    "action/lore-sprint(faction=\"red\",from=\"2-Arrow\",rest=[],ships=[\"red/Ship/7\",\"red/Ship/8\",\"red/Ship/9\"],then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Mobilization\",\"done\":1,\"total\":2},to=\"2-Crescent\")",
+    "action/take(action=\"Move\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Mobilization\",\"done\":2,\"total\":2})",
+    "action/move-pick(faction=\"red\",from=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Mobilization\",\"done\":2,\"total\":2},to=\"2-Arrow\")",
+    "action/move-ships(count=3,faction=\"red\",from=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Mobilization\",\"done\":2,\"total\":2},to=\"2-Arrow\")",
+    "turn/pivot(card=\"Construction-4\",faction=\"yellow\",suit=\"Construction\")",
+    "turn/seize(card=\"Aggression-5\",faction=\"yellow\",pips=1,suit=\"Construction\")",
+    "turn/prelude-spend(action=\"Move\",faction=\"yellow\",pips=1,resource=\"Psionic\",suit=\"Construction\")",
+    "action/move-pick(faction=\"yellow\",from=\"2-Arrow\",then={\"type\":\"turn/prelude\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"pips\":1},to=\"2-Crescent\")",
+    "action/move-ships(count=3,faction=\"yellow\",from=\"2-Arrow\",then={\"type\":\"turn/prelude\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"pips\":1},to=\"2-Crescent\")",
+    "turn/prelude-discard(faction=\"yellow\",pips=1,resource=\"Relic\",suit=\"Construction\")",
+    "action/take(action=\"Build\",faction=\"yellow\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"done\":1,\"total\":1})",
+    "action/build(faction=\"yellow\",piece=\"City\",system=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"done\":1,\"total\":1})",
+    "turn/copy(card=\"Mobilization-4\",faction=\"blue\")",
+    "turn/prelude-spend(action=\"Build\",faction=\"blue\",pips=1,resource=\"Material\",suit=\"Mobilization\")",
+    "action/build(faction=\"blue\",piece=\"City\",system=\"2-Hex\",then={\"type\":\"turn/prelude\",\"faction\":\"blue\",\"suit\":\"Mobilization\",\"pips\":1})",
+    "turn/prelude-battle(faction=\"blue\",pips=1,resource=\"Weapon\",suit=\"Mobilization\")",
+    "action/take(action=\"Move\",faction=\"blue\",then={\"type\":\"turn/pips\",\"faction\":\"blue\",\"suit\":\"Mobilization\",\"done\":1,\"total\":1})",
+    "action/move-pick(faction=\"blue\",from=\"2-Hex\",then={\"type\":\"turn/pips\",\"faction\":\"blue\",\"suit\":\"Mobilization\",\"done\":1,\"total\":1},to=\"2-Crescent\")",
+    "action/move-ships(count=2,faction=\"blue\",from=\"2-Hex\",then={\"type\":\"turn/pips\",\"faction\":\"blue\",\"suit\":\"Mobilization\",\"done\":1,\"total\":1},to=\"2-Crescent\")",
+    "turn/lead(card=\"Aggression-3\",faction=\"yellow\",suit=\"Aggression\")",
+    "ambition/declare(ambition=\"Tyrant\",faction=\"yellow\",pips=2,suit=\"Aggression\")",
+    "action/take(action=\"Battle\",faction=\"yellow\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":2})",
+    "battle/declare(faction=\"yellow\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":2})",
+    "battle/system(faction=\"yellow\",system=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":2})"
+  ]
+}

@@ -9,7 +9,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --build --force && tsc -p apps/web --noEmit"
+    "typecheck": "tsc --build --force && tsc -p apps/web --noEmit",
+    "saves:build": "vite-node scripts/build-test-saves.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
