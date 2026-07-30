@@ -11,8 +11,10 @@
  */
 
 import { AMBITIONS } from '@arcs/engine'
-import type { Ambition, AmbitionMarker, GameState } from '@arcs/engine'
+import type { Action, Ambition, AmbitionMarker, Continue, GameState } from '@arcs/engine'
 import { useState } from 'react'
+
+import { store } from '../store.js'
 
 /** Vertical centre of each ambition box, as a fraction of the panel height. */
 const ROW_Y: Record<Ambition, string> = {
@@ -31,9 +33,27 @@ function markerSrc(m: AmbitionMarker): string {
   return `/game-assets/ambition/ambition-values-${m.high}-${m.low}.webp`
 }
 
-export function AmbitionTrack({ state }: { state: GameState }): JSX.Element {
+export function AmbitionTrack({
+  state,
+  cont,
+}: {
+  state: GameState
+  cont?: Continue
+}): JSX.Element {
   const [artBroken, setArtBroken] = useState(false)
   const threshold = 39 - state.factions.length * 3
+
+  /*
+   * Populist Demands declares an ambition, and declaring one is a thing you do *to this track* —
+   * it was a list of "Declare Tycoon" buttons beside the board that shows the five ambitions and
+   * which are already taken. The row you would be claiming is right there, so it is clickable.
+   */
+  const declarable = new Map<Ambition, Action>()
+  if (cont?.kind === 'ask') {
+    for (const a of cont.actions) {
+      if (a.type === 'vox/populist') declarable.set(a['ambition'] as Ambition, a)
+    }
+  }
 
   const declaredByAmbition = new Map<Ambition, AmbitionMarker[]>()
   for (const d of state.declared) {
@@ -42,7 +62,41 @@ export function AmbitionTrack({ state }: { state: GameState }): JSX.Element {
     declaredByAmbition.set(d.ambition, list)
   }
 
-  if (artBroken) return <AmbitionFallback state={state} threshold={threshold} />
+  /*
+   * The claim strip has to survive the art failing to load.
+   *
+   * This early return sits *before* the track's own markup, so putting the Populist Demands buttons
+   * only in the main return would leave that decision undrawable whenever the artwork 404s — and
+   * the action panel steps aside for anything this surface claims, so the game would stop. The
+   * renderability invariant cannot catch this: it asks who owns an Ask, not whether a runtime
+   * branch inside the owner happens to draw it.
+   */
+  const claims =
+    declarable.size === 0 ? null : (
+      <>
+        {[...declarable.entries()].map(([a, action]) => (
+          <button
+            key={`declare-${a}`}
+            type="button"
+            className="amb-claim"
+            style={{ top: ROW_Y[a] }}
+            title={`Declare ${a}`}
+            onClick={() => store.apply(action)}
+          >
+            <span>Declare {a}</span>
+          </button>
+        ))}
+      </>
+    )
+
+  if (artBroken) {
+    return (
+      <div className="amb-wrap">
+        <AmbitionFallback state={state} threshold={threshold} />
+        {claims}
+      </div>
+    )
+  }
 
   return (
     <div className="ambition-track">
@@ -64,6 +118,9 @@ export function AmbitionTrack({ state }: { state: GameState }): JSX.Element {
             style={{ left: HEX_X[i], top: HEX_Y }}
           />
         ))}
+
+        {/* Populist Demands — click the ambition's row to declare it. */}
+        {claims}
 
         {/* Declared markers sit in their ambition's box. */}
         {AMBITIONS.map((a) => {

@@ -44,6 +44,7 @@ export type Surface =
   | 'battle'
   | 'tray'
   | 'map'
+  | 'ambitions'
 
 /** Card plays live in the fanned hand at the bottom of the screen. */
 const HAND = ['turn/lead', 'turn/surpass', 'turn/copy', 'turn/pivot']
@@ -93,12 +94,17 @@ const BATTLE = [
 /**
  * Spatial choices answered by clicking the map.
  *
- * Move and Battle already worked this way. Galactic Rifles joins them: both of its steps name
- * systems, and a list of "Fire from 5-Gate" beside the map that answers it was the wrong shape.
+ * Move and Battle already worked this way. Galactic Rifles joins them — both of its steps name
+ * systems — and so does Mass Uprising, whose first step names a **cluster**: a set of systems with
+ * no drawn representation at all, which made "Rise up in cluster 3" the least answerable prompt in
+ * the game. Every system in the cluster lights up instead.
  */
-const MAP = ['rifles/target', 'rifles/roll']
+const MAP = ['rifles/target', 'rifles/roll', 'vox/uprising', 'vox/uprising-place']
 
 /** The action phase, grouped by the card or pip each option comes from. */
+/** Declaring an ambition is done to the ambition track, which draws the five rows. */
+const AMBITIONS_SURFACE = ['vox/populist']
+
 const TRAY = ['action/take', 'action/guild-alt']
 
 /**
@@ -161,10 +167,7 @@ const PANEL = [
   'vox/free-city',
   'vox/free-seize',
   'vox/outrage',
-  'vox/populist',
   'vox/steal-guild',
-  'vox/uprising',
-  'vox/uprising-place',
 ]
 
 const TABLE: readonly (readonly [Surface, readonly string[]])[] = [
@@ -176,6 +179,7 @@ const TABLE: readonly (readonly [Surface, readonly string[]])[] = [
   ['raid', RAID],
   ['battle', BATTLE],
   ['map', MAP],
+  ['ambitions', AMBITIONS_SURFACE],
   ['tray', TRAY],
   ['panel', PANEL],
 ]

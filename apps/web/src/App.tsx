@@ -105,7 +105,7 @@ export function App(): JSX.Element {
           <div className="board-cell">
             <Board state={state} cont={cont} highlight={current} />
           </div>
-          <AmbitionTrack state={state} />
+          <AmbitionTrack state={state} cont={cont} />
           <div className="hand-row">
             <Hand state={state} cont={cont} />
           </div>

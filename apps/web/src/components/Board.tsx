@@ -69,6 +69,40 @@ function riflesSystems(cont: Continue): { map: Map<string, Action>; kind: 'from'
 }
 
 /**
+ * Mass Uprising, both steps, as system -> action.
+ *
+ * Choosing a *cluster* was a list of "Rise up in cluster 3" with nothing on the map saying which
+ * systems that is — the one decision in the game where the thing being chosen had no drawn
+ * representation at all. A cluster is a set of systems, so every system in it lights up and
+ * clicking any of them chooses the cluster.
+ *
+ * The second step places ships one at a time and already names a system, so it needs no
+ * translation — the same shape as Galactic Rifles' target step.
+ */
+function uprisingSystems(
+  state: GameState,
+  cont: Continue,
+): { map: Map<string, Action>; kind: 'cluster' | 'place' } {
+  const map = new Map<string, Action>()
+  if (cont.kind !== 'ask') return { map, kind: 'cluster' }
+
+  const clusters = cont.actions.filter((a) => a.type === 'vox/uprising')
+  if (clusters.length > 0) {
+    for (const a of clusters) {
+      const n = Number(a['cluster'])
+      for (const id of state.board.systems) {
+        if (systemInfo(id).cluster === n) map.set(id, a)
+      }
+    }
+    return { map, kind: 'cluster' }
+  }
+  for (const a of cont.actions) {
+    if (a.type === 'vox/uprising-place') map.set(a['system'] as string, a)
+  }
+  return { map, kind: 'place' }
+}
+
+/**
  * Moves offered by the current decision, as a map of origin -> destination -> action.
  *
  * The board does not invent moves: it is an alternative *renderer* for whatever `Ask` the
@@ -284,6 +318,11 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
   const fleet = fleetChoice(cont)
   const battleSys = battleSystems(cont)
   const rifles = riflesSystems(cont)
+  const uprising = uprisingSystems(state, cont)
+  const voxOut =
+    cont.kind === 'ask' && uprising.map.size > 0
+      ? cont.actions.find((a) => a.type === 'vox/done' || a.type === 'action/skip')
+      : undefined
   const riflesOut =
     cont.kind === 'ask' && rifles.map.size > 0
       ? cont.actions.find((a) => a.type === 'battle/cancel' || a.type === 'action/skip')
@@ -411,6 +450,23 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
           <FleetPicker state={state} choice={fleet} scale={unitsPerPx} />
         ) : null}
 
+        {/* Mass Uprising — the whole cluster lights up, then the systems ships land in. */}
+        {uprising.map.size > 0 &&
+          [...uprising.map.entries()].map(([id, action]) => {
+            const { cx, cy, r } = centreOf(state, id)
+            return (
+              <g
+                key={`uprising-${id}`}
+                className="sys-hit battle"
+                onClick={() => store.apply(action)}
+              >
+                <title>{String(action['label'])}</title>
+                <Reticle cx={cx} cy={cy} kind="battle" />
+                <circle className="sys-target" cx={cx} cy={cy} r={r} />
+              </g>
+            )
+          })}
+
         {/* Galactic Rifles — pick the firing system, then the system it strikes. */}
         {rifles.map.size > 0 &&
           [...rifles.map.entries()].map(([id, action]) => {
@@ -486,6 +542,17 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
         </div>
       ) : battleSys.size > 0 ? (
         <div className="board-hint battle">Battle — click a system to attack there</div>
+      ) : uprising.map.size > 0 ? (
+        <div className="board-hint battle">
+          {uprising.kind === 'cluster'
+            ? 'Mass Uprising — click any system in the cluster you want'
+            : 'Mass Uprising — click a system to place a ship'}
+          {voxOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(voxOut)}>
+              {String(voxOut['label'] ?? 'Skip')}
+            </button>
+          ) : null}
+        </div>
       ) : rifles.map.size > 0 ? (
         /*
          * Carries its own way out. The panel steps aside for anything the map owns, so without a
