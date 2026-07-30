@@ -44,6 +44,31 @@ function battleSystems(cont: Continue): Map<string, Action> {
 }
 
 /**
+ * Galactic Rifles, both steps, as system -> action.
+ *
+ * The card is a *spatial* decision twice over — which of your systems fires, then which adjacent
+ * system it hits — and both were lists of labelled buttons ("Fire from 5-Gate", "Fire at red in
+ * 2-Arrow") while the map that answers them sat right there. Same treatment as Battle: reticles on
+ * the systems you may choose.
+ *
+ * `rifles/target` is the *first* step despite the name — it carries `from`, the system that fires.
+ * `rifles/roll` is the second and carries `at`, the system struck. Keyed off the field rather than
+ * the type name, so the naming quirk cannot mislead.
+ */
+function riflesSystems(cont: Continue): { map: Map<string, Action>; kind: 'from' | 'at' } {
+  const map = new Map<string, Action>()
+  if (cont.kind !== 'ask') return { map, kind: 'from' }
+  for (const a of cont.actions) {
+    if (a.type === 'rifles/target') map.set(a['from'] as string, a)
+  }
+  if (map.size > 0) return { map, kind: 'from' }
+  for (const a of cont.actions) {
+    if (a.type === 'rifles/roll') map.set(a['at'] as string, a)
+  }
+  return { map, kind: 'at' }
+}
+
+/**
  * Moves offered by the current decision, as a map of origin -> destination -> action.
  *
  * The board does not invent moves: it is an alternative *renderer* for whatever `Ask` the
@@ -258,6 +283,11 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
   const dests = from === null ? undefined : origins.get(from)
   const fleet = fleetChoice(cont)
   const battleSys = battleSystems(cont)
+  const rifles = riflesSystems(cont)
+  const riflesOut =
+    cont.kind === 'ask' && rifles.map.size > 0
+      ? cont.actions.find((a) => a.type === 'battle/cancel' || a.type === 'action/skip')
+      : undefined
 
   /** What a click on this system does right now, if anything. */
   function roleOf(id: string): 'origin' | 'dest' | 'onward' | null {
@@ -381,6 +411,25 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
           <FleetPicker state={state} choice={fleet} scale={unitsPerPx} />
         ) : null}
 
+        {/* Galactic Rifles — pick the firing system, then the system it strikes. */}
+        {rifles.map.size > 0 &&
+          [...rifles.map.entries()].map(([id, action]) => {
+            const { cx, cy, r } = centreOf(state, id)
+            return (
+              <g
+                key={`rifles-${id}`}
+                className="sys-hit battle"
+                onClick={() => store.apply(action)}
+              >
+                <title>
+                  {rifles.kind === 'from' ? `Fire Rifles from ${id}` : String(action['label'])}
+                </title>
+                <Reticle cx={cx} cy={cy} kind="battle" />
+                <circle className="sys-target" cx={cx} cy={cy} r={r} />
+              </g>
+            )
+          })}
+
         {/* Battle — systems you may fight in: click the system to attack there. */}
         {battleSys.size > 0 &&
           [...battleSys.entries()].map(([id, action]) => {
@@ -437,6 +486,23 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
         </div>
       ) : battleSys.size > 0 ? (
         <div className="board-hint battle">Battle — click a system to attack there</div>
+      ) : rifles.map.size > 0 ? (
+        /*
+         * Carries its own way out. The panel steps aside for anything the map owns, so without a
+         * cancel here a player who opened Galactic Rifles by mistake would be stuck choosing a
+         * target — the same shape of trap as the Railgun deadlock, one surface stepping back and
+         * the other not covering everything it took on.
+         */
+        <div className="board-hint battle">
+          {rifles.kind === 'from'
+            ? 'Galactic Rifles — click one of your systems to fire from'
+            : 'Galactic Rifles — click an adjacent system to strike'}
+          {riflesOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(riflesOut)}>
+              {String(riflesOut['label'] ?? 'Cancel')}
+            </button>
+          ) : null}
+        </div>
       ) : picking ? (
         <div className="board-hint">
           {onward.size > 0

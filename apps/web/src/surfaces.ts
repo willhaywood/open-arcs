@@ -43,6 +43,7 @@ export type Surface =
   | 'raid'
   | 'battle'
   | 'tray'
+  | 'map'
 
 /** Card plays live in the fanned hand at the bottom of the screen. */
 const HAND = ['turn/lead', 'turn/surpass', 'turn/copy', 'turn/pivot']
@@ -89,6 +90,14 @@ const BATTLE = [
   'battle/sensors-done',
 ]
 
+/**
+ * Spatial choices answered by clicking the map.
+ *
+ * Move and Battle already worked this way. Galactic Rifles joins them: both of its steps name
+ * systems, and a list of "Fire from 5-Gate" beside the map that answers it was the wrong shape.
+ */
+const MAP = ['rifles/target', 'rifles/roll']
+
 /** The action phase, grouped by the card or pip each option comes from. */
 const TRAY = ['action/take', 'action/guild-alt']
 
@@ -101,8 +110,8 @@ const TRAY = ['action/take', 'action/guild-alt']
  */
 const PANEL = [
   'battle/system',
+  // `rifles/from` opens the flow and carries no choice; the two picks are on the map.
   'rifles/from',
-  'rifles/target',
   'action/build',
   'action/move-pick',
   'action/move-ships',
@@ -142,7 +151,6 @@ const PANEL = [
   'leaders/generous-give',
   'leaders/may-follow',
   'leaders/must-follow',
-  'rifles/roll',
   /*
    * The Vox cards. Every one of these was unclaimed until the sweep named it, and several want a
    * real surface rather than a list — Mass Uprising picks a *cluster*, which nothing on the map
@@ -167,6 +175,7 @@ const TABLE: readonly (readonly [Surface, readonly string[]])[] = [
   ['slots', SLOTS],
   ['raid', RAID],
   ['battle', BATTLE],
+  ['map', MAP],
   ['tray', TRAY],
   ['panel', PANEL],
 ]
