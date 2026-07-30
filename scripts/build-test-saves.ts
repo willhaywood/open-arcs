@@ -26,10 +26,12 @@ import { join } from 'node:path'
 
 import {
   LORE,
+  Location,
   applyExternal,
   defaultRegistry,
   leaderCard,
   loreCard,
+  contentsOf,
   serializeGame,
   startGame,
 } from '@arcs/engine'
@@ -79,6 +81,19 @@ interface Scenario {
   readonly first: string
   /** What to check afterwards, in order. */
   readonly steps: readonly string[]
+  /**
+   * Whose decision the save must land on, relative to the **primary card's holder**.
+   *
+   * `holder` (default) — the player holding the card is the one being asked. True of anything the
+   * card lets *you* do.
+   *
+   * `other` — someone else is asked. True of cards that act on a rival's turn: Railgun Arrays makes
+   * the *attacker* assign a hit, and Keeper's Trust rewrites a menu the *raider* is looking at.
+   *
+   * Checked because leaving it out silently produced a save parked on the wrong player's screen —
+   * Ancient Holdings landed on a faction that did not hold it, where there was nothing to see.
+   */
+  readonly asks?: 'holder' | 'other'
   /** The moment to stop and save. */
   readonly stopAt: (state: GameState, ask: Ask) => boolean
   /** Nudge play toward the interaction. Return an action from `ask.actions`, or undefined. */
@@ -135,6 +150,35 @@ const towardBattle = (_s: GameState, a: Ask): Action | undefined => {
   )
 }
 
+/**
+ * Steering toward a **raid**, which is a different battle from the one `towardBattle` looks for.
+ *
+ * Keys come off raid dice, and raid dice need defending buildings to aim at. An assault-heavy
+ * picker — the right default everywhere else — collects no keys at all, so the raid menu never
+ * opens and the Keeper cards that rewrite it are unreachable. This prefers the largest raid pool
+ * on offer, and a target system holding buildings.
+ */
+const towardRaid = (state: GameState, a: Ask): Action | undefined => {
+  const raid = a.actions
+    .filter((x) => x.type === 'battle/roll')
+    .sort((x, y) => Number(y['raid']) - Number(x['raid']))[0]
+  const buildings = a.actions.find(
+    (x) =>
+      (x.type === 'battle/system' || x.type === 'battle/target') &&
+      contentsOf(state.figures, Location.system(x['system'] as never)).some(
+        (id) => /\/(City|Starport)\//.test(id),
+      ),
+  )
+  return (
+    buildings ??
+    find(a, 'battle/target') ??
+    find(a, 'battle/system') ??
+    a.actions.find((x) => x.type === 'action/take' && x['action'] === 'Battle') ??
+    raid ??
+    undefined
+  )
+}
+
 /** Steering toward a Move, for the Move-alt cards. */
 const towardMove = (_s: GameState, a: Ask): Action | undefined =>
   a.actions.find((x) => x.type === 'action/take' && x['action'] === 'Move') ?? undefined
@@ -145,6 +189,7 @@ const SCENARIOS: readonly Scenario[] = [
   // ---------------------------------------------------------------- battle
   {
     slug: 'volley',
+    asks: 'other',
     first: 'Click one of your own ships to take the railgun hit, then Confirm.',
     batch: 'Battle interrupts',
     title: 'Railgun Arrays — the hit before the dice',
@@ -229,6 +274,7 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     slug: 'vs-raider-exosuits',
+    asks: 'other',
     first: 'Read the raid column, then set a pool with 1 raid die and Roll.',
     batch: 'Battle dice',
     title: 'Hidden Harbors + Raider Exosuits — both rewrite the raid-dice limit',
@@ -250,6 +296,7 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     slug: 'vs-signal-breaker',
+    asks: 'other',
     first: 'Set an assault-heavy pool and Roll, then read the Intercepted note.',
     batch: 'Battle dice',
     title: 'Mirror Plating + Signal Breaker — the intercept that cancels itself',
@@ -434,6 +481,228 @@ const SCENARIOS: readonly Scenario[] = [
       a.actions.find((x) => x.type === 'ambition/declare' && x['ambition'] === 'Empath') ??
       a.actions.find((x) => x.type === 'action/take' && (x['action'] === 'Tax' || x['action'] === 'Build')),
   },
+// ---------------------------------------------------------------- build sites
+  {
+    slug: 'summon-at-a-city',
+    first: 'Take Build and look for a "Summon Ship" option.',
+    batch: 'Build alts',
+    title: 'Tool Priests — build a ship at a city, once a turn',
+    cards: ['lore01'],
+    why:
+      'The card says "yes, even Rival cities you control!", so any colour\'s city in a system you ' +
+      'rule is a shipyard. Once per turn across all of them, not once per city — the limit is the ' +
+      'part most likely to be wrong.',
+    steps: [
+      'Summon a ship, then take another Build in the same turn: no second Summon should be offered.',
+      'Check a rival\'s city in a system you rule is offered, not just your own.',
+      'A city in a system you do NOT rule must not be offered.',
+    ],
+    stopAt: (_s, a) => labelled(a, /^Summon Ship/) !== undefined,
+    steer: (_s, a) => a.actions.find((x) => x.type === 'action/take' && x['action'] === 'Build'),
+  },
+  {
+    slug: 'city-outside-the-slots',
+    first: 'Take Build and pick the "Build Cloud City" option, noting what it charges.',
+    batch: 'Build alts',
+    title: 'Cloud Cities — a city where there is no building slot',
+    cards: ['lore09'],
+    why:
+      'The only city that does not occupy a building slot, paid for with the planet\'s own ' +
+      'resource. It is tracked in `state.unslotted`, and a stale id there would make the *next* ' +
+      'city built from that piece wrongly unslotted — capacity bugs are silent and cumulative.',
+    steps: [
+      'The cost should match the planet\'s printed resource, and you must hold it.',
+      'It should be offered on a planet whose building slots are all full.',
+      'Raze it later and check your capacity and slot count come back correct.',
+    ],
+    stopAt: (_s, a) => labelled(a, /Cloud City/) !== undefined,
+    steer: (_s, a) => a.actions.find((x) => x.type === 'action/take' && x['action'] === 'Build'),
+    seeds: 600,
+  },
+  {
+    slug: 'nurture-and-prune',
+    first: 'Take Build and use "Nurture" to tax one of your own cities.',
+    batch: 'Build alts',
+    title: 'Living Structures — a Build that taxes, a Repair that rebuilds',
+    cards: ['lore10'],
+    why:
+      'Two alts on one card, on different actions. Nurture is a Tax bought with a Build pip, so ' +
+      'it must trigger everything a tax triggers — the FAQ is explicit that a "new action" ' +
+      'containing a standard action fires that action\'s modifiers. Prune converts a building in ' +
+      'place, which touches slots.',
+    steps: [
+      'Nurture should gain the resource and fire any tax-triggered traits you hold.',
+      'Then take Repair and use "Prune" to swap a city for a starport.',
+      'A pruned city returning to your board should re-cover a resource slot.',
+    ],
+    stopAt: (_s, a) => labelled(a, /^Nurture/) !== undefined,
+    steer: (_s, a) => a.actions.find((x) => x.type === 'action/take' && x['action'] === 'Build'),
+  },
+  // ---------------------------------------------------------------- not a battle
+  {
+    slug: 'fire-rifles',
+    first: 'Take Battle, then "Fire Rifles", and pick a system to fire from.',
+    batch: 'Battle interrupts',
+    title: 'Galactic Rifles — a strike that is not a battle',
+    cards: ['lore02'],
+    why:
+      'The official ruling is that this is NOT a battle, so no defence-triggered ability may ' +
+      'fire. That currently falls out of the shape rather than a guard — it never enters ' +
+      '`openBattle`, so Mirror Plating, Hidden Harbors, Railgun Arrays and Predictive Sensors are ' +
+      'simply off the path. Worth confirming by eye, because nothing enforces it.',
+    steps: [
+      'One skirmish die per fresh ship in the firing system, capped at six.',
+      'Hits land on ships before buildings, as in a battle.',
+      'No raid, no outrage, no post-battle repair should happen.',
+      'If the target holds Railgun Arrays or Mirror Plating, neither should trigger.',
+    ],
+    stopAt: (_s, a) => has(a, 'rifles/from') || labelled(a, /^Fire from/) !== undefined,
+    steer: (_s, a) =>
+      labelled(a, /^Fire Rifles/) ??
+      a.actions.find((x) => x.type === 'action/take' && x['action'] === 'Battle'),
+  },
+  {
+    slug: 'repair-after-the-battle',
+    first: 'Pick an assault-heavy pool and Roll, then resolve the battle to the end.',
+    batch: 'Battle dice',
+    title: 'Repair Drones — the effect with no prompt',
+    cards: ['lore07'],
+    why:
+      'Applied without asking: HRF prompts, we do not, because the ships in a system are ' +
+      'interchangeable. That makes it the one card here with **no Ask of its own** — nothing can ' +
+      'park on it, so this save parks just before the battle resolves. An effect with no prompt is ' +
+      'also an effect nobody notices failing.',
+    steps: [
+      'Take a self-hit so one of your attacking ships is damaged.',
+      'Finish the battle. One damaged attacking ship should come back fresh.',
+      'The log should say so — that is the only feedback the card gives.',
+      'It must NOT repair after a Galactic Rifles strike, which is not a battle.',
+    ],
+    stopAt: (_s, a) => has(a, 'battle/roll') && a.actions.some((x) => Number(x['assault']) >= 1),
+    steer: towardBattle,
+  },
+  // ---------------------------------------------------------------- raiding
+  {
+    slug: 'the-extra-slot',
+    first: 'Open the arrange screen from the Prelude and look at the extra slot on the card.',
+    batch: 'Prelude',
+    title: 'Ancient Holdings — a resource slot that is not on the player board',
+    cards: ['lore13'],
+    why:
+      'An extra slot living on the card, raided for four keys — dearer than any city slot. It ' +
+      'widens capacity from outside `CITY_SLOT_KEYS`, so anything counting slots by index can miss ' +
+      'it, and a token stranded there is invisible to `slotsOf`.',
+    steps: [
+      'The card slot should appear alongside the six city slots, and hold a token.',
+      'Capacity should be one higher than the cities on your board imply.',
+      'A rival raiding it should be charged 4 keys, not 1-3 — not reachable from this save, so ' +
+        'check it against lore21-keepers-trust--raid-a-guild-card.',
+      'Drag a token in and out and confirm it is spendable from there.',
+    ],
+    stopAt: (_s, a) => has(a, 'turn/prelude-arrange'),
+    steer: (_s, a) => find(a, 'turn/prelude'),
+  },
+  {
+    slug: 'raid-a-guild-card',
+    asks: 'other',
+    first: 'Spend the keys — take a resource or a card, and watch what the price is.',
+    batch: 'Raiding',
+    title: "Keeper's Trust — what a raid may take from you",
+    cards: ['lore21'],
+    why:
+      'Trust and Solidarity both rewrite the raid menu from the *victim\'s* side, which is unusual ' +
+      'enough to be worth watching: most cards change what their holder may do. The raid menu is ' +
+      'also priced per slot, so the wrong slot means the wrong price.',
+    steps: [
+      'Each purchase should be priced by the slot the token sits in, not a flat rate.',
+      'Check what Trust protects, and that it protects it from every raider.',
+      'Stop raiding partway and confirm unspent keys are simply lost.',
+    ],
+    stopAt: (_s, a) => has(a, 'battle/raid-take'),
+    steer: towardRaid,
+    seeds: 1200,
+  },
+  {
+    slug: 'take-a-card-of-any-suit',
+    asks: 'other',
+    first: 'Spend keys on a court card and check which suits are on offer.',
+    batch: 'Raiding',
+    title: "Keeper's Solidarity — a card whose suit you do not hold",
+    cards: ['lore22'],
+    why:
+      'Normally a raided card must match a suit you hold. Solidarity lifts that, so the menu ' +
+      'should be wider than the base game allows — a change that looks like nothing if the base ' +
+      'restriction was never implemented in the first place.',
+    steps: [
+      'Cards of suits you hold none of should be takeable.',
+      'Compare against the same raid without the card, if you can reach one.',
+      'The key cost should be unchanged — Solidarity widens choice, not price.',
+    ],
+    stopAt: (_s, a) => has(a, 'battle/raid-take') && a.actions.some((x) => x['kind'] === 'card'),
+    steer: towardRaid,
+    seeds: 1200,
+  },
+  // ---------------------------------------------------------------- spoils
+  {
+    slug: 'trophy-for-an-influence',
+    first: "Take the Warlord's Terror option to trade a trophy for an Influence.",
+    batch: 'Prelude',
+    title: "Warlord's Terror — spend a trophy on an action",
+    cards: ['lore24'],
+    why:
+      'Returns a captured piece to *its owner\'s* reserve and buys an action with it. Returning it ' +
+      'to the wrong reserve is the obvious failure and is invisible unless someone counts pieces; ' +
+      'it also lowers your trophy count, which is Warlord scoring.',
+    steps: [
+      'The returned piece must go to its OWNER\'s reserve, not yours and not the box.',
+      'Your trophy count should drop by one.',
+      'The Influence that follows should behave like any other Influence.',
+      'With an empty trophy pile the option should not appear.',
+    ],
+    stopAt: (_s, a) => labelled(a, /Terror/) !== undefined,
+    steer: (_s, a) => find(a, 'turn/prelude') ?? towardBattle(_s, a),
+  },
+  {
+    slug: 'captive-for-a-secure',
+    first: "Take the Tyrant's Ego option to trade a captive for a Secure.",
+    batch: 'Prelude',
+    title: "Tyrant's Ego — spend a captive on an action",
+    cards: ['lore25'],
+    why:
+      'The captive twin of Terror, and the same failure applies: the agent must go home to its ' +
+      'owner. Captives are Tyrant scoring, so a miscount moves the ambition.',
+    steps: [
+      'The agent must return to its OWNER\'s reserve.',
+      'Your captive count should drop by one.',
+      'The Secure that follows should offer the ordinary court choices.',
+      'With no captives the option should not appear.',
+    ],
+    stopAt: (_s, a) => labelled(a, /Ego/) !== undefined,
+    steer: (_s, a) => find(a, 'turn/prelude') ?? towardBattle(_s, a),
+  },
+  {
+    slug: 'trade-material-for-anything',
+    first: "Take a Tycoon's Charm trade and watch the slots as the swap lands.",
+    batch: 'Prelude',
+    title: "Tycoon's Charm — swap Material or Fuel for anything",
+    cards: ['lore28'],
+    why:
+      'One swap at a time because the Prelude loops, so "any number" is taking it repeatedly. ' +
+      'Each swap is a *gain*, which means it can overflow your slots — the interesting case is ' +
+      'trading into a full row and being made to settle it.',
+    steps: [
+      'The traded-away resource should leave and the new one arrive in a legal slot.',
+      'Take the option again — it should still be there while you hold Material or Fuel.',
+      'Trade into a full row and confirm you are made to rearrange or discard.',
+      'The option should vanish once you hold neither Material nor Fuel.',
+    ],
+    stopAt: (_s, a) => has(a, 'turn/prelude-charm'),
+    steer: (_s, a) =>
+      a.actions.find((x) => x.type === 'ambition/declare' && x['ambition'] === 'Tycoon') ??
+      find(a, 'turn/prelude'),
+    lorePerPlayer: 3,
+    seeds: 800,
+  },
 ]
 
 /** The printed name of a lore or leader card. */
@@ -508,6 +777,21 @@ function draftPick(
   return (neutral[0] ?? ask.actions[0])!
 }
 
+/**
+ * Is the faction being asked the one the scenario means?
+ *
+ * A save is only worth loading if the decision on screen belongs to a player who can see the
+ * card's effect. Without this the sweep happily stops on the first faction to reach a matching Ask,
+ * which is usually not the holder.
+ */
+function rightSeat(state: GameState, ask: Ask, sc: Scenario): boolean {
+  const primary = sc.cards[0]!
+  const held =
+    (state.lores[ask.faction as keyof typeof state.lores] ?? []).includes(primary) ||
+    state.leaders[ask.faction as keyof typeof state.leaders] === primary
+  return (sc.asks ?? 'holder') === 'holder' ? held : !held
+}
+
 /** Which faction holds each of the scenario's cards, read back off the finished state. */
 function holdingOf(state: GameState, cards: readonly string[]): string {
   const where = (id: string): string => {
@@ -553,7 +837,7 @@ function hunt(sc: Scenario, seeds: number): Hit | { misses: string } {
       if (r.continue.kind !== 'ask') break
       const ask = r.continue
 
-      if (drafted && sc.stopAt(r.state, ask)) {
+      if (drafted && rightSeat(r.state, ask, sc) && sc.stopAt(r.state, ask)) {
         return {
           seed,
           journal: r.state.journal.length,

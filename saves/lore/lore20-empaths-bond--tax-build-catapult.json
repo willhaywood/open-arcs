@@ -427,6 +427,19 @@
     "turn/pivot(card=\"Construction-3\",faction=\"yellow\",suit=\"Construction\")",
     "turn/lead(card=\"Administration-6\",faction=\"red\",suit=\"Administration\")",
     "ambition/declare(ambition=\"Empath\",faction=\"red\",pips=2,suit=\"Administration\")",
-    "action/take(action=\"Tax\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":1,\"total\":2})"
+    "action/take(action=\"Tax\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":1,\"total\":2})",
+    "action/tax-city(city=\"red/City/3\",faction=\"red\",system=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":1,\"total\":2})",
+    "action/take(action=\"Tax\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":2,\"total\":2})",
+    "action/tax-city(city=\"blue/City/3\",faction=\"red\",system=\"3-Arrow\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Administration\",\"done\":2,\"total\":2})",
+    "turn/pivot(card=\"Aggression-4\",faction=\"yellow\",suit=\"Aggression\")",
+    "turn/seize(card=\"Aggression-2\",faction=\"yellow\",pips=1,suit=\"Aggression\")",
+    "action/take(action=\"Battle\",faction=\"yellow\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1})",
+    "battle/system(faction=\"yellow\",system=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1})",
+    "battle/roll(assault=0,enemy=\"red\",faction=\"yellow\",raid=0,skirmish=1,system=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1})",
+    "battle/reroll(enemy=\"red\",faction=\"yellow\",indices=[0],pool={\"skirmish\":1,\"assault\":0,\"raid\":0},rolls=[{\"die\":\"Skirmish\",\"face\":4}],source=\"Empath's Vision\",system=\"2-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1},used=[\"lore19\"])",
+    "battle/hit(ctx={\"faction\":\"yellow\",\"system\":\"2-Crescent\",\"enemy\":\"red\",\"self\":0,\"intercepted\":0,\"ships\":0,\"buildings\":1,\"keys\":0,\"dice\":[{\"die\":\"Skirmish\",\"face\":3}],\"razed\":false,\"then\":{\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1}},faction=\"yellow\",phase=\"buildings\",target=\"red/City/3\")",
+    "battle/finish(ctx={\"faction\":\"yellow\",\"system\":\"2-Crescent\",\"enemy\":\"red\",\"self\":0,\"intercepted\":0,\"ships\":0,\"buildings\":0,\"keys\":0,\"dice\":[{\"die\":\"Skirmish\",\"face\":3}],\"razed\":false,\"then\":{\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Aggression\",\"done\":1,\"total\":1},\"tookTrophies\":false},faction=\"yellow\")",
+    "turn/copy(card=\"Administration-3\",faction=\"blue\")",
+    "action/take(action=\"Tax\",faction=\"blue\",then={\"type\":\"turn/pips\",\"faction\":\"blue\",\"suit\":\"Administration\",\"done\":1,\"total\":1})"
   ]
 }

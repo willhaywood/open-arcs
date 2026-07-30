@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "options": {
+    "board": "Board3MixUp",
+    "factions": [
+      "red",
+      "yellow",
+      "blue"
+    ],
+    "seed": 10,
+    "leadersAndLore": {
+      "expansion": true,
+      "lorePerPlayer": 2
+    }
+  },
+  "journal": [
+    "leaders/take(card=\"lore09\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"leader10\",faction=\"yellow\",kind=\"leader\")",
+    "leaders/take(card=\"leader06\",faction=\"red\",kind=\"leader\")",
+    "leaders/take(card=\"leader14\",faction=\"blue\",kind=\"leader\")",
+    "leaders/take(card=\"lore06\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"lore21\",faction=\"red\",kind=\"lore\")",
+    "leaders/take(card=\"lore28\",faction=\"blue\",kind=\"lore\")",
+    "leaders/take(card=\"lore13\",faction=\"yellow\",kind=\"lore\")",
+    "leaders/take(card=\"lore27\",faction=\"red\",kind=\"lore\")",
+    "turn/lead(card=\"Construction-5\",faction=\"red\",suit=\"Construction\")",
+    "ambition/declare(ambition=\"Keeper\",faction=\"red\",pips=2,suit=\"Construction\")",
+    "turn/prelude-spend(action=\"Build\",faction=\"red\",pips=2,resource=\"Material\",suit=\"Construction\")",
+    "action/build(faction=\"red\",piece=\"City\",system=\"3-Hex\",then={\"type\":\"turn/prelude\",\"faction\":\"red\",\"suit\":\"Construction\",\"pips\":2})",
+    "turn/prelude-battle(faction=\"red\",pips=2,resource=\"Weapon\",suit=\"Construction\")",
+    "action/take(action=\"Build\",faction=\"red\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Construction\",\"done\":1,\"total\":2})",
+    "action/build(faction=\"red\",piece=\"Ship\",starport=\"red/Starport/1\",system=\"5-Crescent\",then={\"type\":\"turn/pips\",\"faction\":\"red\",\"suit\":\"Construction\",\"done\":1,\"total\":2})",
+    "turn/copy(card=\"Construction-4\",faction=\"yellow\")",
+    "turn/seize(card=\"Aggression-3\",faction=\"yellow\",pips=1,suit=\"Construction\")",
+    "turn/prelude-spend(action=\"Move\",faction=\"yellow\",pips=1,resource=\"Fuel\",suit=\"Construction\")",
+    "action/move-pick(faction=\"yellow\",from=\"2-Arrow\",then={\"type\":\"turn/prelude\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"pips\":1},to=\"2-Crescent\")",
+    "action/move-ships(count=3,faction=\"yellow\",from=\"2-Arrow\",then={\"type\":\"turn/prelude\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"pips\":1},to=\"2-Crescent\")",
+    "turn/prelude-spend(action=\"Build\",faction=\"yellow\",pips=1,resource=\"Material\",suit=\"Construction\")",
+    "action/build(faction=\"yellow\",piece=\"City\",system=\"2-Crescent\",then={\"type\":\"turn/prelude\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"pips\":1})",
+    "action/take(action=\"Build\",faction=\"yellow\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"done\":1,\"total\":1})",
+    "action/build(faction=\"yellow\",piece=\"City\",system=\"5-Hex\",then={\"type\":\"turn/pips\",\"faction\":\"yellow\",\"suit\":\"Construction\",\"done\":1,\"total\":1})",
+    "turn/pivot(card=\"Administration-4\",faction=\"blue\",suit=\"Administration\")",
+    "turn/prelude-spend(action=\"Build\",faction=\"blue\",pips=1,resource=\"Material\",suit=\"Administration\")"
+  ]
+}
