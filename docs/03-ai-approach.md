@@ -411,9 +411,11 @@ anyway, so it may as well run the bot too.
 
 
 
-1. Should the bot be **observably explainable**? HRF carries a `desc` string on every
-   `Evaluation` and has a debug UI for it. Cheap to keep and genuinely useful for tuning; worth
-   deciding before the interfaces harden.
+1. ~~Should the bot be **observably explainable**?~~ **Decided: yes, and not optional.** A player
+   has to be able to follow what a bot seat is doing, so the reason must come from the code that
+   made the decision — reconstructing it from the board afterwards is guesswork that will
+   eventually narrate something untrue. `chooseAction` returns a `BotDecision` carrying a
+   player-facing `because` and an optional `considered` list for tuning. See docs/19 section 2a.
 2. Do the difficulty labels need to be **calibrated against human play**, or is a self-play ELO
    ladder sufficient? Calibration needs playtesters and is the only way to know whether "Easy" is
    actually beatable by a new player.
