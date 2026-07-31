@@ -733,9 +733,20 @@ function performMoveMoreGo(
         (left > 0 ? ` (${left} stayed behind)` : ''),
     ],
   }
-  // Still a gate nobody rules? Then the chain is live — but only for the ships that came.
+  /*
+   * May the chain carry on from here? Judged on the board **before** these ships landed.
+   *
+   * The FAQ is explicit about the timing — a catapult stops at "a gate controlled by a Rival
+   * *(counted just before your ships move in)*" — and reading it after the move is the whole bug.
+   * A rival holding a gate with two fresh ships rules it; move three ships in and *you* rule it, so
+   * a post-move test says nobody is blocking and the chain runs on. Reported from play as
+   * catapulting straight through a gate held by two fresh enemy ships.
+   *
+   * `state` is the pre-move board, which is also what `canCatapult` uses for the opening leg, so
+   * both ends of the chain now agree about when control is counted.
+   */
   const onward =
-    systemInfo(to).isGate && !next.factions.some((e) => e !== faction && rules(next, e, to))
+    systemInfo(to).isGate && !state.factions.some((e) => e !== faction && rules(state, e, to))
   if (onward) return { state: next, continue: offerMoveMore(next, faction, to, going, then) }
   return { state: next, continue: C.then(then as Action) }
 }

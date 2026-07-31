@@ -195,6 +195,34 @@ and the one invariant still worth adding.
 - **Trophy return at cleanup** — the other way capacity shrinks; see section 1. The row-settling
   machinery is already there, so this is about returning the pieces, not about resources.
 
+## 4a. The catapult stopping rule — fixed
+
+**Reported from play: ships catapulted through a gate holding two fresh enemy ships.** The FAQ:
+a catapult must stop at "any planet (regardless of control)" and at "a gate controlled by a Rival
+**(counted just before your ships move in)**".
+
+That parenthetical was the whole bug. `performMoveMoreGo` tested control on the board *after* the
+ships landed, so the arriving ships counted toward ruling — move three into a gate a rival holds
+with two and you rule it, so nothing appears to be blocking and the chain runs on. It now reads the
+pre-move board, which is also what `canCatapult` uses for the opening leg, so both ends of the chain
+agree about when control is counted.
+
+Tests in `test/control.test.ts`; mutation-verified against the original off-by-one-state.
+
+Two things worth not re-investigating:
+
+- **Passing a gate with only damaged enemy ships is correct.** `ruleValue` counts fresh ships, so a
+  damaged ship rules nothing. There is a test pinning this so a later fix cannot overshoot into
+  "any enemy ship stops you".
+- **`offerMoveMore` offering every adjacent system is correct.** You may *move* onward to a planet;
+  you simply stop on arrival. The stopping is enforced where the move resolves, not by hiding the
+  option.
+
+**Still open, and wider than the catapult:** `ruleValue` counts **ships only** — buildings
+contribute nothing to ruling a system. That decides Build, Tax, Annex and ambition scoring, so it
+wants checking against the rulebook rather than being assumed correct on the strength of one
+catapult report.
+
 ## 5. Smaller known items
 
 - **Ancient Holdings' resource slot — fixed.** Kept here because the shape of the bug is worth

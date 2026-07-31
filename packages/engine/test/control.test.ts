@@ -16,6 +16,8 @@ import { describe, expect, it } from 'vitest'
 import {
   Location,
   advance,
+  connectedSystems,
+  system as systemInfo,
   contentsOf,
   defaultRegistry,
   rules,
@@ -158,5 +160,80 @@ describe('what ruling gates, now that damage counts against it', () => {
     }
     expect(buildable(state)).toBe(true)
     expect(buildable(damage(state, 'red', system, 'Ship', 4))).toBe(false)
+  })
+})
+
+describe('the catapult stops where the rules say it must', () => {
+  /*
+   * Reported from play: ships catapulted straight through a gate held by two fresh enemy ships.
+   *
+   * The FAQ: a catapult must stop at "a gate controlled by a Rival **(counted just before your
+   * ships move in)**". That parenthetical is the whole rule here. `performMoveMoreGo` tested it
+   * *after* the move, so the arriving ships counted toward ruling — move three into a gate a rival
+   * holds with two, and you now rule it, so nothing appeared to be blocking and the chain ran on.
+   *
+   * Asserted through `action/move-more-go`, the continuation step itself, because that is where the
+   * timing lives; going through a whole Move would test the opening leg's separate check.
+   */
+  const gateWith = (enemyShips: number, damagedShips = 0) => {
+    const base = fresh()
+    const gate = base.board.systems.find((id) => systemInfo(id).isGate)!
+    let s = clearSystem(base, gate)
+    if (enemyShips > 0) s = place(s, 'yellow', gate, 'Ship', enemyShips)
+    if (damagedShips > 0) {
+      s = place(s, 'yellow', gate, 'Ship', damagedShips)
+      s = damage(s, 'yellow', gate, 'Ship', damagedShips)
+    }
+    // Red's ships are mid-catapult, sitting in an adjacent system.
+    const prev = connectedSystems(base.board, gate)[0]!
+    s = place(clearSystem(s, prev), 'red', prev, 'Ship', 3)
+    const group = contentsOf(s.figures, Location.system(prev)).filter((id) =>
+      id.startsWith('red/Ship/'),
+    )
+    return { state: s, gate, group }
+  }
+
+  const continueInto = (setup: ReturnType<typeof gateWith>) =>
+    advance(
+      setup.state,
+      {
+        type: 'action/move-more-go',
+        faction: 'red',
+        to: setup.gate,
+        group: setup.group,
+        count: 3,
+        then: { type: 'turn/lead-main', faction: 'red' },
+      },
+      registry,
+    )
+
+  /*
+   * Whether the *catapult* is still live, not whether anything at all is being asked. `then` is the
+   * ordinary turn, which asks its own questions either way — so checking `continue.kind` alone
+   * passes in both directions and proves nothing.
+   */
+  const stillCatapulting = (c: ReturnType<typeof continueInto>['continue']): boolean =>
+    c.kind === 'ask' && c.actions.some((a) => a.type === 'action/move-more')
+
+  it('stops at a gate a rival rules, even once your ships outnumber theirs', () => {
+    const setup = gateWith(2)
+    const out = continueInto(setup)
+    // Three red land on two yellow, so red rules it *now* — and must still stop.
+    expect(
+      contentsOf(out.state.figures, Location.system(setup.gate)).filter((id) =>
+        id.startsWith('red/Ship/'),
+      ).length,
+    ).toBe(3)
+    expect(stillCatapulting(out.continue)).toBe(false)
+  })
+
+  it('carries on through a gate holding only damaged enemy ships', () => {
+    // Damaged ships rule nothing, so this never blocked — kept so the fix cannot overshoot into
+    // "any enemy ship stops you".
+    expect(stillCatapulting(continueInto(gateWith(0, 2)).continue)).toBe(true)
+  })
+
+  it('carries on through an empty gate', () => {
+    expect(stillCatapulting(continueInto(gateWith(0)).continue)).toBe(true)
   })
 })
