@@ -135,6 +135,18 @@ Save → send the JSON → they Load → play their turn → send it back. Play-
 zero infrastructure. For a game this slow it is not as silly as it sounds, and it is a genuine
 fallback if a server ever goes down.
 
+## 6a. Bots alongside humans
+
+Fully in **docs/03 section 9a**, written after this document. The short version:
+
+- A bot seat needs no new machinery — the journal records actions, not who chose them, so a bot's
+  game replays as a human's would.
+- **Whichever client notices it is a bot's turn computes and posts.** That keeps the server dumb,
+  and the `expectedLength` check in section 4 already makes two clients racing harmless.
+- The price is that **the bot must be deterministic** given observed state and a journal-derived
+  seed, or two clients disagree and the game forks by who posted first. Free for a v1 evaluator;
+  a real constraint on v2 rollouts.
+
 ## 7. Things to decide that aren't the transport
 
 - **Undo becomes a negotiation.** Today undo replays the journal minus its last entry. In

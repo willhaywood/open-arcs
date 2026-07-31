@@ -332,7 +332,84 @@ interface Objective {
 Phase 1 has exactly one implementation. Phase 2 adds up to 24 more. Getting the indirection in
 now costs almost nothing; adding it later means revisiting every heuristic.
 
-## 10. Open questions
+## 9a. Bot seats, and bots alongside humans
+
+Written after docs/17. The AI plan predates the multiplayer one and they had never been read
+against each other; the good news is that the journal design does most of the work.
+
+### A bot seat is not a special kind of seat
+
+**A bot's decision is just an action.** The journal is an ordered list of encoded actions, and it
+does not record *who chose* each one — only what was chosen. So a game where blue was played by a
+bot replays byte-for-byte as a game where blue was played by a human making the same choices. No
+new persistence, no new engine concept, nothing for `loadGame` to learn.
+
+In Arcs every faction is a player, so "AI-controlled enemies alongside humans" needs no new entity
+either. It is a seat whose decisions come from `chooseAction` rather than a click. The Empire in the
+campaign is the only genuine non-player force, and that is out of scope by docs/04.
+
+### One thing that must go in `options`
+
+`options` must record **which seats are bots**, alongside `board`, `factions` and `seed`.
+
+Replay does not need it — the journal already carries the actions. The *UI* does: loading a save has
+to know whether to prompt for blue's turn or compute it, and without that a reloaded game stalls
+waiting for a human who is not there. It belongs in `options` rather than beside the save because it
+is a property of the game as set up, and everything else with that property already lives there.
+
+### Where a bot runs, in multiplayer
+
+docs/17's recommended shape is a **dumb server**: it stores a journal and appends strings, and never
+runs the engine. Bots do not have to change that, which is worth protecting — it is what makes that
+plan a weekend rather than a month.
+
+| Where | Verdict |
+| --- | --- |
+| **Any client, whoever notices** | **Best fit.** Preserves the dumb server. Two clients racing to post the same bot move is already handled: `expectedLength` makes the loser a no-op. |
+| Server-side | Works — the engine is pure TypeScript and runs in a Worker — but it turns the append-only store into a service that runs the engine, which is the thing docs/17 was avoiding. |
+| One designated host client | Fragile: the game stalls when that specific person closes their laptop. |
+
+So: whichever client sees that the current seat is a bot computes the move and posts it. The
+optimistic-concurrency check that already stops a double-tap duplicating an action also stops two
+clients duplicating a bot's.
+
+### The constraint that buys this: determinism
+
+For any-client execution to be safe, **the bot must be a pure function of observed state plus a seed
+derived from the journal.** Two clients computing blue's move must reach the same answer, or the
+game forks depending on who posted first.
+
+That is free for v1, which is a deterministic `maxBy` over a value function. It is *not* free for
+v2: rollouts need randomness, and it must come from a stream derived from `options.seed` and the
+journal position — never `Math.random()`. This is the same discipline section 6.2 already demands of
+the engine, extended to the bot, and it is much cheaper to adopt now than to retrofit once rollouts
+exist.
+
+Compare-and-set means a divergence is not silently accepted — one client's action lands and the
+other's is rejected — but the losing client would then be replaying a game it did not predict, which
+is a confusing bug to chase. Determinism avoids it rather than detecting it.
+
+### What this does *not* fix
+
+**Hidden information.** docs/17 section 2 is blunt: every client can derive all hands and future
+rolls from `options.seed`. A bot running on a human's client is subject to the same thing, and worse,
+that human could make it cheat. `observe(state, faction)` (section 6.6) is what stops the *bot* from
+cheating by accident; it does nothing about a modified client.
+
+For a friends game that is the same trade docs/17 already accepts. A bot in a competitive game needs
+the server-authoritative shape from docs/17 section 5, and at that point the server runs the engine
+anyway, so it may as well run the bot too.
+
+### Order to build it
+
+1. **Bots in the local game first.** Hotseat with a bot seat is the same loop — "current seat is a
+   bot, compute and apply" — minus the posting. It needs no server and shakes out the UI question of
+   how a bot's turn is shown.
+2. **`options.bots` and `observe`-typed bots** before either v2 or multiplayer, since both are
+   expensive to retrofit.
+3. **Multiplayer bots last**, at which point they are the local loop plus one `POST`.
+
+
 
 1. Should the bot be **observably explainable**? HRF carries a `desc` string on every
    `Evaluation` and has a debug UI for it. Cheap to keep and genuinely useful for tuning; worth
