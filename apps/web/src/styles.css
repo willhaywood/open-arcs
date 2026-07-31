@@ -4367,6 +4367,32 @@ button {
   z-index: 46;
   pointer-events: none;
 }
+/*
+ * Taken over: out of the hand's cell entirely, onto the map's bottom edge.
+ *
+ * Sharing the hand area is correct while a bot is playing, because nothing else is up. It is wrong
+ * the moment the seat is handed back — the cards are in that cell, the tray is drawn over them, and
+ * `pointer-events: auto` on `.bot-inner` means it takes the clicks meant for a card.
+ */
+.bot-tray.compact {
+  grid-area: map;
+  align-self: end;
+  justify-self: center;
+  padding-bottom: 10px;
+}
+.bot-tray.compact .bot-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px;
+}
+.bot-tray.compact .bot-head {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.bot-tray.compact .bot-waiting {
+  padding-top: 0;
+}
 .bot-inner {
   pointer-events: auto;
   background: linear-gradient(rgba(14, 17, 24, 0.94), rgba(10, 12, 18, 0.97));

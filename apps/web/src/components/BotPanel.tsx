@@ -42,9 +42,22 @@ export function BotPanel({
   if (cont.kind !== 'ask' && turn === undefined) return null
 
   const waiting = turn !== undefined && store.botMode !== 'run'
+  /*
+   * Taken over, the seat is *yours* — so the tray has to get out of the way of the cards.
+   *
+   * It shares the hand's grid cell with the Prelude and action trays, which is right when only one
+   * of them is up at a time. Take-over is the case where that assumption breaks: the tray says "play
+   * this seat from the board" while sitting on top of the board it means, and at `z-index: 46`
+   * against the cards' 0 it won every click. The seat could not be played at all.
+   *
+   * Compact moves it to the map's bottom edge instead — the same idiom as the Prelude tray, map
+   * still visible — and drops to just the controls, since the diagnostics are about a decision the
+   * bot is no longer making.
+   */
+  const compact = turn !== undefined && store.botMode === 'off'
 
   return (
-    <div className="bot-tray">
+    <div className={`bot-tray${compact ? ' compact' : ''}`}>
       <div className="bot-inner">
         <div className="bot-head">
           {turn !== undefined ? (
@@ -100,7 +113,7 @@ export function BotPanel({
           ) : null}
         </div>
 
-        {decision !== null ? <Narration decision={decision} /> : null}
+        {decision !== null && !compact ? <Narration decision={decision} /> : null}
 
         {waiting ? (
           <div className="bot-waiting">
@@ -117,7 +130,7 @@ export function BotPanel({
           </div>
         ) : null}
 
-        {decision?.considered !== undefined && decision.considered.length > 0 ? (
+        {!compact && decision?.considered !== undefined && decision.considered.length > 0 ? (
           <Diagnostics decision={decision} state={state} />
         ) : null}
       </div>
