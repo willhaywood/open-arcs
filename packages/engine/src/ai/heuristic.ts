@@ -15,6 +15,17 @@ import type { Action } from '../action.js'
 import type { Bot, BotDecision, Considered, Lookahead } from './bot.js'
 import type { ObservedState } from '../observe.js'
 
+/**
+ * What one unspent action pip is worth, in the same units as `valueOf`.
+ *
+ * Sized against the terms it competes with rather than guessed: a card is 0.15 of tempo, a Ship
+ * 0.35, a City 2.0. A pip usually becomes a Move or a Build, so 0.5 prices it well above the card
+ * it costs and well below the city it might become.
+ *
+ * A starting point, like every weight here — the arena is what moves it.
+ */
+const PIP_VALUE = 0.5
+
 function describe(action: Action): string {
   return String(action['label'] ?? action.type)
 }
@@ -49,9 +60,31 @@ export const heuristicBot: Bot = {
     for (const action of actions) {
       const probe = lookahead(action)
       if (probe === undefined) continue
-      const score = valueOf(probe.observed, observed.self, intent)
+      /*
+       * What the turn still has to spend, priced. Added here rather than in `valueOf` because pips
+       * are not in the state at all (see `Probe.actionsAhead`), so the value function cannot reach
+       * them — this is the one term that has to live outside it.
+       *
+       * **Without it the bot will not lead.** Leading costs a card, which the tempo term charges
+       * 0.15 for, and buys three actions, which nothing counted; so every card scored below `Pass`
+       * and three heuristic bots produced 2.5 mean power against the trivial bot's 10.7. Reaching
+       * the pip ask was not enough on its own — the board has not moved there either, so the
+       * position looks identical until the pips themselves are priced.
+       *
+       * A flat rate is crude: a pip is worth what you do with it, and Build and Move are not the
+       * same. It is deliberately the *cheap* answer, and the honest one is a rollout (V2). This is
+       * a weight for the arena to move — docs/19 section 2d.7.
+       */
+      const gained = valueOf(probe.observed, observed.self, intent)
+      const score = gained + probe.actionsAhead * PIP_VALUE
       /*
        * **A repeating action must strictly improve the position to be eligible at all.**
+       *
+       * Gated on `gained`, not on `score`, and the difference is not cosmetic — getting it wrong
+       * brought the livelock straight back. `here` is the board as it stands and has no pip term,
+       * so comparing the pip-inclusive score against it made *every* candidate look like an
+       * improvement and the gate never fired. The gate asks "did that achieve anything", and pips
+       * still to spend are potential rather than achievement.
        *
        * A tie-break is not enough, and the arena showed why on its first real run. Arranging
        * resource slots offers value-neutral swaps alongside options that place the arriving token by
@@ -64,7 +97,7 @@ export const heuristicBot: Bot = {
        * cannot go round forever. It still permits honest re-entry — taking one pip of three comes
        * back to a *different* question anyway, and anything that genuinely gains passes the gate.
        */
-      if (probe.repeats && score <= here) stuck.add(action)
+      if (probe.repeats && gained <= here) stuck.add(action)
       considered.push({
         action,
         score,

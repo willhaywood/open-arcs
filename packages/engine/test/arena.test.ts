@@ -23,6 +23,7 @@ import {
   heuristicBot,
   playGame,
   runArena,
+  runBots,
   startGame,
   stepBot,
   trivialBot,
@@ -62,6 +63,41 @@ describe('the arena', () => {
     )
     expect(out.finished).toBe(true)
     expect(out.actions).toBeLessThan(3_000)
+  })
+
+  it('leads about as often as it passes — the whole point of pricing pips', () => {
+    /*
+     * The regression test for the lead fix, and the one number that exposed the bug in the first
+     * place. `valueOf` charges tempo for the card leaving your hand and counts nothing for the three
+     * actions it buys, because pips live on the continuation and not in the state — so every card
+     * scored below `Pass`. Three heuristic bots then passed eight times for every lead, took 86
+     * decisions a game instead of ~800, and scored 2.5 mean power against the trivial bot's 10.7.
+     *
+     * A mirror match is what makes this visible: against opponents who *do* lead, a bot that never
+     * leads still free-rides on their rounds and looks strong. Only when every seat is the same bot
+     * does refusing to start a round show up as a game where nothing happens.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    const out = runBots(
+      startGame(
+        { board: 'Board3Frontiers', factions: [...three], seed: 1, bots: [...three] },
+        registry,
+      ),
+      three,
+      heuristicBot,
+      registry,
+      3_000,
+    )
+    const count = (type: string): number =>
+      out.decisions.filter((d) => d.action.type === type).length
+    const leads = count('turn/lead')
+    const passes = count('turn/pass')
+
+    expect(leads).toBeGreaterThan(0)
+    // Was 4:32 before pips were priced, and roughly 1:1 after. Half separates them with room spare.
+    expect(leads).toBeGreaterThan(passes * 0.5)
+    // A game where nobody leads is over almost immediately; a real one runs for hundreds of moves.
+    expect(out.decisions.length).toBeGreaterThan(400)
   })
 
   it('rotates seats between games so nobody is measured on seat order', () => {
@@ -194,14 +230,20 @@ describe('going in circles', () => {
      * This one finds a candidate whose target was already asked *earlier than the current question*
      * and requires that specific candidate to be unflagged, so the two rules disagree on it.
      */
+    /*
+     * Swept across seeds rather than pinned to one. Fixing the lead decision changed which
+     * sub-decisions the bot enters at all, and a single seed stopped producing the case — the
+     * guard below caught that rather than the test quietly verifying nothing.
+     */
+    let checked = 0
+    for (let seed = 1; seed <= 6 && checked === 0; seed++) {
     let r = startGame(
-      { board: 'Board4MixUp1', factions: [...FOUR], seed: 1, bots: [...FOUR] },
+      { board: 'Board4MixUp1', factions: [...FOUR], seed, bots: [...FOUR] },
       registry,
     )
     let asked = NO_ASKS
-    let checked = 0
 
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 1200; i++) {
       if (r.continue.kind !== 'ask') break
       const faction = r.continue.faction
       const prompt = r.continue.prompt
@@ -240,6 +282,7 @@ describe('going in circles', () => {
       const step = stepBot(r, faction === 'red' ? heuristicBot : trivialBot, faction, registry, asked)
       r = step.result
       asked = step.asked
+    }
     }
 
     // The test is worthless if it never found the case; assert it did.

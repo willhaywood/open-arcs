@@ -667,6 +667,69 @@ It also settles the ranking that 2f could not do by eye:
 - **Games are cheap**: ~25ms for a trivial game, ~600ms with one heuristic seat. Hundreds of games
   per run is affordable, so no result here needs to rest on a small sample.
 
+## 2h. Fixing the lead decision
+
+Section 5 step 7, and the fix section 2g's mirror match made measurable.
+
+### The bug was a blind spot, not a weight
+
+Leading a card costs a card — which `valueOf` charges 0.15 of tempo for — and buys three actions,
+which **nothing counted**. Pips are not in the state; they live on the continuation (section 1.5),
+so `valueOf` structurally cannot see them. Every card therefore scored below `Pass`.
+
+Two changes, and the first is useless without the second:
+
+1. **`settle`** advances a probed position past the optional steps between choosing a card and
+   spending its pips — declining the declare prompt and the Prelude — so every candidate is scored
+   at the same point in the turn. Candidates were previously compared *at different moments*:
+   `Pass` after your turn, a card three decisions before yours had happened.
+2. **`Probe.actionsAhead`** reports the pips waiting at that horizon, and `heuristicBot` prices them
+   at `PIP_VALUE = 0.5`.
+
+Settling alone changed nothing at all — measured, not assumed. The board has not moved at the pip
+ask either, so the position looks identical until the pips themselves are priced.
+
+**This is honestly no longer one-ply.** It is one decision evaluated at a comparable horizon, which
+is what section 2f option 2 proposed; calling it one-ply would be a fiction.
+
+### What it did
+
+Three-player Frontiers, 12 games, and the four-player runs beside them:
+
+| | before | after |
+| --- | --- | --- |
+| 3 heuristic — mean power | 2.5 | **16.7** |
+| 3 heuristic — decisions/game | 86 | **836** |
+| 3 heuristic — outright wins | 8% | **31%** |
+| 1 heuristic v 2 trivial — wins | 58% | **100%** |
+| 1 heuristic v 2 trivial — mean power | 24.2 | **33.9** |
+| 4 heuristic — mean power | 2.2 | **13.3** |
+| pass : lead in a mirror | 32 : 4 | **72 : 71** |
+
+The mirror now out-scores three trivial bots (16.7 against 10.7), which is the comparison that
+matters — a bot that free-rides on opponents who lead can beat the trivial bot without being able to
+play a game.
+
+### The trap, worth not repeating
+
+Pricing pips **brought the livelock straight back**, because the progress gate compared the
+pip-inclusive score against `here`, which has no pip term. Every candidate then looked like an
+improvement and the gate never fired. The gate asks "did that achieve anything", so it must compare
+board value with board value — pips still to spend are potential, not achievement. It is gated on
+`gained` and ranked on `score`, and the mutation that conflates them is covered.
+
+A second, milder one: fixing the lead changed which sub-decisions the bot enters, and the unwind
+test stopped finding its case on seed 1. Its own "did this test verify anything" guard caught that
+rather than the test quietly passing — it now sweeps seeds.
+
+### Still open
+
+- `PIP_VALUE` is a flat rate, and a pip is worth what you do with it. Build and Move are not the
+  same thing. This is the cheap answer; the honest one is a rollout.
+- `settle` declines optional steps rather than playing them, so a card whose value is the *declare*
+  it enables is still undervalued.
+- The browser still runs `trivialBot` — switching `store.ts` is now worth doing.
+
 ## 3. V2 — rollouts
 
 Extends V1's loop rather than replacing it, exactly as docs/03 section 2 promises.
@@ -710,10 +773,8 @@ score (docs/03 section 7).
    tell whether rollouts helped. **Done — section 2g**, and it earned its place immediately: it
    found a livelock that had gone unnoticed, and it showed that V1's win rate against the trivial
    bot was flattering a strategy that cannot start a game.
-7. **Fix leading** — the pass:lead ratio in a mirror match is the metric, and section 2g option 2
-   (look past the lead to the first pip) is the cheap thing to try first. Inserted here rather than
-   folded into V2 because it is now measurable on its own, and if it works V2 starts from a bot that
-   plays a whole game.
+7. **Fix leading** — **done, section 2h.** Pass:lead went from 32:4 to 72:71 and mirror-match power
+   from 2.5 to 16.7, so V2 now starts from a bot that plays a whole game.
 8. V2 rollouts.
 9. Difficulty ladder (docs/03 section 8) — cheapest once there are two strengths to interpolate
    between.

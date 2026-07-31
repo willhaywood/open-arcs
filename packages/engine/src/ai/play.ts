@@ -122,6 +122,86 @@ export interface BotStep {
 }
 
 /**
+ * Actions that decline an optional step between choosing a card and spending its pips.
+ *
+ * **This couples the harness to two rule-module action types, knowingly.** The alternative is
+ * recognising "the step is optional" structurally, which the engine does not express — and the cost
+ * of being wrong here is small and self-limiting: `settle` only advances past an ask that offers one
+ * of these, so a renamed or missing type makes it stop early and score where it used to. Degraded,
+ * never incorrect.
+ */
+const DECLINE = ['ambition/skip-declare', 'turn/prelude-done']
+
+/**
+ * Advance a hypothetical position to the point where this turn's actions actually begin.
+ *
+ * **The lead decision is scored at the wrong moment, and this is the fix.** `advance` stops at the
+ * next ask, so probing "lead Mobilization-5" lands on the declare prompt or the Prelude — before the
+ * board has moved. The card has left your hand and bought nothing yet, so every card scores as pure
+ * cost while `Pass` scores as free. Measured over 12 three-player games, that produced 8 passes for
+ * every lead and 2.5 mean power against the trivial bot's 10.7 (docs/19 section 2g).
+ *
+ * The real defect is subtler than "not far enough ahead": candidates were compared **at different
+ * points in the game**. `Pass` ends your turn, so it was scored after your turn; a card was scored
+ * three decisions before yours had happened. Settling puts every candidate on the same horizon —
+ * the moment the turn's pips are about to be spent — which is what makes the comparison mean
+ * anything.
+ *
+ * It declines the optional steps on the way rather than playing them well. That is deliberate: the
+ * bot will be asked those questions for real and will evaluate them then, so choosing here would
+ * pre-empt a decision with a guess. Declining values a card at what it is *guaranteed* to buy.
+ *
+ * **This is honestly no longer one-ply**, and calling it that would be a fiction (docs/19 section 2f
+ * option 2). It is one decision, evaluated at a comparable horizon.
+ */
+/**
+ * How many action pips the faction still has to spend at this ask, or 0.
+ *
+ * Dug out of the `turn/pips` continuation the pip options carry, the same way the action tray finds
+ * it — and for the same reason: **it is not in the state**. `state.lead.pips` is the round's lead,
+ * not the acting player's own card, which is exactly the mix-up that once labelled a pivoted
+ * Aggression turn "Construction 2".
+ *
+ * `total - done + 1` because `then` describes the state *after* the pip about to be taken.
+ */
+function pipsAhead(cont: Continue, faction: FactionId): number {
+  if (cont.kind !== 'ask' || cont.faction !== faction) return 0
+  const dig = (v: unknown, depth = 0): Record<string, unknown> | undefined => {
+    if (depth > 6 || v === null || typeof v !== 'object') return undefined
+    const o = v as Record<string, unknown>
+    if (o['type'] === 'turn/pips') return o
+    return dig(o['then'], depth + 1)
+  }
+  for (const a of cont.actions) {
+    const hit = dig(a['then'])
+    if (hit === undefined) continue
+    const done = Number(hit['done'])
+    const total = Number(hit['total'])
+    if (!Number.isFinite(done) || !Number.isFinite(total)) continue
+    return Math.max(0, total - done + 1)
+  }
+  return 0
+}
+
+function settle(
+  result: RuleResult,
+  faction: FactionId,
+  reg: RuleRegistry,
+  limit = 8,
+): RuleResult {
+  let current = result
+  for (let i = 0; i < limit; i++) {
+    const c = current.continue
+    if (c.kind !== 'ask' || c.faction !== faction) return current
+    const decline = c.actions.find((a) => DECLINE.includes(a.type))
+    if (decline === undefined) return current
+    current = advance(current.state, decline, reg)
+  }
+  // The limit is a guard against an unforeseen cycle, not a budget; scoring where we got to is fine.
+  return current
+}
+
+/**
  * Take exactly one bot decision, and apply it.
  *
  * **One action, not a whole turn.** The caller drives the loop, which is what lets the UI pace the
@@ -177,7 +257,18 @@ export function stepBot(
         c.kind === 'ask' && c.faction === faction && c.prompt !== undefined
           ? seen.get(c.prompt)
           : undefined
-      return { observed: observe(next.state, faction), repeats: at !== undefined && at >= depth }
+      /*
+       * The two halves read different positions on purpose. `repeats` asks where the game goes
+       * *next*, so it uses the immediate continuation — settling first would step over the very
+       * re-entry it exists to catch. The value is read after settling, because that is the horizon
+       * candidates have to share to be comparable.
+       */
+      const settled = settle(next, faction, reg)
+      return {
+        observed: observe(settled.state, faction),
+        repeats: at !== undefined && at >= depth,
+        actionsAhead: pipsAhead(settled.continue, faction),
+      }
     } catch {
       return undefined
     }

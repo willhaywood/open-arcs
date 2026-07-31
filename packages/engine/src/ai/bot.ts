@@ -79,6 +79,18 @@ export interface Probe {
    * question when it gains nothing.
    */
   readonly repeats: boolean
+  /**
+   * Action pips this turn still has to spend, once the position settles.
+   *
+   * **Here rather than in `ObservedState` because it is not in the state.** Pips live on the
+   * continuation (docs/19 section 1.5), so `valueOf` structurally cannot see them — and that is
+   * precisely why leading a card scored as pure cost. The card left your hand, which the tempo term
+   * charges for, and bought three actions, which nothing counted.
+   *
+   * Zero when the turn is over or the position never reaches the pip phase, which is what makes
+   * `Pass` comparable: passing buys no actions, and now says so.
+   */
+  readonly actionsAhead: number
 }
 
 /**
