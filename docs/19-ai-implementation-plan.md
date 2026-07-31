@@ -730,6 +730,41 @@ rather than the test quietly passing — it now sweeps seeds.
   it enables is still undervalued.
 - The browser still runs `trivialBot` — switching `store.ts` is now worth doing.
 
+## 2i. A decision is final
+
+Watching a game in the browser raised a question the arena had not asked: the fleets were huge and
+almost nothing was fighting. Counted rather than guessed, across one three-player game:
+
+| | battles started | dice rolled | cancels |
+| --- | --- | --- | --- |
+| heuristic | 19 | **4** | **31** |
+| trivial | 28 | 28 | 0 |
+
+**The pip term was paying the bot to run away.** An action landing mid-battle has no pip ask to
+read, so `actionsAhead` reported 0 for every roll, while the `Cancel` beside it returned to the pip
+ask and reported 1 — half a pip for abandoning the fight. `actionsAhead` of zero means "cannot
+tell" as often as it means "nothing left", and nothing distinguished the two.
+
+**Rollbacks are now excluded from the candidate set before anything is weighed.** Cancel exists for
+a human who clicked into the battle screen and changed their mind; it is an interface affordance,
+not a move.
+
+Keyed on the **label**, because the type cannot tell them apart: `action/skip` is `Cancel` when it
+abandons an action and `Done` or `Stop here` when it completes one, and a leader's exit is `Cancel`
+before it places anything and `Done` after. The label is the distinction the engine actually draws.
+
+**Pricing them differently was tried first and was measurably worse** — zeroing the pip credit on any
+action that unwinds cost 3 mean power a game (19.6 against 22.8), because the same adjustment docked
+the legitimate `Done` that ends a sub-decision and returns to spend pips. Excluding the affordance
+is both simpler and stronger, so the `unwinds` flag was removed rather than kept.
+
+| three-player, 12 games | trivial | heuristic |
+| --- | --- | --- |
+| mean power | 10.7 | **22.8** |
+| power scored by everyone | 32.0 | **68.3** |
+| battles started : rolled | 28 : 28 | **20 : 20** |
+| v two trivial — wins / power | — | **100% / 33.7** |
+
 ## 3. V2 — rollouts
 
 Extends V1's loop rather than replacing it, exactly as docs/03 section 2 promises.

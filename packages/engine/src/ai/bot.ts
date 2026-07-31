@@ -89,6 +89,14 @@ export interface Probe {
    *
    * Zero when the turn is over or the position never reaches the pip phase, which is what makes
    * `Pass` comparable: passing buys no actions, and now says so.
+   *
+   * **Zero also means "cannot tell", which is why rollbacks must not be candidates.** An action
+   * landing mid-resolution — the dice of a battle it just started — has no pip ask to read and
+   * reports 0, while a `Cancel` beside it returns to the pip ask and reports 1. That paid the bot
+   * half a pip to abandon each fight, and it cancelled 31 battles for every 4 it rolled. The fix is
+   * `refuses` in the heuristic bot, which drops rollbacks before anything is weighed — pricing them
+   * differently was tried first and measurably cost 3 power a game, because the same adjustment
+   * also docked the legitimate `Done` that ends a sub-decision.
    */
   readonly actionsAhead: number
 }

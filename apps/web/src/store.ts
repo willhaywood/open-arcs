@@ -16,8 +16,8 @@ import {
   serializeGame,
   NO_ASKS,
   startGame,
+  heuristicBot,
   stepBot,
-  trivialBot,
   undo as engineUndo,
 } from '@arcs/engine'
 import type {
@@ -135,7 +135,7 @@ class GameStore {
     if (this.result === null) return
     const faction = this.botTurn()
     if (faction === undefined) return
-    const out = stepBot(this.result, trivialBot, faction, this.registry, this.botAsked)
+    const out = stepBot(this.result, heuristicBot, faction, this.registry, this.botAsked)
     this.result = out.result
     this.botAsked = out.asked
     this.lastDecision = out.decision

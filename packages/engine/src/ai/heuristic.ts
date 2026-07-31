@@ -26,6 +26,28 @@ import type { ObservedState } from '../observe.js'
  */
 const PIP_VALUE = 0.5
 
+/**
+ * Backing out of something already begun. A bot never does this: a decision is final.
+ *
+ * Cancel exists for a *human* who clicked into the battle screen and changed their mind. It is an
+ * interface affordance, not a move, and offering it to an evaluator was actively harmful — landing
+ * mid-battle leaves no pip ask to read, so `actionsAhead` reported 0 for every roll and 1 for the
+ * `Cancel` beside it, paying the bot half a pip to abandon each fight. It cancelled 31 battles for
+ * every 4 it rolled, while the trivial bot fought all 28 of its own.
+ *
+ * **Keyed on the label, because the type cannot tell them apart.** `action/skip` is `Cancel` when it
+ * abandons an action and `Done` or `Stop here` when it completes one — the same type, opposite
+ * meanings — and a leader's exit is `Cancel` before it places anything and `Done` after. The label
+ * is the distinction the engine actually draws, so it is the one to read. `battle/cancel` is matched
+ * by type as well, since it can never mean anything else.
+ *
+ * A renamed label degrades rather than breaks: the bot could consider cancelling again, which is a
+ * weaker bot, not a stuck one.
+ */
+function refuses(action: Action): boolean {
+  return action.type === 'battle/cancel' || action['label'] === 'Cancel'
+}
+
 function describe(action: Action): string {
   return String(action['label'] ?? action.type)
 }
@@ -55,9 +77,17 @@ export const heuristicBot: Bot = {
      */
     const here = valueOf(observed, observed.self, intent)
 
+    /*
+     * Rollbacks are dropped before anything is weighed, so they cannot win on score or on a
+     * tie-break. Kept as a fallback only if they are somehow all that is offered, which would be a
+     * rule to fix rather than a decision to make.
+     */
+    const live = actions.filter((a) => !refuses(a))
+    const choices = live.length > 0 ? live : actions
+
     const considered: Considered[] = []
     const stuck = new Set<Action>()
-    for (const action of actions) {
+    for (const action of choices) {
       const probe = lookahead(action)
       if (probe === undefined) continue
       /*

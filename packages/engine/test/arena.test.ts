@@ -100,6 +100,40 @@ describe('the arena', () => {
     expect(out.decisions.length).toBeGreaterThan(400)
   })
 
+  it('never cancels — a decision is final', () => {
+    /*
+     * Cancel exists for a human who clicked into the battle screen and changed their mind. Offered
+     * to an evaluator it was actively harmful: an action landing mid-battle has no pip ask to read
+     * so `actionsAhead` reports 0, while the `Cancel` beside it returns to the pip ask and reports
+     * 1 — half a pip for backing out. The bot cancelled 31 battles for every 4 it rolled, while the
+     * trivial bot fought all 28 of its own.
+     *
+     * Asserted on the journal rather than on the filter, so it holds however the rule is
+     * implemented: every battle started is a battle rolled.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    const out = runBots(
+      startGame(
+        { board: 'Board3Frontiers', factions: [...three], seed: 1, bots: [...three] },
+        registry,
+      ),
+      three,
+      heuristicBot,
+      registry,
+      3_000,
+    )
+    const count = (type: string): number =>
+      out.decisions.filter((d) => d.action.type === type).length
+    const cancels = out.decisions.filter(
+      (d) => d.action.type === 'battle/cancel' || d.action['label'] === 'Cancel',
+    ).length
+
+    expect(cancels).toBe(0)
+    // And it does pick fights — a bot that simply never battles would also never cancel.
+    expect(count('battle/system')).toBeGreaterThan(5)
+    expect(count('battle/roll')).toBe(count('battle/system'))
+  })
+
   it('rotates seats between games so nobody is measured on seat order', () => {
     const report = runArena(
       { bots: [heuristicBot, trivialBot, trivialBot, trivialBot], games: 4, seed: 1 },
