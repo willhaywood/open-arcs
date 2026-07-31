@@ -53,7 +53,36 @@ export interface BotDecision {
  * shape. A bot never has to work out what is legal.
  */
 /**
- * Apply an action and report the position it leads to, as *this bot* would see it.
+ * What one candidate action leads to.
+ *
+ * `repeats` exists because of a livelock the arena found on its first real run, and the reasoning
+ * matters more than the flag: the bot faced `arrange your resource slots`, where swapping two
+ * tokens is value-identical to `Done` — the value function prices resources by type, never by slot.
+ * Tied, so the first offer won, and the first offer was a swap. Forever.
+ *
+ * **No pure position-scoring bot can escape that.** Identical position, identical choice, by
+ * definition of purity — so the way out cannot be a weight. It has to be information, and the only
+ * thing that separates "swap" from "Done" is that one leaves you facing the same question. The
+ * harness holds the continuation and the bot does not, so the harness is the only place that can
+ * see it. That is the same reason `Lookahead` exists at all.
+ *
+ * This stays deterministic across clients: it is computed from the position, not from history, so
+ * two clients running the bot still agree (docs/03 section 9a).
+ */
+export interface Probe {
+  readonly observed: ObservedState
+  /**
+   * The action leaves this bot facing the same question — it did not advance the game.
+   *
+   * A hint, not a prohibition. An action that repeats the ask but genuinely *improves* the position
+   * is fine and common — taking one pip of several. What is never right is choosing to repeat a
+   * question when it gains nothing.
+   */
+  readonly repeats: boolean
+}
+
+/**
+ * Apply an action and report where it leads, as *this bot* would see it.
  *
  * The harness supplies it, because scoring a move means applying it and only the caller holds the
  * full `GameState` — handing that to the bot would undo the whole point of `ObservedState`. So the
@@ -62,7 +91,7 @@ export interface BotDecision {
  *
  * Returns `undefined` when the action cannot be applied — a bot must cope rather than assume.
  */
-export type Lookahead = (action: Action) => ObservedState | undefined
+export type Lookahead = (action: Action) => Probe | undefined
 
 export interface Bot {
   readonly id: string

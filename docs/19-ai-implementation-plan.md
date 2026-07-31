@@ -566,6 +566,107 @@ fixes it.
   when removed, because declaring also moves the payout term. An isolating test was written, passed
   for an unrelated reason, and was deleted rather than kept — it is flagged in the source.
 
+## 2g. The arena, and what it measured
+
+Step 6 of section 5, built before V2 exactly as sequenced. `packages/engine/src/ai/arena.ts` plus
+`npm run arena`; the fast seeded properties live in `test/arena.test.ts`.
+
+```bash
+npm run arena -- --games 40 --seats heuristic,trivial,trivial,trivial
+```
+
+Per bot it reports **wins**, **outright wins**, **mean rank** and **mean power**, aggregated across
+the seats that bot played. Four numbers rather than one because a win rate at four seats is thin,
+and because two of them exist to stop the report lying:
+
+- **Seats rotate between games.** Seat order matters in Arcs, so a fixed assignment measures the
+  seat. A game count that is not a multiple of the seat count is reported as unbalanced rather than
+  quietly averaged.
+- **Outright wins are separated from tie-break wins.** `performCheckWin` reduces over
+  `state.factions` keeping the first on equality, so when nobody scores the first seat "wins" every
+  game. Without that split, four bots doing nothing would read as one bot at 100%.
+
+### It found a livelock on its first real run
+
+`heuristicBot` never finished a game: twenty thousand actions, still in chapter one, swapping two
+resources back and forth. `valueOf` prices resources by type and never by slot, so every swap scored
+*exactly* what `Done` scored, and the first-offered tie-break picked a swap. Forever.
+
+**No pure position-scoring bot can escape that** — identical position, identical choice, by
+definition of purity. So the fix could not be a weight; it had to be information, and the only thing
+distinguishing a swap from `Done` is that one leaves you facing the same question. The harness holds
+the continuation and the bot does not, so `Lookahead` now returns a `Probe` carrying `repeats`, and a
+repeating action must **strictly improve** the position to be eligible at all. Termination is then a
+property rather than a hope: every repeat raises a bounded quantity.
+
+Three attempts at that were wrong, and each is worth not repeating:
+
+1. **Tie-breaking toward progress.** Not enough. The options that *did* make progress placed the
+   arriving token by discarding something, so they scored strictly lower — the swaps were not tied
+   for best, they were best.
+2. **"Have I seen this question before?"** Over-fires. `Done` returns to the Prelude, which has also
+   been asked, so it condemned the only way out as hard as the loop. Both re-enter; only one goes
+   backwards. Comparing *positions in the turn* separates them — unwinding to an earlier question is
+   how a sub-decision ends.
+3. **Resetting the history when the acting seat changes.** Not a turn boundary. A faction whose turn
+   ends a round then *leads* the next, so two of its turns run back to back with nobody asked in
+   between. `stepBot` now derives the boundary from the state itself, so no caller can get it wrong
+   — which two of them, including a throwaway probe, already had.
+
+A livelock presents as **slowness, not failure**: deleting the fix and re-running the tests did not
+fail them, it hung for ten minutes. Hence `stuckAfter`, and hence the tests carry an explicit bound.
+
+### The measurements
+
+40 games each, seats rotated. Four equal seats would win 25%.
+
+| matchup | bot | wins | outright | rank | power |
+| --- | --- | --- | --- | --- | --- |
+| heuristic v 3 trivial | heuristic-v1 | 73% | 73% | 1.35 | 28.3 |
+| | trivial | 9% | 9% | 2.81 | 8.6 |
+| 2 heuristic v 2 trivial | heuristic-v1 | 38% | 38% | 1.90 | 21.3 |
+| | trivial | 13% | 10% | 2.96 | 11.1 |
+| mirror (4 heuristic) | heuristic-v1 | 25% | **9%** | 1.69 | **2.2** |
+
+**V1 beats the trivial bot convincingly**, which section 2f set as the bar it had to clear.
+
+### The passing bug is not fixed — it was hidden
+
+The mirror row is the finding. Four heuristic bots produce **89 decisions per game against ~720**,
+**2.2 mean power**, and wins that are 91% faction-order tie-breaks. Counting what they actually
+choose settles the mechanism:
+
+```
+74 decisions:  32 turn/pass   4 turn/lead   8 action/take   ...
+```
+
+**Eight passes for every lead.** The bot barely ever leads; it follows other people's cards and
+plays those pips competently, which is why it looks strong against a trivial bot that keeps leading
+and why the 1v3 number is flattering. Put four of them together and nobody starts a round.
+
+This is section 2f's diagnosis confirmed rather than removed: one-ply lookahead after "lead a card"
+lands mid-turn, before the board has moved, so the card's cost is visible and its payoff is not. The
+loop-breaking made games *finish*; it did not give the evaluator sight of a lead's payoff.
+
+It also settles the ranking that 2f could not do by eye:
+
+- **Option 1, the arena.** Done. It is the only reason we know the 73% was flattering.
+- **Option 2, look past the lead.** Now the cheap thing to try, and cheap to *judge* — the mirror
+  match is a direct read of whether the bot will lead, and the pass:lead ratio is the metric.
+- **Option 3, V2 rollouts.** Still the designed answer, and now measurable against a baseline
+  instead of against an impression.
+
+### Worth knowing before the next change
+
+- **Run the mirror, not just 1v3.** A bot that free-rides on opponents who play scores well against
+  a bot that plays badly. Only the mirror exposes a strategy that cannot start a game.
+- **Mean power is the honest number.** Wins and rank both looked respectable in the mirror (25%,
+  1.69) for four bots that did almost nothing.
+- **The browser still runs `trivialBot`.** `store.ts` was never switched to the heuristic bot, so
+  the panel demonstrates plumbing rather than play.
+- **Games are cheap**: ~25ms for a trivial game, ~600ms with one heuristic seat. Hundreds of games
+  per run is affordable, so no result here needs to rest on a small sample.
+
 ## 3. V2 — rollouts
 
 Extends V1's loop rather than replacing it, exactly as docs/03 section 2 promises.
@@ -606,9 +707,15 @@ score (docs/03 section 7).
 4. `intentFor` (section 2b) — chapter goals, derived from observed state, never remembered.
 5. `ValueFn` + `chooseAction` returning a `BotDecision` — the real V1, biased by intent.
 6. Arena and strength measurement (docs/03 section 7) — needed *before* V2, or there is no way to
-   tell whether rollouts helped.
-7. V2 rollouts.
-8. Difficulty ladder (docs/03 section 8) — cheapest once there are two strengths to interpolate
+   tell whether rollouts helped. **Done — section 2g**, and it earned its place immediately: it
+   found a livelock that had gone unnoticed, and it showed that V1's win rate against the trivial
+   bot was flattering a strategy that cannot start a game.
+7. **Fix leading** — the pass:lead ratio in a mirror match is the metric, and section 2g option 2
+   (look past the lead to the first pip) is the cheap thing to try first. Inserted here rather than
+   folded into V2 because it is now measurable on its own, and if it works V2 starts from a bot that
+   plays a whole game.
+8. V2 rollouts.
+9. Difficulty ladder (docs/03 section 8) — cheapest once there are two strengths to interpolate
    between.
 
 Steps 1 and 2 are small and unblock the rest; step 4 is the one most likely to be skipped and most

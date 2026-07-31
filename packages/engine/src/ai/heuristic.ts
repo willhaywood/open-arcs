@@ -36,25 +36,60 @@ export const heuristicBot: Bot = {
       return { action: first, because: `${intent.summary} — no lookahead available` }
     }
 
+    /*
+     * The position as it stands, which is what a repeating action has to beat.
+     *
+     * `valueOf` needs no lookahead, so this is free — and it is the only reference point that makes
+     * "did that achieve anything" answerable at all.
+     */
+    const here = valueOf(observed, observed.self, intent)
+
     const considered: Considered[] = []
+    const stuck = new Set<Action>()
     for (const action of actions) {
-      const after = lookahead(action)
-      if (after === undefined) continue
+      const probe = lookahead(action)
+      if (probe === undefined) continue
+      const score = valueOf(probe.observed, observed.self, intent)
+      /*
+       * **A repeating action must strictly improve the position to be eligible at all.**
+       *
+       * A tie-break is not enough, and the arena showed why on its first real run. Arranging
+       * resource slots offers value-neutral swaps alongside options that place the arriving token by
+       * *discarding* something — which score strictly lower. So the swaps were not merely tied for
+       * best, they *were* the best, and the bot swapped two tokens back and forth for twenty
+       * thousand actions without leaving chapter one.
+       *
+       * Gating on the current position rather than on rival candidates is what makes termination a
+       * property instead of a hope: every repeat strictly increases a bounded quantity, so a turn
+       * cannot go round forever. It still permits honest re-entry — taking one pip of three comes
+       * back to a *different* question anyway, and anything that genuinely gains passes the gate.
+       */
+      if (probe.repeats && score <= here) stuck.add(action)
       considered.push({
         action,
-        score: valueOf(after, observed.self, intent),
-        note: topTerms(termsFor(after, observed.self, intent)),
+        score,
+        note:
+          topTerms(termsFor(probe.observed, observed.self, intent)) +
+          (probe.repeats ? ' [same question]' : ''),
       })
     }
     if (considered.length === 0) {
       return { action: first, because: `${intent.summary} — nothing could be evaluated` }
     }
 
-    // Strictly greater, so the earliest of equal candidates wins — a stable, seedless tie-break.
-    let best = considered[0]!
-    for (const c of considered) if (c.score > best.score) best = c
+    /*
+     * Eligible candidates first; fall back to everything only if the engine offers nothing but
+     * no-ops, which would be a rule to fix rather than a decision to make.
+     */
+    const eligible = considered.filter((c) => !stuck.has(c.action))
+    const pool = eligible.length > 0 ? eligible : considered
 
-    const runnerUp = considered.filter((c) => c !== best).sort((a, b) => b.score - a.score)[0]
+    // Strictly greater, so the earliest of equal candidates wins — a stable, seedless tie-break.
+    let best = pool[0]!
+    for (const c of pool) if (c.score > best.score) best = c
+
+    // The margin is over the candidates it was actually choosing between, not over ones it ruled out.
+    const runnerUp = pool.filter((c) => c !== best).sort((a, b) => b.score - a.score)[0]
     const margin = runnerUp === undefined ? undefined : best.score - runnerUp.score
     const close = margin !== undefined && margin < 0.05
 

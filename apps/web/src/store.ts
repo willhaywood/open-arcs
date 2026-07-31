@@ -14,12 +14,20 @@ import {
   defaultRegistry,
   loadGame,
   serializeGame,
+  NO_ASKS,
   startGame,
   stepBot,
   trivialBot,
   undo as engineUndo,
 } from '@arcs/engine'
-import type { Action, BotDecision, FactionId, NewGameOptions, RuleResult } from '@arcs/engine'
+import type {
+  Action,
+  AskedThisTurn,
+  BotDecision,
+  FactionId,
+  NewGameOptions,
+  RuleResult,
+} from '@arcs/engine'
 import { useSyncExternalStore } from 'react'
 
 type Listener = () => void
@@ -73,6 +81,20 @@ class GameStore {
   private timer: ReturnType<typeof setTimeout> | null = null
 
   /**
+   * Questions already put to the seat currently acting, so a bot can tell re-entry from progress.
+   *
+   * Threaded here as well as in the arena's loop because a livelocked bot in the browser is a frozen
+   * tab, which is the worst place to discover it. `stepBot` handles the turn boundary itself; the
+   * store only has to drop it when the position is *rebuilt*, since after an undo or a load the
+   * history describes a game that no longer exists.
+   */
+  private botAsked: AskedThisTurn = NO_ASKS
+
+  private forgetBotTurn(): void {
+    this.botAsked = NO_ASKS
+  }
+
+  /**
    * Bumped whenever bot *presentation* state changes — mode, pace, the last decision, overrides.
    *
    * `getSnapshot` returns `this.result`, so `useSyncExternalStore` compares object identity and
@@ -113,8 +135,9 @@ class GameStore {
     if (this.result === null) return
     const faction = this.botTurn()
     if (faction === undefined) return
-    const out = stepBot(this.result, trivialBot, faction, this.registry)
+    const out = stepBot(this.result, trivialBot, faction, this.registry, this.botAsked)
     this.result = out.result
+    this.botAsked = out.asked
     this.lastDecision = out.decision
     this.emitBotUi()
     if (this.botMode === 'run') this.scheduleBot()
@@ -145,6 +168,7 @@ class GameStore {
 
   start(options: NewGameOptions): void {
     this.clearBotTimer()
+    this.forgetBotTurn()
     this.options = options
     this.generation += 1
     this.result = startGame(options, this.registry)
@@ -179,6 +203,7 @@ class GameStore {
      * a bot's turn at all.
      */
     this.clearBotTimer()
+    this.forgetBotTurn()
     this.botMode = 'step'
     this.result = engineUndo(this.options, this.result, this.registry)
     this.lastDecision = null
@@ -198,6 +223,7 @@ class GameStore {
   /** Load a save file's JSON. Throws (with a clear message) on a bad file. */
   load(json: string): void {
     this.clearBotTimer()
+    this.forgetBotTurn()
     const { options, result } = loadGame(json, this.registry)
     this.options = options
     this.result = result
@@ -214,6 +240,7 @@ class GameStore {
 
   reset(): void {
     this.clearBotTimer()
+    this.forgetBotTurn()
     this.lastDecision = null
     this.overrides = 0
     this.result = null
