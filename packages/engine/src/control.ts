@@ -96,7 +96,21 @@ export function systemsWherePresent(state: GameState, color: FactionId): SystemI
 }
 
 /** Cities a faction still holds in reserve. Drives resource-slot capacity and the scoring bonus. */
-export function citiesInReserve(state: GameState, faction: FactionId): number {
+/**
+ * The slice of state that resource-slot maths reads.
+ *
+ * Named so `ObservedState` satisfies it too. A bot has to compute what it holds and what an
+ * ambition would score, and duplicating that arithmetic into the AI would be two copies of a rule —
+ * the mistake docs/03 section 2 calls out in HRF, which keeps a second scalar just for rollouts.
+ * Widening the parameter instead means there is one implementation and the bot cannot drift from
+ * the engine.
+ */
+export interface SlotView {
+  readonly figures: GameState['figures']
+  readonly lores: GameState['lores']
+}
+
+export function citiesInReserve(state: SlotView, faction: FactionId): number {
   return contentsOf(state.figures, Location.reserve(faction)).filter(
     (id) => parseFigureId(id).piece === 'City',
   ).length
@@ -144,7 +158,7 @@ export function gateCityTypes(state: GameState, s: SystemId): readonly Resource[
  * This is the single producer — everything that gains, spends, counts for an ambition or is raided
  * asks here, so the card slot cannot be visible to one of those and invisible to another.
  */
-export function slotsOf(state: GameState, faction: FactionId): LocationId[] {
+export function slotsOf(state: SlotView, faction: FactionId): LocationId[] {
   const slots = usableSlots(faction, slotCapacity(citiesInReserve(state, faction)))
   if (hasLore(state, faction, ANCIENT_HOLDINGS)) {
     slots.push(ResourceSlot.cardSlot(faction, ANCIENT_HOLDINGS))

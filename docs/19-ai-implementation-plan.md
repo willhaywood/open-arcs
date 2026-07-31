@@ -493,6 +493,79 @@ panel is what makes the first real value function tractable to develop, so havin
 beforehand against a bot whose reasoning is "first legal action" means the harness is proven when the
 interesting part starts. Building it after V1 means writing V1 blind.
 
+## 2f. Where this got to — handover
+
+Steps 1–5 of section 5 are built. What follows is the state, and the findings that should change
+what happens next.
+
+### Built and tested
+
+| | |
+| --- | --- |
+| `observe` | Carries every public zone plus **your own** hand and public hand sizes. Hidden: `rng`, `journal`, rivals' hands, `unusedLore`. |
+| `options.bots` | Which seats a bot plays, in options so a *load* knows to compute rather than stall. |
+| `Bot` / `BotDecision` / `Lookahead` | A bot takes `ObservedState` and returns a decision carrying a player-facing `because`. |
+| `trivialBot` | First legal action. Proves plumbing; the arena's control. |
+| `isBotSeat` / `botToAct` / `stepBot` / `stepBots` / `runBots` | One loop for hotseat, arena and multiplayer. |
+| `BotPanel` | Run / step / take-over, paced narration, diagnostics table, override counter. |
+| `intentFor` | Chapter goals, derived from observed state, never remembered. |
+| `valueOf` / `termsFor` | Position worth in expected power, relative to the best opponent, intent-biased. |
+| `heuristicBot` | One-ply search over the above. **Plays worse than the trivial bot** — see below. |
+
+### The finding that should shape V2
+
+`heuristicBot` **passes immediately**. Four decisions, chapter over, nobody scores. The diagnostics
+say exactly why:
+
+```
+red — offered 7
+    -0.15  Pass
+    -0.30  Lead Mobilization-7
+    -0.30  Lead Aggression-2
+```
+
+Every option is negative and the gap is one card of tempo. **Not a weighting error.** One-ply
+lookahead after "lead a card" lands *mid-turn* — on the declare prompt or the Prelude — where the
+board has not moved. The cost of the card is visible; the payoff, several decisions later when the
+pips are spent, is not. Zeroing the tempo term does not help: Pass and Lead then tie at 0.00 and
+offer order decides.
+
+This is docs/03 section 3.4 confirmed empirically — *"lead/surpass/pass pay off over a whole round;
+a static evaluator sees only the immediate board"* — and it lands on the **highest-weight decision in
+the game** (section 2d.1), which makes it fatal rather than a rough edge.
+
+Three ways out, in the order I would try them:
+
+1. **The arena first.** Section 5 already sequences it before further tuning, and this is the case
+   that proves why: three plausible fixes and no way to rank them by eye. The trivial bot is the
+   baseline, and "does it still pass on turn one" is the first measured question.
+2. **Look past the lead.** Advance through the Prelude to the first pip before scoring the lead
+   decision. Targeted and cheap — and honestly no longer one-ply, which is worth admitting rather
+   than describing as V1.
+3. **Straight to V2 rollouts.** The designed answer. At ~9ms a rollout a lead decision affords ~100,
+   and rollouts see the payoff by construction.
+
+Option 2 is a smaller step than it looks and may be enough to make V1 playable; option 3 is the
+plan. Do not simply re-tune the weights — the information is not present at one ply, so no weight
+fixes it.
+
+### Traps found along the way, worth not repeating
+
+- **A leak test that could not fail.** `observe`'s test scanned `JSON.stringify(view)` for rival
+  card ids — but the zones are `Tracker`s built on `Map`, and `JSON.stringify(new Map())` is `{}`.
+  A projection leaking every hand passed clean. Anything asserting over engine state must walk Maps
+  by hand.
+- **Intent flapped through `contest`.** It read my own metric, so *spending* Material lowered my
+  appetite for the Tycoon I was spending it on, between two actions of one turn. The rule is sharper
+  than "do not read resources": intent must not move across **my own** actions, so rivals' positions
+  are safe to read and mine are not.
+- **A React store that emitted without changing.** `setBotMode` updated state and emitted, but
+  `getSnapshot` returned the unchanged `result`, so `useSyncExternalStore` reused the render and
+  take-over silently did nothing. Presentation state needs its own primitive snapshot.
+- **One weight is knowingly untested.** The "already declared is stickier" multiplier fails no test
+  when removed, because declaring also moves the payout term. An isolating test was written, passed
+  for an unrelated reason, and was deleted rather than kept — it is flagged in the source.
+
 ## 3. V2 — rollouts
 
 Extends V1's loop rather than replacing it, exactly as docs/03 section 2 promises.

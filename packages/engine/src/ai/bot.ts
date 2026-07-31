@@ -52,9 +52,29 @@ export interface BotDecision {
  * is why docs/19 section 1 closes the `legalActions` prerequisite as satisfied by a different
  * shape. A bot never has to work out what is legal.
  */
+/**
+ * Apply an action and report the position it leads to, as *this bot* would see it.
+ *
+ * The harness supplies it, because scoring a move means applying it and only the caller holds the
+ * full `GameState` — handing that to the bot would undo the whole point of `ObservedState`. So the
+ * one-ply lookahead docs/03 section 2 describes is split: the harness advances, the bot sees the
+ * result through the same redaction as everything else.
+ *
+ * Returns `undefined` when the action cannot be applied — a bot must cope rather than assume.
+ */
+export type Lookahead = (action: Action) => ObservedState | undefined
+
 export interface Bot {
   readonly id: string
-  decide(observed: ObservedState, actions: readonly Action[]): BotDecision
+  /**
+   * `lookahead` is absent for callers that cannot supply it. A bot that needs it must degrade
+   * rather than throw: an evaluator with no lookahead is a worse bot, not a broken game.
+   */
+  decide(
+    observed: ObservedState,
+    actions: readonly Action[],
+    lookahead?: Lookahead,
+  ): BotDecision
 }
 
 /**

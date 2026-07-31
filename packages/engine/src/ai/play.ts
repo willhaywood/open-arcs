@@ -11,10 +11,12 @@
  * the same moves are the same file (docs/03 section 9a).
  */
 
-import { applyExternal } from '../index.js'
+import { advance, applyExternal, defaultRegistry } from '../index.js'
 import { observe } from '../observe.js'
 import type { RuleRegistry, RuleResult } from '../dispatch.js'
 import type { FactionId } from '../ids.js'
+import type { Action } from '../action.js'
+import type { ObservedState } from '../observe.js'
 import type { Bot, BotDecision } from './bot.js'
 
 /** Is this seat played by a bot? */
@@ -53,7 +55,21 @@ export function stepBot(
   if (result.continue.kind !== 'ask') {
     throw new Error('stepBot: called when the engine is not asking')
   }
-  const decision = bot.decide(observe(result.state, faction), result.continue.actions)
+  /*
+   * One-ply lookahead, supplied here because only this function holds the full state. Each probe
+   * uses `advance` rather than `applyExternal`: a considered-and-rejected move must not reach the
+   * journal, and these are hypotheticals, not plays.
+   */
+  // Hoisted: one registry per decision, not one per candidate probed.
+  const reg = registry ?? defaultRegistry()
+  const lookahead = (action: Action): ObservedState | undefined => {
+    try {
+      return observe(advance(result.state, action, reg).state, faction)
+    } catch {
+      return undefined
+    }
+  }
+  const decision = bot.decide(observe(result.state, faction), result.continue.actions, lookahead)
   return { result: applyExternal(result, decision.action, registry), decision }
 }
 

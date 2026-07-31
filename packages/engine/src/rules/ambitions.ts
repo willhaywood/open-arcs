@@ -17,6 +17,7 @@ import type { Action } from '../action.js'
 import type { Suit } from '../cards.js'
 import { Continue as C } from '../continue.js'
 import { citiesInReserve, slotsOf } from '../control.js'
+import type { SlotView } from '../control.js'
 import { CourtPile, SECRET_ORDER, courtCard, hasGuild } from '../court.js'
 import { Prelude } from '../prelude.js'
 import type { RuleModule, RuleResult } from '../dispatch.js'
@@ -72,8 +73,13 @@ export function ambitionsForStrength(strength: number): readonly Ambition[] {
   return AMBITIONS.filter((a) => AMBITION_STRENGTH[a] === strength)
 }
 
+/** What `metric` reads — widened so a bot's `ObservedState` satisfies it too. See `SlotView`. */
+export interface MetricView extends SlotView {
+  readonly resources: GameState['resources']
+}
+
 /** The scored quantity for a faction (base game — game.scala:1152). */
-export function metric(state: GameState, faction: FactionId, ambition: Ambition): number {
+export function metric(state: MetricView, faction: FactionId, ambition: Ambition): number {
   const slots = slotsOf(state, faction)
   const res = (r: Parameters<typeof countResource>[2]) =>
     countResource(state.resources, slots, r)
