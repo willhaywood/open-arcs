@@ -25,6 +25,7 @@ import { useState } from 'react'
 
 import { SETUP_CARDS } from '../setups.js'
 import { store } from '../store.js'
+import { colorOf } from '../theme.js'
 
 const ALL_FACTIONS: FactionId[] = ['red', 'yellow', 'blue', 'white']
 
@@ -61,6 +62,8 @@ export function NewGame(): JSX.Element {
   const [leaders, setLeaders] = useState(false)
   const [expansion, setExpansion] = useState(false)
   const [lorePer, setLorePer] = useState(1)
+  /** Seats played by a bot. Order follows seating, not click order — see `enterGame`. */
+  const [bots, setBots] = useState<string[]>([])
 
   const byName = new Map(boardsFor(players).map((b) => [b.name, b]))
 
@@ -85,14 +88,15 @@ export function NewGame(): JSX.Element {
 
   function enterGame(): void {
     if (picked === null) return
+    const seats = ALL_FACTIONS.slice(0, players)
     store.start({
       board: picked,
-      factions: ALL_FACTIONS.slice(0, players),
+      factions: seats,
       seed,
       // Omitted entirely for a base game, so the option's absence is what turns it off.
-      ...(leaders
-        ? { leadersAndLore: { expansion, lorePerPlayer } }
-        : {}),
+      ...(leaders ? { leadersAndLore: { expansion, lorePerPlayer } } : {}),
+      // Same: absent rather than empty, so a base game's options are unchanged by this existing.
+      ...(bots.length > 0 ? { bots: seats.filter((f) => bots.includes(f)) } : {}),
     })
   }
 
@@ -239,6 +243,39 @@ export function NewGame(): JSX.Element {
               </div>
             </div>
           ) : null}
+        </div>
+
+        {/*
+         * Which seats a bot plays. Here rather than behind the variant toggle because a bot seat is
+         * orthogonal to leaders and lore — you can want one in a base game — and because a setup
+         * option you cannot see is a setup option nobody uses.
+         */}
+        <div className="ng-bots">
+          <span className="ng-sub-label">Bot seats</span>
+          <div className="ng-bot-row">
+            {ALL_FACTIONS.slice(0, players).map((f) => {
+              const on = bots.includes(f)
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  className={`ng-bot${on ? ' on' : ''}`}
+                  disabled={revealed}
+                  style={on ? { borderColor: colorOf(f), color: colorOf(f) } : undefined}
+                  onClick={() => setBots((cur) => (on ? cur.filter((x) => x !== f) : [...cur, f]))}
+                >
+                  {f}
+                </button>
+              )
+            })}
+          </div>
+          <em className="ng-bot-note">
+            {bots.length === 0
+              ? 'all seats played by hand'
+              : bots.length === players
+                ? 'every seat is a bot — watch it play'
+                : `${players - bots.length} played by hand`}
+          </em>
         </div>
 
         {revealed ? (
