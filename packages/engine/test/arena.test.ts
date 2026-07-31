@@ -134,6 +134,32 @@ describe('the arena', () => {
     expect(count('battle/roll')).toBe(count('battle/system'))
   })
 
+  it('chooses between standard actions on merit, not on offer order', () => {
+    /*
+     * Battle, Move, Build and Secure all lead to a *sub-ask* — which system, which ships, which card
+     * — where the board has not moved. Scored there they came out identical, to three decimal
+     * places, and offer order decided: the bot battled because Battle was listed first and secured
+     * nothing all game, though Secure was offered fifteen times.
+     *
+     * Asserted on securing because it is the action that was never reachable by offer order. It is a
+     * proxy for the fix rather than the fix itself, but it is the behaviour that was missing, and it
+     * fails when `settle` stops at the sub-ask instead of resolving it.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    const out = runBots(
+      startGame(
+        { board: 'Board3Frontiers', factions: [...three], seed: 1, bots: [...three] },
+        registry,
+      ),
+      three,
+      heuristicBot,
+      registry,
+      3_000,
+    )
+    const secures = out.decisions.filter((d) => d.action.type === 'action/secure').length
+    expect(secures).toBeGreaterThan(0)
+  })
+
   it('rotates seats between games so nobody is measured on seat order', () => {
     const report = runArena(
       { bots: [heuristicBot, trivialBot, trivialBot, trivialBot], games: 4, seed: 1 },

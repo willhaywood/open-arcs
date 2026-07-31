@@ -183,21 +183,50 @@ function pipsAhead(cont: Continue, faction: FactionId): number {
   return 0
 }
 
+/**
+ * How far `settle` will go before giving up and scoring where it got to.
+ *
+ * A guard against an unforeseen cycle rather than a budget: a real sub-flow is two or three asks
+ * (choose a system, choose a target, gather dice), so anything approaching this is a loop.
+ */
+const SETTLE_LIMIT = 10
+
 function settle(
   result: RuleResult,
   faction: FactionId,
   reg: RuleRegistry,
-  limit = 8,
+  resolve: (result: RuleResult, actions: readonly Action[]) => Action,
 ): RuleResult {
   let current = result
-  for (let i = 0; i < limit; i++) {
+  /*
+   * Prompts already resolved inside this settle, so a sub-flow that can be re-entered — arranging
+   * resource slots, which offers value-neutral swaps forever — costs one step rather than the whole
+   * budget. `stepBot`'s own history cannot help here: none of this is happening in the real game.
+   */
+  const visited = new Set<string>()
+
+  for (let i = 0; i < SETTLE_LIMIT; i++) {
     const c = current.continue
     if (c.kind !== 'ask' || c.faction !== faction) return current
+    // The horizon: the turn's actions are about to be spent, which is what candidates are compared at.
+    if (pipsAhead(c, faction) > 0) return current
+    if (c.prompt !== undefined && visited.has(c.prompt)) return current
+    if (c.prompt !== undefined) visited.add(c.prompt)
+
+    /*
+     * Decline optional steps, resolve mandatory ones.
+     *
+     * Declining is right for a step the bot will be asked for real and can evaluate then — the
+     * declare prompt, the Prelude — where choosing here would pre-empt a real decision with a guess.
+     * A *sub-flow* is different: "Battle — choose a system" is not a separate decision, it is the
+     * rest of the one being scored, and stopping there is what made Battle, Move, Build and Secure
+     * score identically. All of them lead to a sub-ask before the board has moved, so they tied and
+     * offer order decided: the bot battled because Battle was listed first and never once secured a
+     * court card, though it was offered 15 times a game.
+     */
     const decline = c.actions.find((a) => DECLINE.includes(a.type))
-    if (decline === undefined) return current
-    current = advance(current.state, decline, reg)
+    current = advance(current.state, decline ?? resolve(current, c.actions), reg)
   }
-  // The limit is a guard against an unforeseen cycle, not a budget; scoring where we got to is fine.
   return current
 }
 
@@ -236,6 +265,31 @@ export function stepBot(
       : new Map([...history, [asking.prompt, history.size] as const])
   const depth = asking.prompt === undefined ? seen.size : (seen.get(asking.prompt) ?? seen.size)
 
+  /*
+   * How a sub-flow gets played out while scoring: the bot's own judgement, one ply deep.
+   *
+   * Reusing `bot.decide` rather than a separate policy keeps the two consistent — a bot that would
+   * choose this system for real chooses it here — and it costs no new interface. The inner lookahead
+   * deliberately does *not* settle again: without that, scoring one candidate would resolve a
+   * sub-flow whose every candidate resolves a sub-flow, and the work would compound. One ply inside
+   * the sub-flow is enough to tell a good target from a bad one, which is all this has to do.
+   */
+  const resolve = (at: RuleResult, options: readonly Action[]): Action => {
+    const shallow = (action: Action): Probe | undefined => {
+      try {
+        const after = advance(at.state, action, reg)
+        return {
+          observed: observe(after.state, faction),
+          repeats: false,
+          actionsAhead: pipsAhead(after.continue, faction),
+        }
+      } catch {
+        return undefined
+      }
+    }
+    return bot.decide(observe(at.state, faction), options, shallow).action
+  }
+
   const lookahead = (action: Action): Probe | undefined => {
     try {
       const next = advance(result.state, action, reg)
@@ -263,7 +317,7 @@ export function stepBot(
        * re-entry it exists to catch. The value is read after settling, because that is the horizon
        * candidates have to share to be comparable.
        */
-      const settled = settle(next, faction, reg)
+      const settled = settle(next, faction, reg, resolve)
       return {
         observed: observe(settled.state, faction),
         repeats: at !== undefined && at >= depth,

@@ -765,6 +765,64 @@ is both simpler and stronger, so the `unwinds` flag was removed rather than kept
 | battles started : rolled | 28 : 28 | **20 : 20** |
 | v two trivial — wins / power | — | **100% / 33.7** |
 
+## 2j. Choosing which action to take
+
+The court work (section 2i's successor) went in and the bot still secured nothing — offered Secure
+15 times a game, taken 0. Reading the scores rather than reasoning about them found why:
+
+```
+8.267  Battle
+8.267  Move
+8.267  Secure
+7.267  End turn (forfeit 2)
+CHOSE Battle
+```
+
+**Identical, to three decimal places.** Every standard action leads to a *sub-ask* — which system,
+which ships, which card — where the board has not moved. So they tie, and offer order decides. The
+bot battled because Battle is listed first, and never secured because Secure never is.
+
+The same blind spot for the fourth time, and the one that could not take another targeted term:
+
+| blind spot | symptom | fix |
+| --- | --- | --- |
+| pips a card buys | never led | priced pips |
+| a battle in progress | cancelled 31 of 35 | excluded rollbacks |
+| agents toward securing | never played the court | priced claims |
+| **which action to take** | **offer order decided** | **resolve the sub-flow** |
+
+### The fix
+
+`settle` now **resolves** a sub-flow instead of stopping at it, using `bot.decide` one ply deep. The
+distinction it draws is between two things that both look like "another ask":
+
+- **Optional steps are still declined** — the declare prompt, the Prelude. The bot will be asked
+  those for real and can evaluate them then, so choosing here would pre-empt a decision with a guess.
+- **Sub-flows are resolved.** "Battle — choose a system" is not a separate decision, it is the rest
+  of the one being scored.
+
+Reusing `bot.decide` keeps the two consistent — a bot that would choose this target for real chooses
+it here — and costs no new interface. The inner lookahead deliberately does **not** settle again:
+otherwise scoring one candidate resolves a sub-flow whose every candidate resolves a sub-flow, and
+the work compounds.
+
+### What it did
+
+| three-player, 12 games | before | after |
+| --- | --- | --- |
+| v two trivial — mean power | 33.7 | **38.3** |
+| mirror — mean power | 24.4 | 24.5 |
+| secures per game | 0 | 2 |
+| influences per game | 11 | 16 |
+| runtime, mirror | 12.7s | 44.4s |
+
+**Head-to-head it is a clear gain; the mirror barely moves.** Worth stating plainly rather than
+quoting the good number alone: when every seat plays the same way, better action selection cancels
+out. The honest read is that the bot now converts an advantage it already had.
+
+The cost is ~3.5x per decision. Acceptable for the arena and invisible at UI pacing, but it is the
+budget V2's rollouts would want, so the two will have to be sized against each other.
+
 ## 3. V2 — rollouts
 
 Extends V1's loop rather than replacing it, exactly as docs/03 section 2 promises.
@@ -810,8 +868,9 @@ score (docs/03 section 7).
    bot was flattering a strategy that cannot start a game.
 7. **Fix leading** — **done, section 2h.** Pass:lead went from 32:4 to 72:71 and mirror-match power
    from 2.5 to 16.7, so V2 now starts from a bot that plays a whole game.
-8. V2 rollouts.
-9. Difficulty ladder (docs/03 section 8) — cheapest once there are two strengths to interpolate
+8. **Fix action selection** — **done, section 2j.**
+9. V2 rollouts.
+10. Difficulty ladder (docs/03 section 8) — cheapest once there are two strengths to interpolate
    between.
 
 Steps 1 and 2 are small and unblock the rest; step 4 is the one most likely to be skipped and most
