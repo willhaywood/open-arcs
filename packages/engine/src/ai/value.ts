@@ -16,7 +16,16 @@
 
 import { metric } from '../rules/ambitions.js'
 import { AMBITIONS } from '../state.js'
-import { CourtPile, Location, contentsOf, countResource, parseFigureId, slotsOf } from '../index.js'
+import {
+  CourtPile,
+  Location,
+  contentsOf,
+  countResource,
+  courtCard,
+  courtSlots,
+  parseFigureId,
+  slotsOf,
+} from '../index.js'
 import type { FactionId } from '../ids.js'
 import type { ObservedState } from '../observe.js'
 import type { Resource } from '../resources.js'
@@ -45,6 +54,37 @@ export interface Term {
  */
 const bias = (intent: ChapterIntent, ambition: Ambition): number =>
   0.5 + 1.5 * (intent.pursuing.get(ambition) ?? 0)
+
+/** The ambition a guild's resource feeds, inverted from `FEEDS`. */
+const AMBITION_OF: Readonly<Partial<Record<Resource, Ambition>>> = {
+  Material: 'Tycoon',
+  Fuel: 'Tycoon',
+  Relic: 'Keeper',
+  Psionic: 'Empath',
+}
+
+/**
+ * What one court card is worth to hold, rather than a flat rate for any of them.
+ *
+ * Three things the card data already carries, so no per-card table has to be authored:
+ *
+ *   - **`suit`** — the resource the guild deals in, which ties the card straight to an ambition and
+ *     therefore to `intent`. A Fuel guild is worth far more to a bot going for Tycoon, and that is
+ *     the whole reason to prefer one card over another.
+ *   - **`keys`** — what it costs a rival to raid the card off you. The designers' own measure of how
+ *     good it is, and free to read.
+ *   - **`kind`** — a Vox card is discarded when taken rather than held, so it is a one-shot effect
+ *     and priced low and flat. Pretending it is a lasting asset would be worse than crude.
+ *
+ * Every number is a starting point for the arena, like the rest of this file.
+ */
+function courtWorth(id: string, intent: ChapterIntent): number {
+  const card = courtCard(id)
+  if (card.kind !== 'guild') return 0.6
+  const strength = 0.9 + (card.keys ?? 1) * 0.5
+  const ambition = card.suit === undefined ? undefined : AMBITION_OF[card.suit]
+  return strength * (ambition === undefined ? 1 : bias(intent, ambition))
+}
 
 function pieces(observed: ObservedState, self: FactionId, piece: string): string[] {
   const out: string[] = []
@@ -124,9 +164,46 @@ export function termsFor(
   const hurt = ships.length - fresh
   if (ships.length > 0) terms.push({ name: 'ships', power: fresh * 0.35 + hurt * 0.1 })
 
-  // Secured court cards are live abilities, not just score.
-  const secured = contentsOf(observed.courtCards, CourtPile.secured(self)).length
-  if (secured > 0) terms.push({ name: 'court', power: secured * 1.1 })
+  /*
+   * The court, in two halves: what is held, and what is being contested.
+   *
+   * The second half is the one that changes behaviour. Securing needs *more* agents on a card than
+   * anyone else, so it is a build-up — and a flat "1.1 per secured card" priced only the finished
+   * article, leaving the first Influence worth exactly nothing. One ply then never took it, so the
+   * agents never accumulated and the card was never secured: 11 influences, 0 secures and 1 card
+   * taken across a whole three-player game. The same shape of blind spot as leading a card, and the
+   * same fix — price the progress, not just the result.
+   */
+  for (const id of contentsOf(observed.courtCards, CourtPile.secured(self))) {
+    terms.push({ name: `court ${courtCard(id).name}`, power: courtWorth(id, intent) })
+  }
+
+  for (const slot of courtSlots()) {
+    const id = contentsOf(observed.courtCards, CourtPile.slot(slot))[0]
+    if (id === undefined) continue
+    const on = (f: FactionId): number =>
+      contentsOf(observed.figures, Location.court(slot)).filter(
+        (a) => parseFigureId(a).color === f,
+      ).length
+    const mine = on(self)
+    if (mine === 0) continue
+    const best = Math.max(0, ...observed.factions.filter((f) => f !== self).map(on))
+    /*
+     * How likely the card is to end up yours, since `canSecure` is `mine > best`. Ahead is worth
+     * more than level, because only ahead can actually take it.
+     *
+     * **Deliberately a small fraction, and the first version got this wrong.** At 0.6 a claim banked
+     * most of the card's value for free, so paying a pip to actually secure it bought only the
+     * remaining 0.4 and scored as a loss — the bot was offered Secure 15 times in a game and
+     * declined all 15. A claim has to be worth enough to reach for and little enough that closing it
+     * is clearly worth an action.
+     */
+    const claim = mine > best ? 0.25 : mine === best ? 0.12 : 0.05
+    terms.push({
+      name: `court claim ${courtCard(id).name}`,
+      power: courtWorth(id, intent) * claim,
+    })
+  }
 
   // Trophies and captives are already counted by their ambition standing; this is their floor.
   const trophies = contentsOf(observed.figures, Location.trophies(self)).length
