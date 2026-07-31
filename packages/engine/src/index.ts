@@ -17,6 +17,8 @@ export * from './continue.js'
 export * from './state.js'
 export * from './dispatch.js'
 export * from './observe.js'
+export * from './ai/bot.js'
+export * from './ai/play.js'
 export * from './cards.js'
 export * from './resources.js'
 export * from './outrage.js'
@@ -73,6 +75,16 @@ export interface NewGameOptions {
   readonly npcColors?: readonly ColorId[]
   /** Omitted for a base game; present to play with leaders and lore. */
   readonly leadersAndLore?: LeadersAndLoreOptions
+  /**
+   * Seats played by a bot.
+   *
+   * **Here rather than beside the save because replay needs it.** The journal records actions, not
+   * who chose them, so a bot's game replays byte-for-byte as a human's — but a *loaded* game has to
+   * know whether to compute blue's turn or wait for a human, and without this it stalls forever on
+   * a player who is not there. It is a property of how the game was set up, which is what `options`
+   * is for. See docs/19 section 2 and docs/03 section 9a.
+   */
+  readonly bots?: readonly FactionId[]
 }
 
 export function defaultRegistry(): RuleRegistry {
