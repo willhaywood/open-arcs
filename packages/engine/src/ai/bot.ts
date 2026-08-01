@@ -148,6 +148,19 @@ export interface RolloutOptions {
   readonly lookaheadTurns: number
   /** Hard ceiling on engine steps per playout, so an unexpected loop cannot hang a turn. */
   readonly maxSteps: number
+  /**
+   * Play to the end of the chapter instead of counting turns, and score once ambitions have paid.
+   *
+   * **The only horizon at which a rollout sees something the evaluator cannot.** A short playout is
+   * scored by the same `valueOf` the bot would have used anyway, so it is a noisy re-measurement of
+   * the evaluator rather than new evidence — which is why a two-turn horizon left V2 level with V1
+   * over 120 games. At chapter end the ambitions have actually scored and `power` is realised, so
+   * the payoff a static evaluator can only guess at is present in the position being measured.
+   *
+   * Costs a whole chapter of engine steps per playout, so it is the expensive option by a wide
+   * margin and `maxSteps` is what stops it running away.
+   */
+  readonly untilChapterEnd?: boolean
 }
 
 /**

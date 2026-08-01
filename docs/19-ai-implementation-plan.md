@@ -1111,6 +1111,61 @@ Two candidates follow, and the arena can now settle them:
 What is *not* worth doing is another round of hand-tuning against 120-game samples that cannot
 resolve 8 points.
 
+## 3e. The chapter-end horizon, and the verdict on rollouts
+
+Section 3d's diagnosis was that a two-turn playout scored by the same `valueOf` is a noisy
+re-measurement of the evaluator rather than new evidence. The obvious test is to play to **chapter
+end**, where the ambitions have actually scored and `power` is realised — the one thing a static
+evaluator can only guess at through its standing term.
+
+Cheaper than expected: 14s a game at four samples, against 24s for the two-turn horizon, because a
+playout that ends at the chapter boundary often ends sooner than two full turns.
+
+| 3-player, 120 games | wins | rank | power |
+| --- | --- | --- | --- |
+| heuristic-v1 | 39% | 1.80 | **26.1** |
+| rollout-v2(4xchapter) | 37% | 1.93 | 22.7 |
+| rollout-v2(4xchapter) **[twin]** | 24% | 2.23 | 19.4 |
+
+Twins 13 points apart; V1 leads the better twin by 2. **Still inside the noise on win rate.**
+
+### The signal that does survive three runs
+
+Win rate is too noisy to rank these bots, but **mean power is steadier**, and the same pattern shows
+up in every configuration tried:
+
+| 120 games, V1 vs the average of two identical rollout instances | V1 power | rollout power |
+| --- | --- | --- |
+| 2 turns, `trivialBot` playouts | 25.0 | 22.9 |
+| 2 turns, `playoutChoice` | 25.4 | 22.7 |
+| chapter end, `playoutChoice` | 26.1 | 21.1 |
+
+**Three independent runs, three different rollout configurations, and V1 scores more power in all
+of them.** The gap at chapter end (5.0) is larger than the twins' own power gap (3.3), which is the
+only place any of this clears its noise floor — and it points the wrong way for V2.
+
+### The verdict
+
+Rollouts as constructed here are **not better than the one-ply heuristic, and are probably slightly
+worse.** Three horizons and two playout policies did not change that.
+
+The likeliest reason is that a crude playout policy makes the simulated future *biased*, not merely
+noisy — and a biased estimate can be worse than evaluating the position directly. V1 meanwhile
+already looks one action ahead using the **real** bot's judgement (`settle` and sub-flow resolution,
+section 2j). Put plainly: **short lookahead with a good policy beats long lookahead with a bad one**,
+and the budget does not allow a good policy inside a playout — that was measured, not assumed
+(section 3d: greedy-on-`valueOf` playouts could not finish one game in ten minutes).
+
+So the honest conclusion is that section 3d's second candidate is the live one: **rollouts are the
+wrong lever for this game at this budget, and the evaluator is what needs the work.** The code stays
+— it is tested, it is honest, and `--seats rollout:4:chapter` makes it a one-line experiment if the
+evaluator or the playout budget ever changes — but it should not be the next place effort goes.
+
+What that leaves, in order: the evaluator's blind spots are known and cheap to describe (income is
+invisible, planet types are unread, card suits are unread — section 2's worked examples), and its
+weights have never been fitted to anything. **Learning them from self-play is the step that replaces
+arguing about them**, and it is now possible because the arena is fair, sharded and fast.
+
 ## 4. V3 — information-set search
 
 docs/03 section 5 is aspirational and this plan does not schedule it. Two things it needs that do

@@ -338,6 +338,38 @@ describe('the arena', () => {
     expect(differing).toBeGreaterThan(10)
   })
 
+  it('can play a rollout to the end of the chapter, past the ambition payout', () => {
+    /*
+     * The horizon at which a rollout could in principle see what a static evaluator cannot: at
+     * chapter end the ambitions have scored and `power` is realised, rather than being guessed at by
+     * the standing term. Asserted on the chapter having actually turned over, since a playout that
+     * silently truncates at `maxSteps` would look the same from outside and measure nothing.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    let r = startGame(
+      { board: 'Board3Frontiers', factions: [...three], seed: 1, bots: [...three] },
+      registry,
+    )
+    for (let i = 0; i < 30; i++) {
+      if (r.continue.kind !== 'ask') break
+      r = stepBot(r, trivialBot, r.continue.faction, registry).result
+    }
+    if (r.continue.kind !== 'ask') throw new Error('expected an ask to play out from')
+
+    const before = r.state.chapter
+    const turnsOnly = playOut(r, r.continue.faction, registry, 2, 1200, playoutChoice, false)
+    const toChapterEnd = playOut(r, r.continue.faction, registry, 0, 1200, playoutChoice, true)
+
+    /*
+     * Two turns does not reach the payout; the chapter horizon reaches it and *stops there*.
+     * Asserting merely that the chapter advanced is not enough — a playout that ignored the horizon
+     * and ran to `maxSteps` would also show a later chapter, and that mutation passed the first
+     * version of this test. Exactly one chapter on is what distinguishes stopping from running out.
+     */
+    expect(turnsOnly.chapter).toBe(before)
+    expect(toChapterEnd.chapter).toBe(before + 1)
+  })
+
   it('does not roll out anything but the card play', () => {
     /*
      * The guard tested directly rather than through a game, because removing it does not *fail* a

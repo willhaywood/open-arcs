@@ -396,21 +396,31 @@ export function playOut(
   turns: number,
   maxSteps: number,
   policy: (actions: readonly Action[]) => Action = playoutChoice,
+  untilChapterEnd = false,
 ): ObservedState {
   let current = from
   const startedIn = turnKey(current.state)
+  const startChapter = current.state.chapter
   const seen = new Set<string>([startedIn])
   let leftOwnTurn = false
 
   for (let i = 0; i < maxSteps; i++) {
     const c = current.continue
     if (c.kind !== 'ask') break
-    const here = turnKey(current.state)
-    if (here !== startedIn) leftOwnTurn = true
-    if (leftOwnTurn) {
-      seen.add(here)
-      // `seen` includes your own turn, so the horizon counts turns *past* it.
-      if (seen.size > turns + 1) break
+    /*
+     * Chapter end is the point where ambitions have paid and `power` is realised, so stopping the
+     * moment the chapter number moves scores the position *after* the payoff rather than before it.
+     */
+    if (untilChapterEnd) {
+      if (current.state.chapter !== startChapter) break
+    } else {
+      const here = turnKey(current.state)
+      if (here !== startedIn) leftOwnTurn = true
+      if (leftOwnTurn) {
+        seen.add(here)
+        // `seen` includes your own turn, so the horizon counts turns *past* it.
+        if (seen.size > turns + 1) break
+      }
     }
     try {
       current = advance(current.state, policy(c.actions), reg)
@@ -503,7 +513,17 @@ export function stepBot(
     for (let s = 0; s < options.samples; s++) {
       try {
         const seeded = advance(probeFrom(result.state, s + 977), action, reg)
-        out.push(playOut(seeded, faction, reg, options.lookaheadTurns, options.maxSteps))
+        out.push(
+          playOut(
+            seeded,
+            faction,
+            reg,
+            options.lookaheadTurns,
+            options.maxSteps,
+            playoutChoice,
+            options.untilChapterEnd === true,
+          ),
+        )
       } catch {
         // One fewer opinion, not a reason to drop the candidate.
       }

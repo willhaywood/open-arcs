@@ -21,6 +21,7 @@ export type BotSpec =
       readonly samples: number
       readonly lookaheadTurns: number
       readonly maxSteps: number
+      readonly untilChapterEnd?: boolean
     }
 
 export function buildBot(spec: BotSpec): Bot {
@@ -34,21 +35,25 @@ export function buildBot(spec: BotSpec): Bot {
         samples: spec.samples,
         lookaheadTurns: spec.lookaheadTurns,
         maxSteps: spec.maxSteps,
+        ...(spec.untilChapterEnd === true ? { untilChapterEnd: true } : {}),
       })
   }
 }
 
-/** Parse a `--seats` entry: `trivial`, `heuristic`, or `rollout[:samples:turns]`. */
+/** Parse a `--seats` entry: `trivial`, `heuristic`, `rollout[:samples:turns]`, `rollout:4:chapter`. */
 export function parseSpec(name: string): BotSpec {
   const [kind, ...rest] = name.trim().split(':')
   if (kind === 'trivial') return { kind: 'trivial' }
   if (kind === 'heuristic') return { kind: 'heuristic' }
   if (kind === 'rollout') {
+    // `rollout:4:chapter` plays each sample to the end of the chapter instead of counting turns.
+    const chapter = rest[1] === 'chapter'
     return {
       kind: 'rollout',
       samples: Number(rest[0] ?? 4),
-      lookaheadTurns: Number(rest[1] ?? 2),
-      maxSteps: Number(rest[2] ?? 400),
+      lookaheadTurns: chapter ? 0 : Number(rest[1] ?? 2),
+      maxSteps: Number(rest[2] ?? (chapter ? 1200 : 400)),
+      ...(chapter ? { untilChapterEnd: true } : {}),
     }
   }
   throw new Error(`Unknown bot "${name}" — known: trivial, heuristic, rollout[:samples:turns]`)

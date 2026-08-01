@@ -63,7 +63,7 @@ export const DEFAULT_ROLLOUT: RolloutOptions = { samples: 4, lookaheadTurns: 2, 
  */
 export function rolloutBot(options: RolloutOptions = DEFAULT_ROLLOUT): Bot {
   return {
-    id: `rollout-v2(${options.samples}x${options.lookaheadTurns})`,
+    id: `rollout-v2(${options.samples}x${options.untilChapterEnd === true ? 'chapter' : options.lookaheadTurns})`,
     decide(
       observed: ObservedState,
       actions: readonly Action[],
@@ -89,7 +89,7 @@ export function rolloutBot(options: RolloutOptions = DEFAULT_ROLLOUT): Bot {
           action,
           score:
             outcomes.reduce((n, o) => n + valueOf(o, observed.self, intent), 0) / outcomes.length,
-          note: `${outcomes.length} playouts, ${options.lookaheadTurns} turns on`,
+          note: `${outcomes.length} playouts, ${options.untilChapterEnd === true ? 'to chapter end' : `${options.lookaheadTurns} turns on`}`,
         })
       }
 
