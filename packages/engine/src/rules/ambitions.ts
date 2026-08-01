@@ -23,8 +23,8 @@ import { CourtPile, SECRET_ORDER, courtCard, hasGuild, securedCards } from '../c
 import { Prelude } from '../prelude.js'
 import type { RuleModule, RuleResult } from '../dispatch.js'
 import { unhandled } from '../dispatch.js'
-import { Location } from '../ids.js'
-import type { FactionId } from '../ids.js'
+import { Location, parseFigureId } from '../ids.js'
+import type { FactionId, LocationId } from '../ids.js'
 import { hasTrait } from '../leaders.js'
 import {
   countResource,
@@ -318,14 +318,38 @@ function applyLavish(state: GameState): GameState {
   return { ...state, resources, log }
 }
 
+/**
+ * Empty every faction's `pile`, sending each figure home to its **own** colour's reserve.
+ *
+ * Trophies and captives are Rival pieces, so the holder is not the owner — the figure id carries
+ * the colour that has to get it back (`parseFigureId`), exactly as Press Gang does when it releases
+ * a captive (`standard-actions.ts:2061`).
+ */
+function returnPile(
+  figures: GameState['figures'],
+  factions: readonly FactionId[],
+  pile: (f: FactionId) => LocationId,
+): GameState['figures'] {
+  let next = figures
+  for (const faction of factions) {
+    for (const id of contentsOf(next, pile(faction))) {
+      next = move(next, id, Location.reserve(parseFigureId(id).color))
+    }
+  }
+  return next
+}
+
 function performScore(state: GameState): RuleResult {
   const power: Partial<Record<FactionId, number>> = { ...state.power }
   const log = [...state.log]
   const winners: FactionId[] = []
+  /* Which ambitions actually resolved — see the cleanup after this loop. */
+  const scored = new Set<Ambition>()
 
   for (const ambition of state.ambitions) {
     const markers = state.declared.filter((d) => d.ambition === ambition).map((d) => d.marker)
     if (markers.length === 0) continue
+    scored.add(ambition)
 
     const high = markers.reduce((n, m) => n + m.high, 0)
     const low = markers.reduce((n, m) => n + m.low, 0)
@@ -391,8 +415,35 @@ function performScore(state: GameState): RuleResult {
     }
   }
 
+  /*
+   * Chapter-end cleanup, rulebook section 6.2.2 step 1: "If Warlord was scored, return all
+   * Trophies. If Tyrant was scored, return all Captives."
+   *
+   * Three things this gets right that are easy to get wrong:
+   *
+   *   - The trigger is the ambition being **scored**, not won. It fires on the markers being in
+   *     the box, so it happens even when the Qualifying rule left everyone with no power.
+   *   - **Everyone** empties the pile, not just the scorer — confirmed on BGG thread 3507253.
+   *   - Only the pile the ambition counts is cleared. Scoring Warlord never touches captives.
+   *
+   * Without this, trophies and captives accumulate for the whole game, so a lead in either becomes
+   * permanent and Warlord/Tyrant turn into runaways the real game deliberately resets each chapter.
+   * Resources are conspicuously *not* part of this step: they are never returned at chapter end,
+   * which is why nothing here touches them.
+   */
+  let figures = state.figures
+  if (scored.has('Warlord')) figures = returnPile(figures, state.factions, Location.trophies)
+  if (scored.has('Tyrant')) figures = returnPile(figures, state.factions, Location.captives)
+  if (figures !== state.figures) {
+    const kinds = [
+      ...(scored.has('Warlord') ? ['trophies'] : []),
+      ...(scored.has('Tyrant') ? ['captives'] : []),
+    ]
+    log.push(`Chapter cleanup: all ${kinds.join(' and ')} returned`)
+  }
+
   return {
-    state: applyLavish({ ...state, power, winners, log }),
+    state: applyLavish({ ...state, power, winners, log, figures }),
     continue: C.then(CheckWin()),
   }
 }

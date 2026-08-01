@@ -13,10 +13,18 @@ import {
   defaultRegistry,
   metric,
   move,
+  parseFigureId,
   slotsOf,
   startGame,
 } from '../src/index.js'
-import type { Action, Continue, FactionId, GameState, RuleResult } from '../src/index.js'
+import type {
+  Action,
+  Ambition,
+  Continue,
+  FactionId,
+  GameState,
+  RuleResult,
+} from '../src/index.js'
 
 const THREE = ['red', 'yellow', 'blue'] as const
 const FOUR = ['red', 'yellow', 'blue', 'white'] as const
@@ -163,6 +171,100 @@ describe('secured Guild cards score as one icon of their suit', () => {
     for (const f of THREE) {
       expect(metric(inCourt, f, 'Empath')).toBe(metric(before, f, 'Empath'))
     }
+  })
+})
+
+/*
+ * Rulebook 6.2.2 step 1: "If Warlord was scored, return all Trophies. If Tyrant was scored, return
+ * all Captives." Nothing did this, so both piles accumulated for the whole game and a lead in
+ * either became permanent.
+ *
+ * Note what is *absent* from that step: resources. They are never returned at chapter end, which is
+ * the question that turned this up — the answer being that our handling of resources was right.
+ */
+describe('scoring Warlord or Tyrant empties the pile it counted', () => {
+  const base = () => startGame({ board: 'Board3MixUp', factions: THREE, seed: 5 }).state
+
+  /** Move `count` of `victim`'s ships into `holder`'s trophy pile (or agents into captives). */
+  const capture = (
+    state: GameState,
+    holder: FactionId,
+    victim: FactionId,
+    piece: 'Ship' | 'Agent',
+    count: number,
+  ): GameState => {
+    const pile = piece === 'Ship' ? Location.trophies(holder) : Location.captives(holder)
+    const taken = contentsOf(state.figures, Location.reserve(victim))
+      .filter((id) => parseFigureId(id).piece === piece)
+      .slice(0, count)
+    expect(taken).toHaveLength(count) // guard: the fixture must actually hold what it claims
+    return taken.reduce((s, id) => ({ ...s, figures: move(s.figures, id, pile) }), state)
+  }
+
+  const declaring = (state: GameState, ...ambitions: readonly Ambition[]): GameState => ({
+    ...state,
+    declared: ambitions.map((ambition) => ({ ambition, marker: { high: 4, low: 2 } })),
+  })
+
+  const pileSizes = (state: GameState, which: 'trophies' | 'captives') =>
+    THREE.map((f) =>
+      contentsOf(state.figures, which === 'trophies' ? Location.trophies(f) : Location.captives(f))
+        .length,
+    )
+
+  it('returns every faction’s trophies, including factions that scored no power', () => {
+    /*
+     * Red 3, yellow 2, blue 1: red takes first, yellow second, blue places nowhere. The BGG ruling
+     * (thread 3507253) is that blue returns its trophy all the same — the trigger is the ambition
+     * being scored, not the holder having placed.
+     */
+    let state = base()
+    state = capture(state, 'red', 'blue', 'Ship', 3)
+    state = capture(state, 'yellow', 'blue', 'Ship', 2)
+    state = capture(state, 'blue', 'red', 'Ship', 1)
+    expect(pileSizes(state, 'trophies')).toEqual([3, 2, 1])
+
+    const after = advance(declaring(state, 'Warlord'), ScoreAmbitions(), registry)
+
+    expect(pileSizes(after.state, 'trophies')).toEqual([0, 0, 0])
+    // Someone did place, so this is not passing merely because nothing scored.
+    expect(after.state.power['red'] ?? 0).toBeGreaterThan(0)
+  })
+
+  it('sends each figure to its own owner’s reserve, not the holder’s', () => {
+    // The whole reason ownership is parsed off the figure id rather than taken from the pile.
+    let state = capture(base(), 'red', 'blue', 'Ship', 2)
+    const blueBefore = contentsOf(state.figures, Location.reserve('blue')).length
+    const redBefore = contentsOf(state.figures, Location.reserve('red')).length
+
+    const after = advance(declaring(state, 'Warlord'), ScoreAmbitions(), registry)
+
+    expect(contentsOf(after.state.figures, Location.reserve('blue')).length).toBe(blueBefore + 2)
+    expect(contentsOf(after.state.figures, Location.reserve('red')).length).toBe(redBefore)
+  })
+
+  it('clears only the pile its own ambition counts', () => {
+    let state = capture(base(), 'red', 'blue', 'Ship', 2)
+    state = capture(state, 'red', 'blue', 'Agent', 2)
+
+    const warlord = advance(declaring(state, 'Warlord'), ScoreAmbitions(), registry)
+    expect(pileSizes(warlord.state, 'trophies')).toEqual([0, 0, 0])
+    expect(pileSizes(warlord.state, 'captives')).toEqual([2, 0, 0]) // untouched
+
+    const tyrant = advance(declaring(state, 'Tyrant'), ScoreAmbitions(), registry)
+    expect(pileSizes(tyrant.state, 'captives')).toEqual([0, 0, 0])
+    expect(pileSizes(tyrant.state, 'trophies')).toEqual([2, 0, 0]) // untouched
+  })
+
+  it('leaves both piles alone when neither ambition was declared', () => {
+    let state = capture(base(), 'red', 'blue', 'Ship', 2)
+    state = capture(state, 'red', 'blue', 'Agent', 2)
+
+    // Tycoon scores; nothing counts trophies or captives, so nothing is returned.
+    const after = advance(declaring(state, 'Tycoon'), ScoreAmbitions(), registry)
+
+    expect(pileSizes(after.state, 'trophies')).toEqual([2, 0, 0])
+    expect(pileSizes(after.state, 'captives')).toEqual([2, 0, 0])
   })
 })
 

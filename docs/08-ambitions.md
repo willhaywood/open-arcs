@@ -59,9 +59,30 @@ lead a card
   -> pip loop (turn)
 ...
 chapter ends (all pass)
-  -> ambition/score           award power for every declared ambition
+  -> ambition/score           award power for every declared ambition,
+                              then return trophies / captives if their ambition scored
   -> ambition/check-win       end the game, or start the next chapter
 ```
+
+**Chapter-end cleanup** (rulebook 6.2.2 step 1): *"If Warlord was scored, return all Trophies. If
+Tyrant was scored, return all Captives."* This runs at the tail of `performScore` rather than as its
+own action, because it is fully determined — there is nothing to ask anyone. Three details it is
+easy to get wrong, all pinned by tests:
+
+- The trigger is the ambition being **scored**, not won, so it fires even when the Qualifying rule
+  left nobody with any power.
+- **Every** faction empties the pile, not just whoever placed — a faction that came third still
+  returns its trophies.
+- Figures go back to their **own** colour's reserve, not the holder's; the owner is parsed off the
+  figure id, the same way Press Gang releases a captive.
+
+Only the pile the ambition counts is cleared: scoring Warlord never touches captives.
+**Resources are not part of this step** and are never returned at chapter end — the only resource
+discards in the game are capacity and outrage (docs/07).
+
+Omitting this made both piles accumulate for the whole game, so a lead in either was permanent and
+those two ambitions compounded for whoever got there first. Restoring it visibly narrows the spread
+of final scores.
 
 **Declaring zeroes the card**: the played card counts as strength 0, so any same-suit card
 surpasses it. This is wired through `Lead.zeroed` and honoured in the follow options.

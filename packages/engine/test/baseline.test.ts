@@ -70,11 +70,13 @@ describe('the frozen baseline', () => {
  * intact and these numbers moved, the evaluator is untouched and the board underneath it was wrong.
  * Re-recording is then the only option — the previous numbers pinned the bug.
  *
- * Last re-recorded when secured Guild cards began scoring toward Tycoon, Keeper and Empath, which
- * they had never done (see `metric`). Seed 1 is unchanged; seeds 2 and 3 moved.
+ * Last re-recorded when scoring Warlord or Tyrant began returning all trophies or captives, which
+ * had never happened (rulebook 6.2.2 step 1, see `performScore`). All three seeds moved, and the
+ * spread narrowed markedly — which is the point of the rule: those two ambitions no longer compound
+ * for whoever led them first.
  */
 const GOLDEN = [
-  [11, 43, 5],
-  [24, 37, 39],
-  [20, 28, 50],
+  [11, 30, 33],
+  [27, 25, 16],
+  [27, 25, 28],
 ]
