@@ -499,9 +499,15 @@ button {
     clamp(104px, 9.5vw, 148px);
   grid-template-areas:
     "court play map ambitions"
+    "bot   bot  bot bot"
     "hand  hand hand hand"
     "boards boards boards boards";
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  /*
+   * The `bot` row is `auto`, so it is zero-height whenever no tray is up and costs the map only the
+   * grid gap. It exists because the compact tray used to sit *inside* the map cell at its bottom
+   * edge, which put it over the ships and cities on the lower board.
+   */
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
   gap: 10px;
 }
 .board-cell {
@@ -1161,6 +1167,34 @@ button {
 .goal-row img {
   width: 38px;
   height: 38px;
+}
+/*
+ * The supply strip under the chapter marker. Two columns so five resources sit in a tidy block
+ * rather than a tall list — the rail is narrow and the map needs the height.
+ */
+.supply-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 6px;
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+.supply-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.supply-chip img {
+  width: 15px;
+  height: 15px;
+}
+/* Running a type dry changes what taxing does, so it should not look like just another number. */
+.supply-chip.out {
+  color: rgba(230, 120, 120, 0.95);
+  font-weight: 700;
 }
 .ambition-track.fallback {
   padding: 10px;
@@ -2212,8 +2246,10 @@ button {
     grid-template-columns: clamp(80px, 9vw, 104px) minmax(0, 1fr) clamp(92px, 10vw, 116px);
     grid-template-areas:
       "court map ambitions"
+      "bot   bot bot"
       "hand  hand hand"
       "boards boards boards";
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
   }
   .play-rail {
     display: none;
@@ -2234,10 +2270,11 @@ button {
     grid-template-columns: minmax(0, 1fr) clamp(84px, 12vw, 104px);
     grid-template-areas:
       "map ambitions"
+      "bot bot"
       "court court"
       "hand hand"
       "boards boards";
-    grid-template-rows: minmax(0, 1fr) auto auto auto;
+    grid-template-rows: minmax(0, 1fr) auto auto auto auto;
   }
   .court-rail {
     flex-direction: row;
@@ -4374,11 +4411,16 @@ button {
  * the moment the seat is handed back — the cards are in that cell, the tray is drawn over them, and
  * `pointer-events: auto` on `.bot-inner` means it takes the clicks meant for a card.
  */
+/*
+ * Below the map rather than over it. `align-self: end` inside the map cell looked right in a
+ * screenshot and covered the southern systems in play — the pieces you most need to see while a bot
+ * is moving them.
+ */
 .bot-tray.compact {
-  grid-area: map;
-  align-self: end;
+  grid-area: bot;
+  align-self: center;
   justify-self: center;
-  padding-bottom: 10px;
+  padding-bottom: 0;
 }
 .bot-tray.compact .bot-inner {
   display: inline-flex;

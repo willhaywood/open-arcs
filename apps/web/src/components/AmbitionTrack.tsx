@@ -10,7 +10,7 @@
  * If the artwork is missing the panel falls back to a plain readable list.
  */
 
-import { AMBITIONS } from '@arcs/engine'
+import { AMBITIONS, RESOURCES, ResourceSlot, contentsOf } from '@arcs/engine'
 import type { Action, Ambition, AmbitionMarker, Continue, GameState } from '@arcs/engine'
 import { useState } from 'react'
 
@@ -153,6 +153,35 @@ export function AmbitionTrack({
         <img src={asset(`game-assets/goal-${threshold}.webp`)} alt={`${threshold} power`} />
         <span>to win</span>
       </div>
+
+      <Supply state={state} />
+    </div>
+  )
+}
+
+/**
+ * What is left in the general supply, one row per resource.
+ *
+ * Worth showing because it is information the board already contains but hides: tokens live in a
+ * pile off to one side, and running a type dry is a real event — `gain` reports
+ * "(none left in supply)" and the tax simply yields nothing. A player who cannot see the counts has
+ * no warning that the Fuel is about to run out, and no way to understand it afterwards.
+ *
+ * Rendered as a compact strip under the chapter marker rather than as tokens: at this width the
+ * rail has room for a glyph and a number, and the number is the part that matters.
+ */
+function Supply({ state }: { state: GameState }): JSX.Element {
+  return (
+    <div className="supply-row" title="Resources left in the supply">
+      {RESOURCES.map((r) => {
+        const left = contentsOf(state.resources, ResourceSlot.supply(r)).length
+        return (
+          <span key={r} className={`supply-chip${left === 0 ? ' out' : ''}`}>
+            <img src={asset(`game-assets/icon/${r.toLowerCase()}.webp`)} alt={r} />
+            <span>{left}</span>
+          </span>
+        )
+      })}
     </div>
   )
 }
