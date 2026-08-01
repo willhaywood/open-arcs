@@ -1007,6 +1007,56 @@ Two things follow, and they are more valuable than the V2 result itself:
 The accurate summary of V2 today: **built, honest, and of unproven value.** It is not that V2 failed
 — it is that the instrument cannot yet measure it.
 
+## 3c. The arena, parallelised — and what the noise floor actually is
+
+### Parallel
+
+`npm run arena -- --games 120 --jobs 12`. Games are independent and nothing large crosses a process
+boundary, so shards pick games **by index** using the same `seatsForGame`/`seedForGame` as the serial
+path. Outcomes land in a slot per index, so a report never depends on which shard finished first —
+a serial and a parallel run of the same seed produce identical tables, verified directly.
+
+**120 games in 228s against ~19s a game serially: about 8x on twelve cores.** A 38-minute run is now
+four minutes.
+
+Bots cross as **specs** (`{kind:'rollout', samples, …}`) rather than closures, with ids sent
+explicitly — the first version derived ids in the shard and gave both noise-floor twins the same
+name, printing one row with zero games beside another that silently double-counted.
+
+### The instrument is fair; the game is just loud
+
+Two runs of identical rollout configurations finished 12 and 14 points of win rate apart, twice in
+the same direction, which looked like harness bias. The decisive test is exact rather than
+statistical: **with every seat playing the same bot and the seed held across a rotation, the games of
+one rotation are permutations of a single game** — relabelling who sits where cannot change what
+happens — so the aggregate must be identical to the last digit.
+
+| 120 games, three identical bots | wins | rank | power |
+| --- | --- | --- | --- |
+| heuristic-v1 | 33% | 1.98 | 23.7 |
+| heuristic-v1 [twin] | 33% | 1.98 | 23.7 |
+
+**The arena is unbiased.** The earlier gaps were the variance of Arcs itself, showing through a
+three-player game where one of the three seats differed. That symmetry is now a test, so any
+deviation is a bug in rotation, seeding or aggregation rather than a bad sample.
+
+Also fixed on the way: seeds now **hold across a rotation** instead of advancing with it. Advancing
+together confounds them — each bot plays each seat equally often but always on a *different* set of
+boards, so setup luck never cancels.
+
+### What this means for every number in this document
+
+A three-player Arcs game is high-variance, and 120 games still leaves a floor of roughly **±12 points
+of win rate** when a genuine difference exists in the field. So:
+
+- **V2 is indistinguishable from V1.** 120 games: V1 38% / 25.0 power, V2 37% / 24.9. Not "V2 is
+  worse" — genuinely no measurable difference.
+- Every 12-game figure in section 2 remains provisional. The **behavioural** counts stand on their
+  own — 32:4 to 72:71 pass:lead, 31 cancels to 0, 0 secures to 2 — because those are direct counts
+  of what the bot does, not win rates. The **power deltas** are not established.
+- Detecting a small edge needs many hundreds of games. At ~2s a game parallel that is now minutes
+  rather than hours, which is exactly what the parallelism was for.
+
 ## 4. V3 — information-set search
 
 docs/03 section 5 is aspirational and this plan does not schedule it. Two things it needs that do

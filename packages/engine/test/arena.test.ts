@@ -355,6 +355,41 @@ describe('the arena', () => {
     expect(alone.actions).toBe(inRun?.actions)
   })
 
+  it('is exactly symmetric between identical bots — the harness fairness check', () => {
+    /*
+     * With every seat playing the *same* bot and the seed held across a rotation, the games of one
+     * rotation are permutations of a single game: relabelling who sits where cannot change what
+     * happens. So each bot must receive exactly one of each seat's outcome, and the aggregate must
+     * come out identical to the last digit.
+     *
+     * That makes this an exact test of the harness rather than a statistical one. It was written
+     * after two runs in which identical *rollout* bots finished 12 and 14 points of win rate apart,
+     * which looked like harness bias; run this way the answer was unambiguous — three identical bots
+     * over 120 games came out 33%/33%, rank 1.98/1.98, power 23.7/23.7. The arena is fair, and the
+     * gaps were the variance of Arcs itself showing through a three-player game where one seat
+     * differed.
+     *
+     * Any deviation here is a bug in rotation, seeding or aggregation, not a bad sample.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    const bots = ['a', 'b', 'c'].map((n) => ({ ...trivialBot, id: `same-${n}` }))
+    const report = runArena(
+      { bots, games: 3, seed: 1, factions: three, board: 'Board3Frontiers' },
+      registry,
+    )
+
+    expect(report.records).toHaveLength(3)
+    const [first] = report.records
+    for (const r of report.records) {
+      expect(r.games).toBe(first?.games)
+      expect(r.wins).toBe(first?.wins)
+      expect(r.meanPower).toBeCloseTo(first?.meanPower ?? -1, 10)
+      expect(r.meanRank).toBeCloseTo(first?.meanRank ?? -1, 10)
+    }
+    // And the games really were played, rather than all failing identically.
+    expect(report.finished).toBe(3)
+  })
+
   it('counts an unbalanced run as unbalanced rather than averaging it quietly', () => {
     const report = runArena({ bots: [trivialBot, trivialBot, trivialBot, trivialBot], games: 3 }, registry)
     expect(report.balanced).toBe(false)
