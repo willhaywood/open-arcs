@@ -114,8 +114,6 @@ export function NewGame(): JSX.Element {
       )}
 
       <div className="ng-body">
-        <p className="subtitle">Base game · hotseat · rules engine build</p>
-
         <div className="ng-field">
           <span className="ng-label">Players</span>
           <div className="seg">

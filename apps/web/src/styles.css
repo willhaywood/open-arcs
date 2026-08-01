@@ -131,13 +131,6 @@ button {
   flex-direction: column;
   gap: 20px;
 }
-.newgame .subtitle {
-  margin: 0;
-  text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-  letter-spacing: 0.05em;
-}
 .ng-field {
   display: flex;
   flex-direction: column;
