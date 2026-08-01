@@ -966,23 +966,46 @@ came back with depth-2 on **0% wins** and depth-0 on 42% — a colossal gap. Exc
 being ignored at the time, so *both rollout bots were byte-identical configurations*. Two copies of
 the same bot, over 12 games with seats rotated, scored 0% and 42%.
 
-**That is the noise floor, and it is enormous.** Twelve games cannot separate two bots, let alone
-rank three. Every 12-game figure in this document — including the 50/25 above and the comparisons in
-sections 2h through 2j — is a sample far too small for the confidence its presentation implies.
+**That is the noise floor, and it is enormous.** Run deliberately at 30 games — two identical
+configurations under different names, seats rotated, plus V1:
+
+| 3-player, 30 games | wins | outright | rank | power |
+| --- | --- | --- | --- | --- |
+| heuristic-v1 | 47% | 47% | 1.63 | 27.0 |
+| rollout-twin | 37% | 33% | 1.90 | 25.5 |
+| rollout-v2 *(identical to the twin)* | 17% | 13% | 2.40 | 16.6 |
+
+**The bottom two rows are the same bot.** Thirty games apart them by 20 points of win rate and 9
+points of mean power — so a 20-point gap between two *different* bots means nothing at this sample
+size, and the 10-point gap by which V1 leads here means nothing either.
+
+Note also that this run and the 12-game run above disagree about whether V2 beats V1. That is not a
+puzzle to resolve; it is what two draws from a distribution this wide look like.
+
+Every figure in this document from a 12-game run — the 50/25 above, and the comparisons in sections
+2h through 2j — is a sample far too small for the confidence its presentation implies. They may all
+be right. None of them is *shown*.
 
 Two things follow, and they are more valuable than the V2 result itself:
 
-1. **Report a noise floor beside any comparison.** Running a bot against a copy of itself and
-   reporting the spread costs one extra arena run and tells you what a difference has to exceed
-   before it means anything. Nothing in section 2 did this.
-2. **Games have to get cheaper before tuning can proceed.** At ~11s a game a 100-game run is 18
-   minutes, and weight tuning needs many such runs. Arena games are completely independent, so
-   parallelising them across worker threads is the single highest-value change available — the
-   engine already promises it runs in a Worker. That, not another weight, is what unblocks V3 and
-   any further tuning.
+1. **Report a noise floor beside every comparison.** A bot against a copy of itself, and the spread
+   between them, is what a difference has to exceed before it means anything. It costs one extra
+   arena run. Nothing in section 2 did it, which is why section 2's numbers have to be treated as
+   provisional rather than as results.
+2. **Games have to get much cheaper before any tuning can proceed.** The run above took **10
+   minutes** for 30 games, and 30 is demonstrably not enough. Hundreds are needed, and weight tuning
+   needs many such runs — which is hours per question at the current speed.
 
-The accurate summary of V2 today: **built, honest, plausibly better than V1, and not yet
-demonstrated to be.**
+   Arena games are completely independent, and the engine already promises it runs in a Worker
+   (`index.ts`). **Parallelising arena games across worker threads is now the highest-value change
+   available** — higher than any weight, than V3, and than further work on V2, because it is what
+   makes every other question answerable. The per-game inputs and outputs are tiny (`{board,
+   factions, seed, seats}` in, a `GameOutcome` out), so it needs no engine changes and no state
+   serialization. The other half of the same problem is `Tracker` copying whole `Map`s on update
+   (section 1): threads multiply throughput, structural sharing would divide the cost.
+
+The accurate summary of V2 today: **built, honest, and of unproven value.** It is not that V2 failed
+— it is that the instrument cannot yet measure it.
 
 ## 4. V3 — information-set search
 
