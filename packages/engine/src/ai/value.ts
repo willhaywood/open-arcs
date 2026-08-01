@@ -97,21 +97,86 @@ function pieces(observed: ObservedState, self: FactionId, piece: string): string
   return out
 }
 
-/** Expected power for one faction, itemised. */
-export function termsFor(
+/**
+ * The named quantities a position presents, before any weight is applied.
+ *
+ * **Splitting these from the weights is what makes the evaluator fittable at all.** `valueOf` is a
+ * linear function — a dot product of these features with `WEIGHTS` — and every number in `WEIGHTS`
+ * was chosen by argument rather than evidence. Written this way they become data: measurable from
+ * self-play, comparable between candidate sets, and replaceable without touching this file.
+ *
+ * The features deliberately keep the *shape* of each term and expose only its scale. Ambition
+ * standing stays `marker.high x share x bias`, because how a marker's payout scales with how clearly
+ * you are winning is a rule of the game, not a weight; what is free is how much the whole thing is
+ * worth relative to a city. That keeps the parameter count near a dozen instead of near fifty, which
+ * matters when the arena's noise floor is what has to confirm any change.
+ */
+export const FEATURES = [
+  'power',
+  'standing',
+  'resourcesDeclared',
+  'resourcesUndeclared',
+  'weapons',
+  'cities',
+  'starports',
+  'shipsFresh',
+  'shipsDamaged',
+  'courtSecured',
+  'courtClaimAhead',
+  'courtClaimLevel',
+  'courtClaimBehind',
+  'trophies',
+  'captives',
+  'tempo',
+] as const
+
+export type Feature = (typeof FEATURES)[number]
+export type Weights = Readonly<Record<Feature, number>>
+export type Features = Readonly<Record<Feature, number>>
+
+/**
+ * The hand-set weights, in units of expected power.
+ *
+ * Every one is a starting point chosen by argument (docs/19 section 2d.7). They are the baseline any
+ * fitted set has to beat, and the arena is the only thing entitled to say whether it does.
+ */
+export const WEIGHTS: Weights = {
+  power: 1,
+  standing: 1,
+  resourcesDeclared: 0.45,
+  resourcesUndeclared: 0.1125,
+  weapons: 0.25,
+  cities: 2.0,
+  starports: 1.2,
+  shipsFresh: 0.35,
+  shipsDamaged: 0.1,
+  courtSecured: 1,
+  courtClaimAhead: 0.25,
+  courtClaimLevel: 0.12,
+  courtClaimBehind: 0.05,
+  trophies: 0.3,
+  captives: 0.3,
+  tempo: 0.15,
+}
+
+const zero = (): Record<Feature, number> =>
+  Object.fromEntries(FEATURES.map((f) => [f, 0])) as Record<Feature, number>
+
+/** What a position presents to one faction, unweighted. */
+export function featuresOf(
   observed: ObservedState,
   self: FactionId,
   intent: ChapterIntent,
-): readonly Term[] {
-  const terms: Term[] = []
+): Features {
+  const x = zero()
 
-  // Realised power. The only certain term, so it is worth exactly itself.
-  terms.push({ name: 'power', power: observed.power[self] ?? 0 })
+  // Realised power. The only certain quantity here.
+  x.power = observed.power[self] ?? 0
 
   /*
-   * Ambition standing — the dominant term mid-chapter. Worth the payout scaled by how clearly you
-   * are winning it, because a marker you are second on pays the low value and one you are losing
-   * pays nothing.
+   * Ambition standing — the dominant term mid-chapter. The payout scaled by how clearly you are
+   * winning it, because a marker you are second on pays the low value and one you are losing pays
+   * nothing.
    */
   for (const d of observed.declared) {
     const mine = metric(observed, self, d.ambition)
@@ -120,17 +185,14 @@ export function termsFor(
       ...observed.factions.filter((f) => f !== self).map((f) => metric(observed, f, d.ambition)),
     )
     const share = mine === 0 && best === 0 ? 0 : mine > best ? 1 : mine === best ? 0.5 : 0.2
-    terms.push({
-      name: `${d.ambition} standing`,
-      power: d.marker.high * share * bias(intent, d.ambition),
-    })
+    x.standing += d.marker.high * share * bias(intent, d.ambition)
   }
 
   /*
    * Resources, priced by the ambition they feed (docs/03 section 3.3). A Material is worth nothing
-   * in itself — it is worth the Tycoon it might win, so an undeclared Tycoon makes it near-free.
-   * The small floor keeps a bot from throwing resources away entirely, since they buy Prelude
-   * actions whatever is declared.
+   * in itself — it is worth the Tycoon it might win. Declared and undeclared are separate features
+   * rather than one scaled by a constant, so how much cheaper a speculative resource is can be
+   * fitted rather than asserted.
    */
   const slots = slotsOf(observed, self)
   const declared = new Set(observed.declared.map((d) => d.ambition))
@@ -139,45 +201,32 @@ export function termsFor(
     if (feeds === undefined) continue
     const held = feeds.reduce((n, r) => n + countResource(observed.resources, slots, r), 0)
     if (held === 0) continue
-    const live = declared.has(ambition) ? 1 : 0.25
-    terms.push({
-      name: `${ambition} resources`,
-      power: held * 0.45 * live * bias(intent, ambition),
-    })
+    const scaled = held * bias(intent, ambition)
+    if (declared.has(ambition)) x.resourcesDeclared += scaled
+    else x.resourcesUndeclared += scaled
   }
-  // Weapons feed battle rather than an ambition, so they are priced flat.
-  const weapons = countResource(observed.resources, slots, 'Weapon')
-  if (weapons > 0) terms.push({ name: 'weapons', power: weapons * 0.25 })
+  x.weapons = countResource(observed.resources, slots, 'Weapon')
 
   // Buildings: power at scoring, plus everything they unlock — tax income, build sites, capacity.
-  const cities = pieces(observed, self, 'City').length
-  const ports = pieces(observed, self, 'Starport').length
-  if (cities > 0) terms.push({ name: 'cities', power: cities * 2.0 })
-  if (ports > 0) terms.push({ name: 'starports', power: ports * 1.2 })
+  x.cities = pieces(observed, self, 'City').length
+  x.starports = pieces(observed, self, 'Starport').length
 
   /*
-   * Ships, fresh worth far more than damaged — a damaged ship rules nothing, which the catapult bug
-   * in docs/15 confirmed the engine agrees with.
+   * Ships, fresh separated from damaged — a damaged ship rules nothing, which the catapult bug in
+   * docs/15 confirmed the engine agrees with.
    */
   const ships = pieces(observed, self, 'Ship')
-  const fresh = ships.filter((id) => !observed.damaged.includes(id)).length
-  const hurt = ships.length - fresh
-  if (ships.length > 0) terms.push({ name: 'ships', power: fresh * 0.35 + hurt * 0.1 })
+  x.shipsFresh = ships.filter((id) => !observed.damaged.includes(id)).length
+  x.shipsDamaged = ships.length - x.shipsFresh
 
   /*
-   * The court, in two halves: what is held, and what is being contested.
-   *
-   * The second half is the one that changes behaviour. Securing needs *more* agents on a card than
-   * anyone else, so it is a build-up — and a flat "1.1 per secured card" priced only the finished
-   * article, leaving the first Influence worth exactly nothing. One ply then never took it, so the
-   * agents never accumulated and the card was never secured: 11 influences, 0 secures and 1 card
-   * taken across a whole three-player game. The same shape of blind spot as leading a card, and the
-   * same fix — price the progress, not just the result.
+   * The court, in two halves: what is held, and what is being contested. Securing needs *more*
+   * agents on a card than anyone else, so it is a build-up, and pricing only the finished article
+   * left the first Influence worth exactly nothing (docs/19 section 2i).
    */
   for (const id of contentsOf(observed.courtCards, CourtPile.secured(self))) {
-    terms.push({ name: `court ${courtCard(id).name}`, power: courtWorth(id, intent) })
+    x.courtSecured += courtWorth(id, intent)
   }
-
   for (const slot of courtSlots()) {
     const id = contentsOf(observed.courtCards, CourtPile.slot(slot))[0]
     if (id === undefined) continue
@@ -188,33 +237,32 @@ export function termsFor(
     const mine = on(self)
     if (mine === 0) continue
     const best = Math.max(0, ...observed.factions.filter((f) => f !== self).map(on))
-    /*
-     * How likely the card is to end up yours, since `canSecure` is `mine > best`. Ahead is worth
-     * more than level, because only ahead can actually take it.
-     *
-     * **Deliberately a small fraction, and the first version got this wrong.** At 0.6 a claim banked
-     * most of the card's value for free, so paying a pip to actually secure it bought only the
-     * remaining 0.4 and scored as a loss — the bot was offered Secure 15 times in a game and
-     * declined all 15. A claim has to be worth enough to reach for and little enough that closing it
-     * is clearly worth an action.
-     */
-    const claim = mine > best ? 0.25 : mine === best ? 0.12 : 0.05
-    terms.push({
-      name: `court claim ${courtCard(id).name}`,
-      power: courtWorth(id, intent) * claim,
-    })
+    const worth = courtWorth(id, intent)
+    // `canSecure` is `mine > best`, so the three cases are ahead, level and behind.
+    if (mine > best) x.courtClaimAhead += worth
+    else if (mine === best) x.courtClaimLevel += worth
+    else x.courtClaimBehind += worth
   }
 
   // Trophies and captives are already counted by their ambition standing; this is their floor.
-  const trophies = contentsOf(observed.figures, Location.trophies(self)).length
-  const captives = contentsOf(observed.figures, Location.captives(self)).length
-  if (trophies > 0) terms.push({ name: 'trophies', power: trophies * 0.3 })
-  if (captives > 0) terms.push({ name: 'captives', power: captives * 0.3 })
+  x.trophies = contentsOf(observed.figures, Location.trophies(self)).length
+  x.captives = contentsOf(observed.figures, Location.captives(self)).length
 
-  // Tempo. Small on purpose — easy to over-price, and hard to justify beyond "cards are options".
-  terms.push({ name: 'tempo', power: (observed.handSizes[self] ?? 0) * 0.15 })
+  // Tempo — cards are options. Easy to over-price, and hard to justify beyond that.
+  x.tempo = observed.handSizes[self] ?? 0
 
-  return terms
+  return x
+}
+
+/** Expected power for one faction, itemised — features times the weights in force. */
+export function termsFor(
+  observed: ObservedState,
+  self: FactionId,
+  intent: ChapterIntent,
+  weights: Weights = WEIGHTS,
+): readonly Term[] {
+  const x = featuresOf(observed, self, intent)
+  return FEATURES.map((f) => ({ name: f, power: x[f] * weights[f] })).filter((t) => t.power !== 0)
 }
 
 const sum = (terms: readonly Term[]): number => terms.reduce((n, t) => n + t.power, 0)
@@ -230,12 +278,16 @@ export function valueOf(
   observed: ObservedState,
   self: FactionId,
   intent: ChapterIntent,
+  weights: Weights = WEIGHTS,
 ): number {
-  const mine = sum(termsFor(observed, self, intent))
-  const best = Math.max(
-    0,
-    ...observed.factions.filter((f) => f !== self).map((f) => sum(termsFor(observed, f, intent))),
-  )
+  const score = (f: FactionId): number => {
+    const x = featuresOf(observed, f, intent)
+    let total = 0
+    for (const k of FEATURES) total += x[k] * weights[k]
+    return total
+  }
+  const mine = score(self)
+  const best = Math.max(0, ...observed.factions.filter((f) => f !== self).map(score))
   return mine - best
 }
 

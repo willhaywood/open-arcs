@@ -10,7 +10,8 @@
  */
 
 import { intentFor } from './intent.js'
-import { termsFor, topTerms, valueOf } from './value.js'
+import { WEIGHTS, termsFor, topTerms, valueOf } from './value.js'
+import type { Weights } from './value.js'
 import type { Action } from '../action.js'
 import type { Bot, BotDecision, Considered, Lookahead } from './bot.js'
 import type { ObservedState } from '../observe.js'
@@ -52,8 +53,16 @@ function describe(action: Action): string {
   return String(action['label'] ?? action.type)
 }
 
-export const heuristicBot: Bot = {
-  id: 'heuristic-v1',
+/**
+ * V1 with a given set of evaluator weights.
+ *
+ * Exists so a fitted set can be played against the hand-set one in the same match — the only way to
+ * find out whether fitting produced a better *player* rather than merely a better predictor of the
+ * outcome under the policy that generated the data.
+ */
+export function heuristicBotWith(weights: Weights, id = 'heuristic-v1'): Bot {
+  return {
+  id,
   decide(observed: ObservedState, actions: readonly Action[], lookahead?: Lookahead): BotDecision {
     const first = actions[0]
     if (first === undefined) throw new Error('heuristicBot: no actions on offer')
@@ -75,7 +84,7 @@ export const heuristicBot: Bot = {
      * `valueOf` needs no lookahead, so this is free — and it is the only reference point that makes
      * "did that achieve anything" answerable at all.
      */
-    const here = valueOf(observed, observed.self, intent)
+    const here = valueOf(observed, observed.self, intent, weights)
 
     /*
      * Rollbacks are dropped before anything is weighed, so they cannot win on score or on a
@@ -111,7 +120,7 @@ export const heuristicBot: Bot = {
        * sample and this is the same arithmetic as before.
        */
       const gained =
-        probe.samples.reduce((n, s) => n + valueOf(s, observed.self, intent), 0) /
+        probe.samples.reduce((n, s) => n + valueOf(s, observed.self, intent, weights), 0) /
         probe.samples.length
       const score = gained + probe.actionsAhead * PIP_VALUE
       /*
@@ -139,7 +148,7 @@ export const heuristicBot: Bot = {
         action,
         score,
         note:
-          topTerms(termsFor(probe.observed, observed.self, intent)) +
+          topTerms(termsFor(probe.observed, observed.self, intent, weights)) +
           (probe.samples.length > 1 ? ` [${probe.samples.length} rolls]` : '') +
           (probe.repeats ? ' [same question]' : ''),
       })
@@ -172,4 +181,8 @@ export const heuristicBot: Bot = {
       considered,
     }
   },
+  }
 }
+
+/** V1 as shipped, with the hand-set weights. */
+export const heuristicBot: Bot = heuristicBotWith(WEIGHTS)

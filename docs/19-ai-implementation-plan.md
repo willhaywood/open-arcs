@@ -1166,6 +1166,87 @@ invisible, planet types are unread, card suits are unread — section 2's worked
 weights have never been fitted to anything. **Learning them from self-play is the step that replaces
 arguing about them**, and it is now possible because the arena is fair, sharded and fast.
 
+## 3f. Fitting the weights from self-play — and why it failed
+
+Section 3e concluded the evaluator, not the search, was what needed work: every weight was chosen by
+argument, and the arena's noise floor makes "change a weight, run the arena" hopeless at one bit of
+signal per game.
+
+### What was built
+
+- **`valueOf` split into features and weights.** It is now explicitly a dot product: `featuresOf`
+  returns the sixteen quantities a position presents, `WEIGHTS` holds the scales. Behaviour-preserving
+  (the whole suite passes unchanged), and it is what makes fitting possible at all.
+- **`npm run fit`** — self-play collection, sharded like the arena, then ridge regression.
+- **`heuristicBotWith(weights)`** and `--seats heuristic:fitted`, so a fitted set can be played
+  against the hand-set one in the same match.
+
+The target is **final power**, which is exactly what `valueOf`'s docstring claims each term measures.
+Every sampled position of every faction is a row, so 150 games gave 28,488 — against one bit per game
+from a win-rate comparison.
+
+### It fits, weakly
+
+| 150 games, 28,488 rows | RMSE |
+| --- | --- |
+| held-out | 10.64 |
+| predicting the mean | 11.84 |
+
+About 19% of variance explained. Real, but weak.
+
+### And the resulting bot is far worse
+
+| 120 games | wins | rank | power |
+| --- | --- | --- | --- |
+| heuristic-v1 (hand-set) | **64%** | 1.48 | **29.8** |
+| heuristic-fitted | 18% | 2.20 | 19.2 |
+| heuristic-fitted **[twin]** | 18% | 2.25 | 20.0 |
+
+The twins agree to the point (18% and 18%, 19.2 and 20.0), so the noise floor here is near zero and
+the 46-point gap is real. **The hand-set weights are dramatically better than the fitted ones.**
+
+### Why, and it is not a bug
+
+The regression learned **correlations, not action values**. Look at what it produced:
+
+| feature | hand | fitted |
+| --- | --- | --- |
+| weapons | 0.25 | **−1.59** |
+| trophies | 0.30 | **−0.26** |
+| courtSecured | 1.00 | **−0.20** |
+| cities | 2.00 | 0.31 |
+
+Holding weapons predicts losing — because the players holding weapons are the ones in trouble.
+Trophies predict losing because having trophies means having fought. Cities barely predict anything
+because in self-play *everyone* builds them, so they do not separate winners from losers. Fitted
+greedily, the bot then throws weapons away and avoids the court.
+
+This is the standard confound of regression on observational data from a single policy: with a lossy
+feature projection the coefficients absorb "this is a marker of being behind" rather than "this
+causes winning". A quantity can be an excellent predictor of the outcome and a terrible guide to
+action, and choosing actions is the only thing the evaluator is for.
+
+### What would actually be needed
+
+One-shot regression on a fixed policy's trajectories is not policy iteration. Doing this properly
+means some of:
+
+1. **Iterating** — fit, play with the fitted weights, refit. One pass has no improvement loop at all.
+2. **Learning from choices rather than states** — an advantage or TD target, so a weight answers
+   "does taking this help" instead of "do winners tend to have this".
+3. **Regularising toward the hand-set weights** rather than toward zero, so evidence has to overcome
+   a prior rather than start from nothing.
+4. **Sign constraints** on features where the game's rules settle the direction: a city is not bad.
+
+### The one unambiguous win
+
+This is the **first arena result all session decisively outside the noise floor** — 46 points, with
+identical twins agreeing exactly. That matters beyond the experiment: it shows the arena *can* detect
+a real difference when one exists, so the earlier "no measurable difference" verdicts on V2 were
+genuine null results rather than an instrument failing to resolve anything.
+
+The tooling stays. It is tested, sharded and reproducible, and every route above builds on it.
+
 ## 4. V3 — information-set search
 
 docs/03 section 5 is aspirational and this plan does not schedule it. Two things it needs that do
