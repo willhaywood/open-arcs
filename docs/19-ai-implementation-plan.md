@@ -1226,12 +1226,16 @@ feature projection the coefficients absorb "this is a marker of being behind" ra
 causes winning". A quantity can be an excellent predictor of the outcome and a terrible guide to
 action, and choosing actions is the only thing the evaluator is for.
 
+### Iterating does not rescue it — tried, section 3g
+
+The first item below was the obvious candidate and was tested. It does not help.
+
 ### What would actually be needed
 
 One-shot regression on a fixed policy's trajectories is not policy iteration. Doing this properly
 means some of:
 
-1. **Iterating** — fit, play with the fitted weights, refit. One pass has no improvement loop at all.
+1. ~~**Iterating** — fit, play with the fitted weights, refit.~~ **Tried; see section 3g.**
 2. **Learning from choices rather than states** — an advantage or TD target, so a weight answers
    "does taking this help" instead of "do winners tend to have this".
 3. **Regularising toward the hand-set weights** rather than toward zero, so evidence has to overcome
@@ -1246,6 +1250,47 @@ a real difference when one exists, so the earlier "no measurable difference" ver
 genuine null results rather than an instrument failing to resolve anything.
 
 The tooling stays. It is tested, sharded and reproducible, and every route above builds on it.
+
+## 3g. Iterating the fit
+
+`--iterations n` turns the single regression into policy iteration: each round's self-play games are
+played with the previous round's weights, so round two learns from the positions round one's bot
+actually reaches. That is the textbook loop — evaluate the policy, act greedily on the estimate,
+repeat.
+
+Three rounds, 90 games each:
+
+| round | played with | rows | held-out R² |
+| --- | --- | --- | --- |
+| 1 | hand-set weights | 17,004 | 0.216 |
+| 2 | round 1 weights | 19,236 | 0.189 |
+| 3 | round 2 weights | 17,955 | **0.018** |
+
+**The value estimate degrades toward nothing.** Each round trains on games played by a worse policy,
+so the data gets less informative rather than more — the classic divergence of naive policy iteration
+with function approximation and no improvement guarantee.
+
+And the play does not recover:
+
+| 90 games, vs hand-set | fitted wins | twin | hand-set wins |
+| --- | --- | --- | --- |
+| round 1 weights | 18% | 14% | **68%** |
+| round 3 weights | 18% | 17% | **66%** |
+
+**Flat at the floor.** Iterating changed the value estimate a great deal and the playing strength not
+at all, because the strength was already at the bottom after one greedy step.
+
+So the failure is not "too few iterations". It is the one section 3f named: regression on
+observational features learns what *correlates* with winning under the policy that generated the
+data, and iterating on a policy built from those correlations only produces worse data. The
+remaining three routes — learning from choices rather than states, regularising toward the hand
+weights rather than zero, and sign constraints where the rules settle the direction — all attack
+that, and none of them is iteration.
+
+Of those, **regularising toward the hand-set weights is the cheapest to try**: it is one line (ridge
+toward a prior instead of toward zero), and it directly answers the failure mode, since evidence
+would then have to overcome a working prior rather than build a policy from scratch out of
+correlations.
 
 ## 4. V3 — information-set search
 
