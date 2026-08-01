@@ -1,0 +1,14 @@
+# Watch the pinned Action versions in .github/workflows.
+#
+# Four pins had drifted three majors behind before anyone noticed, because the only signal was a
+# deprecation annotation at the end of a deploy log that had otherwise gone green. A monthly PR is
+# a signal that has to be closed rather than one that has to be read.
+#
+# `directory: "/"` is the repo root, not .github/workflows — for the github-actions ecosystem that
+# is what scans the workflow files, and pointing it at the workflows directory finds nothing.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
