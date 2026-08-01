@@ -15,6 +15,7 @@
  */
 
 import { metric } from '../rules/ambitions.js'
+import { declareReadiness } from './declare-ready.js'
 import { incomeFor } from './income.js'
 import { AMBITIONS } from '../state.js'
 import {
@@ -119,6 +120,7 @@ export const FEATURES = [
   'resourcesUndeclared',
   'incomeDeclared',
   'incomeUndeclared',
+  'declareReady',
   'weapons',
   'cities',
   'starports',
@@ -156,6 +158,11 @@ export const WEIGHTS: Weights = {
    */
   incomeDeclared: 0,
   incomeUndeclared: 0,
+  /*
+   * Also off by default, and for the same reason: the frozen baseline must stay byte-identical so a
+   * bot that switches this on can be attributed a difference. `GOAL_WEIGHTS` turns it on.
+   */
+  declareReady: 0,
   weapons: 0.25,
   cities: 2.0,
   starports: 1.2,
@@ -272,6 +279,13 @@ export function featuresOf(
   // Trophies and captives are already counted by their ambition standing; this is their floor.
   x.trophies = contentsOf(observed.figures, Location.trophies(self)).length
   x.captives = contentsOf(observed.figures, Location.captives(self)).length
+
+  /*
+   * Being in a position to *declare* what this faction wants — a card of the right strength, a
+   * marker still free, and the initiative to lead with it. Nothing else here knows any of those,
+   * which is what makes it the first of these additions with no existing proxy.
+   */
+  x.declareReady = declareReadiness(observed, self, intent)
 
   // Tempo — cards are options. Easy to over-price, and hard to justify beyond that.
   x.tempo = observed.handSizes[self] ?? 0

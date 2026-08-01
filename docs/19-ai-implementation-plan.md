@@ -1641,6 +1641,62 @@ Steps 3 and 4 are different in kind, and that is now the reason to expect more f
 proximity to locking an ambition** have *no* existing proxy anywhere in `featuresOf` — they are
 things the bot currently cannot represent at all, rather than things it represents coarsely.
 
+### Step 3 done: declare-readiness — the first replicated gain, and it ships
+
+The first of these additions with **no existing proxy**. Nothing in `featuresOf` knew what was in the
+hand, whose turn it was to lead, or whether a marker remained. Three rules have to line up and the
+bot could see none of them:
+
+- **Only the lead player may declare** — `CheckDeclare` follows a lead and nothing else, so it takes
+  initiative, not merely a good position.
+- **The card's strength picks the ambition** — a 2 declares Tycoon, a 5 Keeper, a 7 anything.
+- **A marker must still be free** this chapter.
+
+`declareReadiness` prices the best single opportunity: the marker's value, scaled by how much the
+faction wants that ambition and by its chance of leading. It reads the hand, which is allowed
+*here* — the anti-flap rule governs `intentFor`, and a value that falls when you spend the card you
+were going to declare with is the truth rather than a flap. Rivals' hands are hidden, so it reads
+zero for everyone but `self`; scoring a rival's readiness would be the dice oracle of section 2k
+arriving through another door, and there is a test for it.
+
+**A rules detail worth keeping:** at three players the strength-1 and strength-7 cards are removed,
+so every remaining card is a 2 to a 6. Every card declares *something* and the wildcard does not
+exist — which is why the tests run at four players, where both edge cases are reachable.
+
+#### It replicates, and it isolates
+
+| 120 games vs baseline | declare (twin-averaged) | baseline | floor |
+| --- | --- | --- | --- |
+| seed 1 | 36% wins, 21.6 power | 28%, 20.8 | 6 pts / 0.1 |
+| seed 900 | 38% wins, 23.0 power | 24%, 19.5 | 10 pts / 2.2 |
+
+Both runs, both metrics, gaps clear their floors — unlike section 4 step 2, which looked good once
+and evaporated on replication.
+
+Because `declareBot` stacks all three steps, one more run attributes it:
+
+| 120 games | wins | power |
+| --- | --- | --- |
+| goal-declare (twin-averaged) | **36.5%** | 21.6 |
+| goal-feasible (steps 1+2 only) | 28% | 20.3 |
+| twin gap = floor | 1 pt | 1.0 |
+
+**8.5 points against a 1-point floor.** The gain is declare-readiness, not the stack beneath it.
+
+#### Why this one worked when steps 1 and 2 did not
+
+Steps 1 and 2 sharpened information the evaluator already had a coarse proxy for — cities were always
+counted; knowing *which planet* is a refinement. Both fed `intent`, which only biases weights.
+
+This one adds a **dimension the bot could not represent at all**, and it changes what the bot *does*
+rather than how it weighs what it already saw. That is the pattern the whole document keeps
+returning to: every gain in section 2 came from widening what the evaluator can see, and every
+attempt to get strength from search (3a-3e) or from re-fitting weights (3f-3i) failed.
+
+**Shipped.** `apps/web` plays `declareBot`; `baselineBot` stays frozen as the measurement reference.
+Step 4 — rival proximity to locking an ambition — is the remaining one with no proxy, and is now the
+best candidate for the same reason this one was.
+
 ### How this gets validated — not with win rates
 
 The arena's floor is 12-21 points and these effects will be smaller. Use what actually worked:

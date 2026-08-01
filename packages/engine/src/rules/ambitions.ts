@@ -36,7 +36,8 @@ import { AMBITIONS } from '../state.js'
 import type { Ambition, AmbitionMarker, GameState } from '../state.js'
 import { contentsOf, move } from '../tracker.js'
 
-const AMBITION_STRENGTH: Readonly<Record<Ambition, number>> = {
+/** Card strength that declares each ambition; a 7 declares any. Exported so the AI reads it here. */
+export const AMBITION_STRENGTH: Readonly<Record<Ambition, number>> = {
   Tycoon: 2,
   Tyrant: 3,
   Warlord: 4,

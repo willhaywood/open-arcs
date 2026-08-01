@@ -34,6 +34,18 @@ export const GOAL_WEIGHTS: Weights = {
 export const goalBot: Bot = heuristicBotWith(GOAL_WEIGHTS, 'goal-income')
 
 /**
+ * Step 3 weights: readiness to declare, priced against the marker it would win.
+ *
+ * `declareReadiness` already returns marker-value scaled by how much the faction wants the ambition
+ * and by its chance of leading, so this multiplier only says how much of that prospect to believe.
+ * Half, to start: a declaration one lead away is worth real power, and it is still a chance rather
+ * than a fact.
+ */
+export const DECLARE_WEIGHTS: Weights = { ...GOAL_WEIGHTS, declareReady: 0.5 }
+
+export const declareBot: Bot = heuristicBotWith(DECLARE_WEIGHTS, 'goal-declare', feasibility)
+
+/**
  * Step 2: the same weights, but chapter goals judged by what the position can *produce*.
  *
  * Separate from `goalBot` so the arena can attribute a difference to feasibility rather than to

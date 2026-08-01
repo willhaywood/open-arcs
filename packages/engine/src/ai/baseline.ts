@@ -35,6 +35,7 @@ export const BASELINE_WEIGHTS: Weights = {
   // Off in the baseline by definition: it predates income projection entirely.
   incomeDeclared: 0,
   incomeUndeclared: 0,
+  declareReady: 0,
   weapons: 0.25,
   cities: 2.0,
   starports: 1.2,
