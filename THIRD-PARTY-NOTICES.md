@@ -46,15 +46,12 @@ engine in Scala, which is **MIT licensed**. Roughly thirty provenance citations 
 
 MIT requires that its copyright notice be retained in derivative works. The upstream notice follows.
 
-> NOTE: the copyright line below must be copied verbatim from the upstream `LICENSE` file before
-> this repository is published. It has not been filled in here because the upstream repository was
-> not available to read at the time of writing, and inventing a copyright holder would be worse
-> than leaving it visibly incomplete.
+Retained verbatim from <https://github.com/haunt-roll-fail/haunt-roll-fail/blob/master/LICENSE>.
 
 ```
 MIT License
 
-Copyright (c) <YEAR> <COPYRIGHT HOLDER — copy from haunt-roll-fail/LICENSE>
+Copyright (c) 2024 haunt-roll-fail
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
