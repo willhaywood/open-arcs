@@ -3,15 +3,20 @@ import { describe, expect, it } from 'vitest'
 import {
   CourtPile,
   AMBITIONS,
+  Location,
   MARKERS,
+  ScoreAmbitions,
   ambitionsForStrength,
   advance,
   chapterAmbitionable,
+  contentsOf,
   defaultRegistry,
   metric,
+  move,
+  slotsOf,
   startGame,
 } from '../src/index.js'
-import type { Action, Continue, GameState, RuleResult } from '../src/index.js'
+import type { Action, Continue, FactionId, GameState, RuleResult } from '../src/index.js'
 
 const THREE = ['red', 'yellow', 'blue'] as const
 const FOUR = ['red', 'yellow', 'blue', 'white'] as const
@@ -352,5 +357,102 @@ describe('cards that let a non-lead declare', () => {
     const after = advance(out.state, offers[0]!, reg2).state
     expect(after.declared.length).toBe(1)
     expect(after.lead?.zeroed).not.toBe(true)
+  })
+})
+
+
+/**
+ * Scoring an ambition, and the case that reads as a bug at the table.
+ *
+ * Written after "yellow won Empath for 12 power" was reported as double-counting. It is correct,
+ * and the arithmetic is worth pinning because three separate rules combine into one surprising
+ * number — quoting the rulebook, which is the authority here:
+ *
+ *   - "Score each ambition that has **any number** of ambition markers... The player who gets first
+ *     place gains the **higher** Power shown on **all** its ambition markers." So an ambition
+ *     declared twice pays the sum of the highs, and a winner never takes a low.
+ *   - "Bonus City Power. Each time you get first place in an ambition (**not tied**), gain extra
+ *     Power if the '+2 to won ambitions' city slot is uncovered..."
+ *   - "You can only gain bonus Power **once per ambition** regardless of how many ambition markers
+ *     it has."
+ */
+describe('scoring ambitions', () => {
+  const THREE_F: readonly FactionId[] = ['red', 'yellow', 'blue']
+
+  /** Give a faction exactly `n` Psionic, which is the Empath metric. */
+  const psionic = (state: GameState, faction: FactionId, n: number): GameState => {
+    let out = state
+    const slots = slotsOf(out, faction)
+    // Clear the slots first so starting resources cannot skew the count.
+    for (const slot of slots) {
+      for (const token of contentsOf(out.resources, slot)) {
+        out = {
+          ...out,
+          resources: move(out.resources, token, `supply:${token.slice(0, token.indexOf('#'))}`),
+        }
+      }
+    }
+    contentsOf(out.resources, 'supply:Psionic')
+      .slice(0, n)
+      .forEach((token, i) => {
+        out = { ...out, resources: move(out.resources, token, slots[i]!) }
+      })
+    return out
+  }
+
+  /** Build cities until only `left` remain in reserve — this is what uncovers the Power bonuses. */
+  const citiesLeft = (state: GameState, faction: FactionId, left: number): GameState => {
+    let out = state
+    const system = out.board.systems[0]!
+    const inReserve = () =>
+      contentsOf(out.figures, Location.reserve(faction)).filter((i) => i.includes('City'))
+    while (inReserve().length > left) {
+      out = { ...out, figures: move(out.figures, inReserve()[0]!, Location.system(system)) }
+    }
+    return out
+  }
+
+  const position = (markers: readonly { high: number; low: number }[], yellowCities: number): GameState => {
+    let s = startGame({ board: 'Board3Frontiers', factions: [...THREE_F], seed: 1 }, registry).state
+    s = psionic(s, 'yellow', 2)
+    s = psionic(s, 'blue', 1)
+    s = psionic(s, 'red', 0)
+    s = citiesLeft(s, 'yellow', yellowCities)
+    return {
+      ...s,
+      declared: markers.map((m) => ({ ambition: 'Empath' as const, marker: m })),
+      power: { red: 0, yellow: 0, blue: 0 },
+    }
+  }
+
+  it('pays the sum of the highs across every marker, plus one city bonus', () => {
+    // The reported game exactly: Empath declared twice (6/3 and 4/2), yellow ahead, one city left.
+    const out = advance(position([{ high: 6, low: 3 }, { high: 4, low: 2 }], 1), ScoreAmbitions(), registry)
+
+    // 6 + 4 highs, + 2 for the uncovered city slot. The winner never takes a low.
+    expect(out.state.power['yellow']).toBe(12)
+    // Second place takes the sum of the lows, and gets no city bonus.
+    expect(out.state.power['blue']).toBe(5)
+    expect(out.state.log.join(' ')).toContain('yellow won Empath for 12 power')
+  })
+
+  it('gives the city bonus once per ambition, not once per marker', () => {
+    const one = advance(position([{ high: 6, low: 3 }], 1), ScoreAmbitions(), registry)
+    const two = advance(position([{ high: 6, low: 3 }, { high: 4, low: 2 }], 1), ScoreAmbitions(), registry)
+
+    // One marker: 6 + 2. Two markers: 10 + 2 — the bonus is added once, not twice.
+    expect(one.state.power['yellow']).toBe(8)
+    expect(two.state.power['yellow']! - one.state.power['yellow']!).toBe(4)
+  })
+
+  it('withholds the city bonus on a tie, which is not first place', () => {
+    // Level on the metric: both tie, so both take the low and neither gets the bonus.
+    let s = position([{ high: 6, low: 3 }], 1)
+    s = psionic(s, 'blue', 2)
+    const out = advance(s, ScoreAmbitions(), registry)
+
+    expect(out.state.power['yellow']).toBe(3)
+    expect(out.state.power['blue']).toBe(3)
+    expect(out.state.log.join(' ')).toContain('tied Empath')
   })
 })

@@ -51,6 +51,7 @@ export { StandardActionsModule, canTake } from './rules/standard-actions.js'
 export {
   AmbitionsModule,
   MARKERS,
+  ScoreAmbitions,
   chapterAmbitionable,
   ambitionsForStrength,
   metric,
