@@ -33,8 +33,8 @@ Still open, and deliberately not built:
   and everything downstream, and reorders every trait that hangs off taxing. Truly free-form
   rearranging — at any moment on your own turn — needs a `Continue` variant meaning "state changed,
   keep waiting", which is a wider change than it is worth today.
-- **Trophy return at cleanup** (section 4) is the other way capacity will shrink. It needs no new
-  machinery; the next gain settles the row.
+- **Trophy return at cleanup — done** (section 4). It was also the other way capacity shrinks, and
+  needed no new machinery: the next gain settles the row.
 
 ## 2. Screens
 
@@ -181,19 +181,30 @@ Every lore bug that reached the screen was an interaction the unit tests could n
 Ask no UI would draw, or a decision shown without the thing it was about. `saves/lore/` now holds a
 game per interaction, parked on the decision and **named after the cards it exercises**, with
 `npm run saves:build` to regenerate and `saves/lore/README.md` as the index — whose coverage table
-lists every implemented lore card against its saves. **17 of 28 covered; the other 11 are named.** **docs/18** has the approach, the two traps found building it,
-and the one invariant still worth adding.
+lists every implemented lore card against its saves. **28 of 28 implemented lore cards now have a
+save, across 25 scenarios.** **docs/18** has the approach, the two traps found building it, and the
+one invariant still worth adding.
 
 ## 4. Systems not started
 
-- **AI.** docs/03 is a locked plan; no code exists.
+- **AI — built.** docs/03 is no longer a plan waiting on code: `packages/engine/src/ai/` holds the
+  evaluator, the bots and the measurement arena, and the web app plays `declareBot`. docs/19 is the
+  implementation record, including a register of measured dead ends so they are not retried.
+
+  What is genuinely left here is narrower than "AI": the token-pricing feature in `ai/value.ts`
+  counts resource *tokens* only and ignores Guild-card icons, while `courtSecured` counts the cards
+  separately. The `standing` feature already goes through `metric` and so does see them. Aligning
+  the token term is bot tuning that needs an arena run to justify, not a correctness fix.
 - **Multiplayer.** Options brainstormed in docs/17 — the journal design makes it small (a server
   that appends strings to a list), but note the hidden-information catch: every client can
   currently derive all hands and all future rolls from `options.seed`.
 - **2-player.** Deferred; HRF excludes it entirely, so the rules need sourcing elsewhere.
 - **Campaign / Blighted Reach.** Out of scope by docs/04.
-- **Trophy return at cleanup** — the other way capacity shrinks; see section 1. The row-settling
-  machinery is already there, so this is about returning the pieces, not about resources.
+- **Trophy return at cleanup — done.** Rulebook 6.2.2 step 1: scoring Warlord returns all trophies,
+  scoring Tyrant all captives, for *every* faction and not just the scorer. Omitting it let both
+  piles accumulate all game, so a lead in either was permanent. See docs/08 § Chapter-end cleanup.
+  Resources are **not** part of that step and are never returned at chapter end — the only resource
+  discards remain capacity and outrage.
 
 ## 4a. The catapult stopping rule — fixed
 
@@ -218,10 +229,11 @@ Two things worth not re-investigating:
   you simply stop on arrival. The stopping is enforced where the move resolves, not by hiding the
   option.
 
-**Still open, and wider than the catapult:** `ruleValue` counts **ships only** — buildings
-contribute nothing to ruling a system. That decides Build, Tax, Annex and ambition scoring, so it
-wants checking against the rulebook rather than being assumed correct on the strength of one
-catapult report.
+**Checked, and correct — this item is closed.** `ruleValue` counting **ships only** was flagged here
+as an assumption worth verifying, because it decides Build, Tax, Annex and ambition scoring. The
+rulebook (4.6.3 Control): *"You control a system and its contents if you have more fresh ships there
+than each Rival (other player). On a tie, no one controls the system."* Ships only, fresh only — and
+`rules()` requiring a strict majority is the tie clause. Buildings are correctly ignored.
 
 ## 5. Smaller known items
 
@@ -241,14 +253,23 @@ catapult report.
   well drawn for it, and nothing extra — stated against `slotsOf` rather than a count, so a future
   card granting a slot is covered without touching the test. Mutation-verified: restoring the old
   row fails four of its five cases.
+- **Two ambition-procedure deviations, both known and both left alone.** Found while verifying the
+  chapter-end rules, neither reported from play:
+  - **Marker flip.** The rulebook returns all markers to the available spaces and flips the lowest
+    unflipped marker to its higher face each chapter (6.2.2 steps 2-3). We model the escalation as
+    HRF's sliding window in `chapterAmbitionable` — similar curve, different mechanism.
+  - **Win tie-break.** 6.2.3 gives a tie to "the tied player earliest in turn order";
+    `performCheckWin` reduces over `state.factions`, which is seating order, not `initiativeOrder`.
 - **Gate Ports "max 1 per gate"** — provenance divergence recorded in docs/14 and unresolved:
   Cloud Cities counts card-placed cities, Gate Ports uses a per-faction count.
 - **`multiAsk` is a placeholder** — summits will need a real simultaneous-decision UI.
 - **Piece badges overlap** in busy systems.
-- **`assets/images/arcs-bg.png`** (2.8 MB) is unused in the served directory.
-- **FM Bolyar Pro** fonts are commercial — a type foundry, a different rightsholder from the
-  game's art — and desktop licences often exclude webfont serving. Worth a licence check before a
-  public build; see docs/16 section 5.
-- **The build ships 56 MB it does not need.** `npm run -w apps/web build` copies the whole art
-  library into `dist/` (73 MB), including 48.6 MB of fate/campaign art the base game never loads
-  and a dead 2.8 MB `arcs-bg.png`. A trimmed deploy build is ~17 MB — docs/16 section 3.
+- **`assets/images/arcs-bg.png`** (2.8 MB) is unused. The deploy strips it, so it costs the live
+  site nothing; it is still copied by a local `npm run build`.
+- **FM Bolyar Pro font licensing — resolved.** Settled by the project owner; the fonts ship as they
+  are. Recorded here as closed so it is not raised again.
+- **The build ships 56 MB it does not need — solved for the deploy only.** `npm run -w apps/web
+  build` still copies the whole art library into `dist/` (~75 MB), including the fate/campaign art
+  the base game never loads. The Pages workflow trims it to roughly 17 MB in a step after the build,
+  deliberately kept there so a local build still produces the complete asset set — docs/16 section 3.
+  Nothing further is needed unless the local build's size starts to hurt.
