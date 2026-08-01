@@ -449,7 +449,7 @@ where `myPower` is realised power plus expected power, summed over:
 | Resources held | ambition-scaled (docs/03 §3.3) | Worthless unless they feed a contested ambition |
 | Cities / starports | ×~2 each, plus what they unlock | Also capacity, tax income, build sites |
 | Ships | fresh ≫ damaged | Damaged rule nothing — see the catapult bug in docs/15 |
-| Court cards held | ×~1 plus ability value | Guild abilities are live effects, not score |
+| Court cards held | ×~1 plus ability value | A guild's suit scores like a resource *and* its ability is live |
 | Trophies / captives | payout-scaled | Only worth anything if Warlord/Tyrant is live |
 | Initiative and hand | small, positive | Tempo; hard to price, easy to over-price |
 

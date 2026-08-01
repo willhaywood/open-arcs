@@ -63,11 +63,19 @@ export interface CourtCard {
   readonly id: string
   readonly name: string
   readonly kind: CourtCardKind
-  /** Guild cards only: the resource the guild deals in (`GuildEffect`'s suit). */
+  /**
+   * Guild cards only: the resource the guild deals in (`GuildEffect`'s suit).
+   *
+   * While the card is secured this icon **scores as one resource of that suit** — the rulebook's
+   * "It adds to ambitions just like resources" — so Material and Fuel guilds feed Tycoon, Relic
+   * guilds Keeper, and Psionic guilds Empath. Weapon guilds feed nothing, because no ambition
+   * counts Weapons. See `metric` in `rules/ambitions.ts`.
+   */
   readonly suit?: Resource
   /**
    * Guild cards only: the key cost to raid this card off its holder in battle
-   * (`game-battle.scala:416`). Not ambition points — secured cards do not score.
+   * (`game-battle.scala:416`). This is the *raid cost* and has nothing to do with scoring — a
+   * secured card is worth one `suit` icon whatever its raid cost happens to be.
    */
   readonly keys?: number
   /**
