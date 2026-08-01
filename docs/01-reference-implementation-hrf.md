@@ -241,36 +241,44 @@ through the Cache API (`CachedImageLoader` in `loader.scala`), with `Laziness` p
 
 ### 4.3 What that means
 
-The artwork is **the physical game's art** — component scans/exports of Leder Games' Arcs
-(art by Kyle Ferrin). It is deliberately not in the MIT-licensed repo, and it is not ours to
-reuse. The MIT licence on the code says nothing about the images, and the images are the part
-with real IP attached.
+The artwork is **the physical game's art** — component scans/exports of Arcs, art by Kyle Ferrin.
+Arcs is owned by **Buried Giant Studios**; Cole Wehrle and Kyle Ferrin left Leder Games and took it
+with them. The card *text* and the fate/lore content are likewise the publisher's. Game *rules*
+(systems, procedures) are not copyrightable; their specific expression is.
 
-Also relevant: the card *text* and the fate/lore content are Leder Games' copyrighted text.
-Game *rules* (systems, procedures) are not copyrightable; their specific expression is.
+### 4.4 The decision taken
 
-This is the single biggest constraint on the project and it needs a decision before anything
-gets built. Options, in rough order of risk:
+The options were, in rough order of risk:
 
-1. **Original art + original wording.** Rules-compatible, everything drawn/written by us.
-   Highest effort, lowest risk.
-2. **Placeholder/programmer art now, art decision later.** Fine for a prototype that stays
-   private, defers the problem rather than solving it.
-3. **Personal-use-only build, never published.** Effectively what a local fan implementation is.
-   Fine for a private project, closes off release.
-4. **Reuse the published assets.** Not viable for anything public.
+1. **Original art + original wording.** Rules-compatible, everything drawn/written by us. Highest
+   effort, lowest risk.
+2. **Placeholder art now, decision later.** Defers the problem rather than solving it.
+3. **Personal-use-only build, never published.** Fine privately, closes off release.
+4. **Reuse the published assets.**
 
-Note that HRF itself is a fan implementation operating without (as far as I can tell) a licence,
-and it hosts the assets itself rather than shipping them — a distribution posture, not a
-permission. Worth checking whether Leder Games has publicly blessed it before assuming anything.
+**Option 4 was chosen, knowingly**, and the artwork is tracked in this repository rather than being
+uploaded separately at deploy time. What that does and does not mean:
+
+- It is **not a licence**. Nothing here grants rights in Buried Giant Studios' artwork, card text, or
+  the Arcs name. `LICENSE` covers this repository's source code and says so explicitly.
+- It is a **fan-project posture with take-down on request**, stated in `THIRD-PARTY-NOTICES.md`. The
+  Arcs Tabletop Simulator mod operates on similar ground; that is a precedent, not a permission, and
+  the distinction is worth keeping in view.
+- It is **effectively permanent**. Git carries 71 MB across 918 binaries in history forever, so
+  reversing this needs a history rewrite rather than a delete.
+- **Git LFS is not used**, deliberately: GitHub Pages does not resolve LFS pointers, so LFS-tracked
+  art would deploy as text files instead of images.
+
+The lower-risk options above remain open and are what to reach for if the posture ever needs to
+change — original art is the only one that removes the question rather than managing it.
 
 ## 5. Licence summary
 
 | Thing | Status |
 | --- | --- |
 | HRF engine + Arcs rules code | MIT — reusable, including as a reference or a direct port, with attribution |
-| Arcs artwork served from hrf.im | Leder Games IP, not licensed, not in the repo |
-| Arcs card/fate/lore text | Leder Games IP |
+| Arcs artwork | Buried Giant Studios IP, **not licensed**, tracked in this repo by choice — see 4.4 |
+| Arcs card/fate/lore text | Buried Giant Studios IP |
 | Arcs rules and procedures | Not copyrightable as such |
 
 If we port structure or read the code closely while writing our own, we are in MIT territory

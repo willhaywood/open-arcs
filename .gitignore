@@ -1,9 +1,9 @@
-# Third-party artwork — Leder Games / Kyle Ferrin. Shipped with the app, on the same footing as
-# the Arcs Tabletop Simulator mod, which hosts it with the creators' approval.
+# Arcs artwork is now tracked (see THIRD-PARTY-NOTICES.md and docs/01 section 4.3). It is Kyle
+# Ferrin's art, owned by Buried Giant Studios, included here on a fan-project footing with a
+# take-down-on-request posture — not because it is licensed to this repository.
 #
-# Kept out of git for size, not permission: 72 MB across 918 binaries that git would carry in
-# history forever. It is uploaded by the deploy instead — see docs/16.
-assets/images/
+# Git LFS is deliberately NOT used: GitHub Pages does not resolve LFS pointers, so an LFS-tracked
+# asset would deploy as a text file rather than an image.
 *.part
 
 node_modules/
