@@ -1,0 +1,18 @@
+{
+  "power": 0.4283872419893315,
+  "standing": 0.43217826171921075,
+  "resourcesDeclared": 0.9447275280830294,
+  "resourcesUndeclared": 1.1300450087551865,
+  "weapons": -1.3094433305793316,
+  "cities": 0.3240872563952093,
+  "starports": 0.414674664670102,
+  "shipsFresh": -0.02154853888362841,
+  "shipsDamaged": 0.7770815039242316,
+  "courtSecured": -0.2810120250528288,
+  "courtClaimAhead": -0.4223482625745995,
+  "courtClaimLevel": 0.009808952066057659,
+  "courtClaimBehind": -0.2789910335656845,
+  "trophies": -0.2733473000383249,
+  "captives": 0.592077835985529,
+  "tempo": 0.33422278450061604
+}

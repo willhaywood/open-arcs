@@ -1292,6 +1292,70 @@ toward a prior instead of toward zero), and it directly answers the failure mode
 would then have to overcome a working prior rather than build a policy from scratch out of
 correlations.
 
+## 3h. Regularising toward the hand-set weights
+
+Section 3g's leftover: shrink the fit toward `WEIGHTS` rather than toward zero, so evidence has to
+overcome a working prior instead of building a policy out of whatever correlations survive.
+
+### A bug found on the way in
+
+**Every fit in sections 3f and 3g was effectively unregularised.** The normal equations accumulate a
+term per row, so against seventeen thousand rows a bare `ridge = 1` on the diagonal is a rounding
+error. The strength is now expressed as a *fraction of the row count*, so `1` means "the prior counts
+for as much as the data" and the number is comparable across runs of different sizes.
+
+### The sweep
+
+One collection, many fits — the games are the expensive part and the solve is instant, so every
+strength is fitted from the same 22,650 rows and the comparison carries no extra sampling noise.
+
+| ridge | held-out R² | cities | weapons | courtSecured |
+| --- | --- | --- | --- | --- |
+| 0 | **0.340** | 0.29 | −1.32 | −0.32 |
+| 0.3 | 0.321 | 0.53 | −1.14 | −0.09 |
+| 1 | 0.258 | 0.86 | −0.77 | 0.15 |
+| 3 | 0.123 | 1.30 | −0.34 | 0.45 |
+| ∞ | — | 2.00 | 0.25 | 1.00 |
+
+It behaves exactly as designed: the dial runs continuously from the pure fit to the hand-set weights.
+**R² prefers ridge 0** — unsurprising, since the prior is not the best predictor.
+
+### What the arena says
+
+| ridge | fitted | twin | hand-set | noise floor (twin gap) |
+| --- | --- | --- | --- | --- |
+| 0 (pure fit) | 18% | 14% | **68%** | 4 |
+| 1 | 30% | 29% | **41%** | 1 |
+| 3 | 26% | 40% | 34% | 14 |
+| ∞ | — | — | — | *is* the hand weights |
+
+**Strength recovers monotonically as the prior takes over, and never exceeds it.** At ridge 1 the
+twins agree to a point and the hand-set weights still win by 11 — that gap is real. At ridge 3 the
+twins are 14 apart and nothing is resolvable, which is the honest reading: indistinguishable from the
+prior it has been shrunk into.
+
+### The conclusion
+
+Regularising limits the damage; it does not extract value. Together with sections 3f and 3g:
+
+- **Prediction and action are different problems here.** The best predictor of final power (ridge 0,
+  R² 0.34) is the *worst* player of the five configurations measured. That is the whole finding.
+- The fitted signal is real — a third of the variance in final power — and it is nonetheless
+  **useless for choosing moves**, because it is loaded with markers of being behind rather than
+  causes of getting ahead.
+- Three of the four routes from section 3f have now been tried: iterating (3g), regularising toward
+  the prior (3h), and the plain fit (3f). None beats hand-set weights.
+
+**What is left is the one that changes the target rather than the fit**: learn from *choices* — an
+advantage or TD signal, where a weight answers "does taking this action help" rather than "do winners
+tend to have this". That is the only remaining route that attacks the confound rather than damping
+it, and it needs the collector to record decisions and counterfactuals rather than positions and
+outcomes.
+
+Worth saying plainly: **the hand-set weights have now survived four measured attempts to beat them.**
+That is a stronger endorsement than they had before this work, and the tooling to challenge them
+again is in place.
+
 ## 4. V3 — information-set search
 
 docs/03 section 5 is aspirational and this plan does not schedule it. Two things it needs that do

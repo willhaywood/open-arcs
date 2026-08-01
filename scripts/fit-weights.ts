@@ -34,7 +34,7 @@
 import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 
-import { FEATURES } from '@arcs/engine'
+import { FEATURES, WEIGHTS } from '@arcs/engine'
 
 const argv = process.argv.slice(2)
 const flag = (name: string): string | undefined => {
@@ -45,7 +45,16 @@ const flag = (name: string): string | undefined => {
 const games = Number(flag('games') ?? 60)
 const jobs = Math.max(1, Number(flag('jobs') ?? 8))
 const seed = Number(flag('seed') ?? 10_000)
-const ridge = Number(flag('ridge') ?? 1)
+/*
+ * Ridge strengths to fit, as a fraction of the row count.
+ *
+ * **Scaled by `n` because otherwise it does nothing.** The normal equations accumulate one term per
+ * row, so with seventeen thousand rows a bare `ridge = 1` is a rounding error against the diagonal —
+ * every fit reported in sections 3f and 3g was effectively unregularised. Expressed as a fraction,
+ * `1` means "the prior counts for as much as the data" and the number is comparable between runs of
+ * different sizes.
+ */
+const ridges = (flag('ridge') ?? '0,0.03,0.1,0.3,1,3').split(',').map(Number)
 const out = flag('out') ?? 'packages/engine/src/ai/fitted-weights.json'
 const iterations = Math.max(1, Number(flag('iterations') ?? 1))
 const board = flag('board') ?? 'Board3Frontiers'
@@ -129,8 +138,21 @@ const collect = async (weights: Record<string, number> | undefined): Promise<Row
     }
   })
 
-/** One fit: standardise, ridge-regress through the normal equations, report held-out error. */
-function fit(rows: readonly Row[]): {
+/**
+ * One fit: standardise, ridge-regress through the normal equations, report held-out error.
+ *
+ * **Regularised toward the hand-set weights rather than toward zero**, which is the point of this
+ * version. Plain ridge shrinks every coefficient to nothing, so with a weak signal the fit builds a
+ * policy out of whatever correlations survive — and section 3f measured where that ends up: weapons
+ * at -1.59 because the players holding them are the ones losing, and a bot that plays 46 points
+ * worse. Shrinking toward `WEIGHTS` instead means evidence has to *overcome a working prior*, and
+ * the strength dial runs from "the hand-set weights" at one end to "the pure fit" at the other, with
+ * the arena to say where on it to stand.
+ */
+function fit(
+  rows: readonly Row[],
+  ridge: number,
+): {
   weights: Record<string, number>
   rmse: number
   base: number
@@ -170,7 +192,17 @@ function fit(rows: readonly Row[]): {
       for (let j = 0; j <= p; j++) A[i]![j]! += v[i]! * v[j]!
     }
   }
-  for (let i = 1; i <= p; i++) A[i]![i]! += ridge
+  /*
+   * Shrink toward the hand-set weights, expressed in the same standardised space the fit works in:
+   * a raw weight `w` becomes `w * sd` once the feature is divided by `sd`. With `lambda` large the
+   * solution *is* the prior, so the strength dial is continuous between the two.
+   */
+  const lambda = ridge * train.length
+  const priorZ = FEATURES.map((f, j) => WEIGHTS[f] * sd[j]!)
+  for (let i = 1; i <= p; i++) {
+    A[i]![i]! += lambda
+    b[i]! += lambda * priorZ[i - 1]!
+  }
 
   const sol = solve(A, b)
   const intercept = sol[0]!
@@ -206,18 +238,29 @@ for (let round = 1; round <= iterations; round++) {
   const rows = await collect(weights)
   if (rows.length < p * 20) throw new Error(`too few rows (${rows.length}) to fit ${p} weights`)
 
-  const result = fit(rows)
-  weights = result.weights
-  const r2 = 1 - (result.rmse / result.base) ** 2
-  console.log(
-    `  ${rows.length} rows   held-out RMSE ${result.rmse.toFixed(2)}` +
-      `  (mean baseline ${result.base.toFixed(2)}, R2 ${r2.toFixed(3)})`,
-  )
-  for (const f of FEATURES) {
-    console.log(`    ${f.padEnd(22)} ${(weights[f] ?? 0).toFixed(3).padStart(9)}`)
+  /*
+   * Every ridge strength is fitted from the *same* collection: the games are the expensive part and
+   * the solve is instant, so a sweep costs nothing extra and the strengths are directly comparable
+   * rather than each carrying its own sampling noise.
+   */
+  console.log(`  ${rows.length} rows`)
+  console.log('  ridge      RMSE      R2   |  a few weights')
+  for (const ridge of ridges) {
+    const result = fit(rows, ridge)
+    const r2 = 1 - (result.rmse / result.base) ** 2
+    const peek = (['cities', 'weapons', 'courtSecured'] as const)
+      .map((f) => `${f} ${(result.weights[f] ?? 0).toFixed(2)}`)
+      .join('  ')
+    console.log(
+      `  ${String(ridge).padEnd(7)} ${result.rmse.toFixed(2).padStart(7)} ${r2.toFixed(3).padStart(7)}   |  ${peek}`,
+    )
+    writeFileSync(
+      out.replace('.json', `-ridge${ridge}.json`),
+      `${JSON.stringify(result.weights, null, 2)}\n`,
+    )
+    // The last strength fitted is what carries into the next round and into the default file.
+    weights = result.weights
   }
-  // Every round is kept, so a run that degrades can be picked apart rather than just discarded.
-  writeFileSync(out.replace('.json', `-r${round}.json`), `${JSON.stringify(weights, null, 2)}\n`)
 }
 
 writeFileSync(out, `${JSON.stringify(weights, null, 2)}\n`)
