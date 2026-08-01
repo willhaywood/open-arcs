@@ -17,8 +17,9 @@ import type { Action } from '../action.js'
 import type { Suit } from '../cards.js'
 import { Continue as C } from '../continue.js'
 import { citiesInReserve, slotsOf } from '../control.js'
+import type { Resource } from '../resources.js'
 import type { SlotView } from '../control.js'
-import { CourtPile, SECRET_ORDER, courtCard, hasGuild } from '../court.js'
+import { CourtPile, SECRET_ORDER, courtCard, hasGuild, securedCards } from '../court.js'
 import { Prelude } from '../prelude.js'
 import type { RuleModule, RuleResult } from '../dispatch.js'
 import { unhandled } from '../dispatch.js'
@@ -77,20 +78,42 @@ export function ambitionsForStrength(strength: number): readonly Ambition[] {
 /** What `metric` reads — widened so a bot's `ObservedState` satisfies it too. See `SlotView`. */
 export interface MetricView extends SlotView {
   readonly resources: GameState['resources']
+  /** Secured Guild cards score too; see `metric`. */
+  readonly courtCards: GameState['courtCards']
 }
 
-/** The scored quantity for a faction (base game — game.scala:1152). */
+/**
+ * The scored quantity for a faction (base game — game.scala:1152).
+ *
+ * **Secured Guild cards count, and they were missing.** The rulebook scores Tycoon as "the most
+ * total Fuel and Material icons **from resources and Guild cards**", and says of a Guild card's
+ * suit: *"This suit icon matches one of the resources. It adds to ambitions just like resources.
+ * Material and Fuel cards add to the Tycoon ambition, Relic cards add to the Keeper ambition, and
+ * Psionic cards add to the Empath ambition."*
+ *
+ * Two details the card data makes easy to get wrong:
+ *
+ *   - **One icon per card, not `keys` of them.** `keys` is the *raid cost* — how many raid symbols
+ *     an attacker spends to steal the card — and is unrelated to scoring. A comment in `court.ts`
+ *     previously asserted the opposite, that secured cards do not score at all.
+ *   - **Weapon guilds score nothing**, exactly as Weapon tokens do not: the rulebook says so
+ *     outright, and it falls out here because no ambition asks for Weapons.
+ */
 export function metric(state: MetricView, faction: FactionId, ambition: Ambition): number {
   const slots = slotsOf(state, faction)
   const res = (r: Parameters<typeof countResource>[2]) =>
     countResource(state.resources, slots, r)
+  // A secured Guild card contributes a single icon of its suit.
+  const guilds = (r: Resource): number =>
+    securedCards(state, faction).filter((id) => courtCard(id).suit === r).length
+  const held = (r: Resource): number => res(r) + guilds(r)
   switch (ambition) {
     case 'Tycoon':
-      return res('Material') + res('Fuel')
+      return held('Material') + held('Fuel')
     case 'Keeper':
-      return res('Relic')
+      return held('Relic')
     case 'Empath':
-      return res('Psionic')
+      return held('Psionic')
     case 'Tyrant':
       return contentsOf(state.figures, Location.captives(faction)).length
     case 'Warlord':

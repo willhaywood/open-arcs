@@ -95,6 +95,77 @@ describe('metrics (base game)', () => {
   })
 })
 
+/*
+ * The rulebook scores Tycoon as "the most total Fuel and Material icons *from resources and Guild
+ * cards*", and says of the suit icon: "It adds to ambitions just like resources. Material and Fuel
+ * cards add to the Tycoon ambition, Relic cards add to the Keeper ambition and Psionic cards add to
+ * the Empath ambition. Weapon cards do not add to any ambitions."
+ *
+ * `metric` counted only resource tokens, so secured guilds scored nothing at all.
+ */
+describe('secured Guild cards score as one icon of their suit', () => {
+  /** `state` with `cards` secured to `faction`, leaving everything else alone. */
+  const secure = (state: GameState, faction: FactionId, ...cards: readonly string[]): GameState =>
+    cards.reduce(
+      (s, id) => ({ ...s, courtCards: move(s.courtCards, id, CourtPile.secured(faction)) }),
+      state,
+    )
+
+  const fresh = () => startGame({ board: 'Board3MixUp', factions: THREE, seed: 5 }).state
+
+  it('adds the card to its own ambition and to no other', () => {
+    const before = fresh()
+    const after = secure(before, 'red', 'bc23') // Elder Broker, Relic
+
+    expect(metric(after, 'red', 'Keeper')).toBe(metric(before, 'red', 'Keeper') + 1)
+    for (const a of ['Tycoon', 'Empath', 'Tyrant', 'Warlord'] as const) {
+      expect(metric(after, 'red', a)).toBe(metric(before, 'red', a))
+    }
+  })
+
+  it('is worth one icon whatever the raid cost, which is a separate part of the card', () => {
+    /*
+     * The discriminator against counting `keys`: both are Relic guilds, but Loyal Keepers costs 3
+     * keys to raid and Sworn Guardians costs 1. Scoring is blind to that — each is one icon.
+     */
+    const base = fresh()
+    const keeperMetric = (id: string) =>
+      metric(secure(base, 'red', id), 'red', 'Keeper') - metric(base, 'red', 'Keeper')
+
+    expect(keeperMetric('bc21')).toBe(1) // Loyal Keepers, raid cost 3
+    expect(keeperMetric('bc22')).toBe(1) // Sworn Guardians, raid cost 1
+  })
+
+  it('scores nothing for Weapon guilds, which no ambition counts', () => {
+    const before = fresh()
+    // Every Weapon guild in the base court at once, including the raid-cost-3 loyal one.
+    const after = secure(before, 'red', 'bc11', 'bc12', 'bc13', 'bc14', 'bc15')
+
+    for (const a of AMBITIONS) expect(metric(after, 'red', a)).toBe(metric(before, 'red', a))
+  })
+
+  it('stacks Material and Fuel guilds together into Tycoon, on top of held resources', () => {
+    const before = fresh()
+    const after = secure(before, 'red', 'bc02', 'bc03', 'bc06') // 2 Material + 1 Fuel
+
+    expect(metric(after, 'red', 'Tycoon')).toBe(metric(before, 'red', 'Tycoon') + 3)
+  })
+
+  it('scores only for the faction holding it — not the court, not a rival', () => {
+    const before = fresh()
+    const secured = secure(before, 'red', 'bc17') // Farseers, Psionic
+
+    expect(metric(secured, 'red', 'Empath')).toBe(metric(before, 'red', 'Empath') + 1)
+    expect(metric(secured, 'yellow', 'Empath')).toBe(metric(before, 'yellow', 'Empath'))
+
+    // Face up in a court slot but unclaimed, it is worth nothing to anybody.
+    const inCourt = { ...before, courtCards: move(before.courtCards, 'bc17', CourtPile.slot(1)) }
+    for (const f of THREE) {
+      expect(metric(inCourt, f, 'Empath')).toBe(metric(before, f, 'Empath'))
+    }
+  })
+})
+
 describe('scoring awards power and ends the game', () => {
   it('a game driven by an ambition-declaring policy ends by power or after 5 chapters', () => {
     const result = playToEnd({ board: 'Board3MixUp', factions: THREE, seed: 21 }, declaringPolicy)

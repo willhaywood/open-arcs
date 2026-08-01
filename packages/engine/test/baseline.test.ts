@@ -62,11 +62,19 @@ describe('the frozen baseline', () => {
 /**
  * Final power for red, yellow, blue on seeds 1, 2 and 3, played by three copies of the baseline.
  *
- * See the note at the top before editing: changing these redefines the frozen baseline, and the one
- * being replaced no longer exists to measure anything against.
+ * See the note at the top before editing: changing these normally redefines the frozen baseline, and
+ * the one being replaced no longer exists to measure anything against.
+ *
+ * The exception is a **rules** fix, where the bot has not changed but the game it is playing has.
+ * `weightsMatchBaseline` above still passing is what tells the two cases apart: if the weights are
+ * intact and these numbers moved, the evaluator is untouched and the board underneath it was wrong.
+ * Re-recording is then the only option — the previous numbers pinned the bug.
+ *
+ * Last re-recorded when secured Guild cards began scoring toward Tycoon, Keeper and Empath, which
+ * they had never done (see `metric`). Seed 1 is unchanged; seeds 2 and 3 moved.
  */
 const GOLDEN = [
   [11, 43, 5],
-  [17, 15, 25],
-  [27, 27, 30],
+  [24, 37, 39],
+  [20, 28, 50],
 ]
