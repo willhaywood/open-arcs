@@ -43,18 +43,23 @@ export function BotPanel({
 
   const waiting = turn !== undefined && store.botMode !== 'run'
   /*
-   * Taken over, the seat is *yours* — so the tray has to get out of the way of the cards.
+   * **Compact whenever a human needs the board**, which is every moment a bot is not mid-turn.
    *
-   * It shares the hand's grid cell with the Prelude and action trays, which is right when only one
-   * of them is up at a time. Take-over is the case where that assumption breaks: the tray says "play
-   * this seat from the board" while sitting on top of the board it means, and at `z-index: 46`
-   * against the cards' 0 it won every click. The seat could not be played at all.
+   * The tray shares the hand's grid cell with the Prelude and action trays, which is right while a
+   * bot is playing because nothing else is up. Two cases break that assumption, and both were bugs:
+   *
+   *   - **Take-over.** The tray reads "play this seat from the board" while sitting on the board it
+   *     means, and at `z-index: 46` against the cards' 0 it won every click.
+   *   - **A human's own turn.** `lastDecision` lingers after any bot has acted, so the tray stays up
+   *     to report it — with `turn` now `undefined`, which the first version read as "not take-over"
+   *     and drew full-size straight over the player's hand and action tray. It also hid the
+   *     resource-overflow prompt, so taxing looked like it silently produced nothing.
    *
    * Compact moves it to the map's bottom edge instead — the same idiom as the Prelude tray, map
-   * still visible — and drops to just the controls, since the diagnostics are about a decision the
-   * bot is no longer making.
+   * still visible — and drops to the controls alone, since the diagnostics describe a decision that
+   * is no longer being made.
    */
-  const compact = turn !== undefined && store.botMode === 'off'
+  const compact = turn === undefined || store.botMode === 'off'
 
   return (
     <div className={`bot-tray${compact ? ' compact' : ''}`}>
