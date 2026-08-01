@@ -24,7 +24,10 @@ import {
   isCardPlay,
   observe,
   playGame,
+  playGameAt,
   rolloutBot,
+  seatsForGame,
+  seedForGame,
   runArena,
   runBots,
   startGame,
@@ -303,6 +306,53 @@ describe('the arena', () => {
     )
     expect(new Set(seatsPlayed).size).toBe(4)
     expect(report.balanced).toBe(true)
+  })
+
+  it('plays the same game whoever plays it, so a run can be sharded', () => {
+    /*
+     * Parallelising the arena splits games across processes, and the whole thing is only safe if a
+     * game is identified by its *index* rather than by a private counter — shard 2 of 5 has to play
+     * game 7 exactly as a serial run would, same matchup and same seed, or the shards are sampling
+     * different experiments and the aggregate is meaningless.
+     *
+     * Asserted on the two functions the shard and the serial loop share, since that agreement is
+     * what the guarantee rests on.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    const bots = ['a', 'b', 'c']
+
+    // Rotation: over n games each bot sits in each seat exactly once.
+    const seatFor = (index: number, f: FactionId): string =>
+      seatsForGame(bots, three, index)[f] as string
+    for (const f of three) {
+      expect(new Set([0, 1, 2].map((i) => seatFor(i, f))).size).toBe(3)
+    }
+    // And it repeats with period n, so game 7 and game 4 are the same matchup.
+    expect(seatsForGame(bots, three, 7)).toEqual(seatsForGame(bots, three, 4))
+
+    /*
+     * Seeds are a pure function of the base and the index — never of play order — and are *held*
+     * across a rotation, so the same starting position is played with every seating before the next
+     * one begins. That is what stops setup luck and seat luck being confounded.
+     */
+    expect([0, 1, 2].map((i) => seedForGame(500, i, 3))).toEqual([500, 500, 500])
+    expect(seedForGame(500, 3, 3)).toBe(501)
+    expect(seedForGame(undefined, 0, 3)).toBe(1)
+
+    // The payoff: playing game 3 alone matches playing it as part of a run.
+    const alone = playGameAt(
+      [trivialBot, trivialBot, trivialBot],
+      3,
+      { seed: 1, board: 'Board3Frontiers', factions: three },
+      registry,
+    )
+    const inRun = runArena(
+      { bots: [trivialBot, trivialBot, trivialBot], games: 4, seed: 1, factions: three, board: 'Board3Frontiers' },
+      registry,
+    ).games[3]
+    expect(alone.seed).toBe(inRun?.seed)
+    expect(alone.power).toEqual(inRun?.power)
+    expect(alone.actions).toBe(inRun?.actions)
   })
 
   it('counts an unbalanced run as unbalanced rather than averaging it quietly', () => {

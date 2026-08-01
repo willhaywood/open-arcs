@@ -213,42 +213,82 @@ function rankOf(
   return 1 + factions.filter((f) => (power[f] ?? 0) > mine).length
 }
 
-export function runArena(config: ArenaConfig, registry?: RuleRegistry): ArenaReport {
-  const reg = registry ?? defaultRegistry()
+/**
+ * Which bot sits in which seat for game `i`.
+ *
+ * Rotates so that over `n` games each bot plays each seat once — seat order matters in Arcs, and a
+ * fixed assignment measures the seat as much as the bot.
+ *
+ * **Exported because a parallel runner has to agree with this exactly.** Game `i` must produce the
+ * same matchup and the same seed whichever process plays it, or the shards are not sampling one
+ * experiment.
+ */
+export function seatsForGame<T>(
+  bots: readonly T[],
+  factions: readonly FactionId[],
+  index: number,
+): Partial<Record<FactionId, T>> {
+  const seats: Partial<Record<FactionId, T>> = {}
+  factions.forEach((f, j) => {
+    // The caller checks the bounds; the index is always in range.
+    seats[f] = bots[(j + index) % bots.length]!
+  })
+  return seats
+}
+
+/**
+ * The seed for game `i` of a run, so every runner agrees on which game is which.
+ *
+ * **A seed is held while the seats rotate through it**, so `n` consecutive games are the same
+ * starting position played with every seating. Without that, seed and seating advance together and
+ * are confounded: each bot plays each seat an equal number of times, but always on a *different set
+ * of boards*, so setup luck never cancels.
+ *
+ * It shows up as a noise floor that will not come down. Two identical bots, 120 games, still landed
+ * 12 points of win rate apart — because they were never compared on the same game. Sharing the seed
+ * across a full rotation removes that whole source of variance rather than averaging it away.
+ */
+export const seedForGame = (base: number | undefined, index: number, seats: number): number =>
+  (base ?? 1) + Math.floor(index / Math.max(1, seats))
+
+/** Play one game of a run by its index, without needing the whole run. */
+export function playGameAt(
+  bots: readonly Bot[],
+  index: number,
+  config: Omit<ArenaConfig, 'bots' | 'games' | 'onGame'>,
+  registry?: RuleRegistry,
+): GameOutcome {
   const factions = config.factions ?? DEFAULT_FACTIONS
-  const seatCount = factions.length
-  if (config.bots.length !== seatCount) {
-    throw new Error(`runArena: ${config.bots.length} bots for ${seatCount} seats`)
-  }
+  return playGame(
+    {
+      seats: seatsForGame(bots, factions, index),
+      seed: seedForGame(config.seed, index, factions.length),
+      ...(config.board === undefined ? {} : { board: config.board }),
+      factions,
+      ...(config.leadersAndLore === undefined ? {} : { leadersAndLore: config.leadersAndLore }),
+      ...(config.stuckAfter === undefined ? {} : { stuckAfter: config.stuckAfter }),
+    },
+    registry,
+  )
+}
 
-  const started = Date.now()
-  const outcomes: GameOutcome[] = []
-
-  for (let i = 0; i < config.games; i++) {
-    // Rotate: seat j plays bots[(j + i) % n], so over n games each bot sits in each seat once.
-    const seats: Partial<Record<FactionId, Bot>> = {}
-    // The bounds are checked above, so the index is always in range.
-    factions.forEach((f, j) => {
-      seats[f] = config.bots[(j + i) % seatCount]!
-    })
-    const outcome = playGame(
-      {
-        seats,
-        seed: (config.seed ?? 1) + i,
-        ...(config.board === undefined ? {} : { board: config.board }),
-        factions,
-        ...(config.leadersAndLore === undefined ? {} : { leadersAndLore: config.leadersAndLore }),
-        ...(config.stuckAfter === undefined ? {} : { stuckAfter: config.stuckAfter }),
-      },
-      reg,
-    )
-    outcomes.push(outcome)
-    config.onGame?.(outcome, i)
-  }
-
+/**
+ * Turn a set of played games into the report.
+ *
+ * **Separate from playing them, which is the whole point.** Games are independent, so they can be
+ * played anywhere — in this process, or across a pool of worker processes — and the aggregation has
+ * to be identical either way or a parallel run is measuring something a serial run is not. Keeping
+ * one implementation is what guarantees that.
+ */
+export function reportFrom(
+  outcomes: readonly GameOutcome[],
+  botIds: readonly string[],
+  factions: readonly FactionId[],
+  ms: number,
+): ArenaReport {
   // Only finished games are averaged; a stall says nothing about who plays better.
   const scored = outcomes.filter((o) => o.finished)
-  const ids = [...new Set(config.bots.map((b) => b.id))]
+  const ids = [...new Set(botIds)]
   const records: BotRecord[] = ids.map((id) => {
     let games = 0
     let wins = 0
@@ -286,11 +326,33 @@ export function runArena(config: ArenaConfig, registry?: RuleRegistry): ArenaRep
     records: [...records].sort((a, b) => a.meanRank - b.meanRank || b.meanPower - a.meanPower),
     games: outcomes,
     finished: scored.length,
-    balanced: config.games % seatCount === 0,
+    balanced: outcomes.length % factions.length === 0,
     meanActions: scored.length === 0 ? 0 : scored.reduce((n, o) => n + o.actions, 0) / scored.length,
     meanTotalPower: scored.length === 0 ? 0 : totalPower / scored.length,
-    ms: Date.now() - started,
+    ms,
   }
+}
+
+export function runArena(config: ArenaConfig, registry?: RuleRegistry): ArenaReport {
+  const reg = registry ?? defaultRegistry()
+  const factions = config.factions ?? DEFAULT_FACTIONS
+  if (config.bots.length !== factions.length) {
+    throw new Error(`runArena: ${config.bots.length} bots for ${factions.length} seats`)
+  }
+
+  const started = Date.now()
+  const outcomes: GameOutcome[] = []
+  for (let i = 0; i < config.games; i++) {
+    const outcome = playGameAt(config.bots, i, config, reg)
+    outcomes.push(outcome)
+    config.onGame?.(outcome, i)
+  }
+  return reportFrom(
+    outcomes,
+    config.bots.map((b) => b.id),
+    factions,
+    Date.now() - started,
+  )
 }
 
 /**
