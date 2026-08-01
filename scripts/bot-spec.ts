@@ -58,9 +58,18 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'heuristic') {
     // `heuristic:fitted` plays the weights `npm run fit` last wrote.
     if (rest[0] !== 'fitted') return { kind: 'heuristic' }
-    return {
-      kind: 'heuristic',
-      weights: JSON.parse(readFileSync(FITTED, 'utf8')) as Record<string, number>,
+    /*
+     * Generated rather than committed, so this fails loudly when it is missing. Every fitted set
+     * measured so far plays worse than the hand-set weights (docs/19 sections 3f-3i), which is why
+     * one is not kept in the tree: it would read as a recommendation.
+     */
+    try {
+      return {
+        kind: 'heuristic',
+        weights: JSON.parse(readFileSync(FITTED, 'utf8')) as Record<string, number>,
+      }
+    } catch {
+      throw new Error(`No fitted weights at ${FITTED} — run \`npm run fit\` first.`)
     }
   }
   if (kind === 'rollout') {

@@ -8,4 +8,9 @@ assets/images/
 
 node_modules/
 dist/
+
+# Output of `npm run fit`. Regenerable, and no fitted set has ever beaten the hand-set weights
+# (docs/19 sections 3f-3i) — so committing one would look like a recommendation rather than a
+# reproducible experiment.
+packages/engine/src/ai/fitted-weights*.json
 .DS_Store
