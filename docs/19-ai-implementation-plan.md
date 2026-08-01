@@ -1540,6 +1540,56 @@ precisely why the original design read structure instead of resources.
 4. **Explicit denial** — rival proximity to locking an ambition, as its own term rather than only
    through the relative subtraction.
 
+### Step 1 done: income projection — built, safe, and barely moves anything
+
+`incomeFor` counts **cities standing on planets that produce the resource an ambition scores**, and
+`planetResource` was widened to take the narrowest thing that answers the question so the AI reads
+the rules rather than re-implementing them.
+
+**Structure only, deliberately.** Holding Administration is exactly what lets you tax, and reading
+card suits is therefore the tempting version — but a hand changes *during* a turn, so that estimate
+would fall the moment a card was played and the bot would contradict itself between two of its own
+actions (section 2b). Cities and planets barely move within a turn. There is a test for it.
+
+Carried as two features at **weight zero**, so `heuristicBot` — the frozen baseline — is byte
+identical and the golden game still passes. `goalBot` differs from it by exactly two numbers.
+
+| 120 games | wins | rank | power |
+| --- | --- | --- | --- |
+| goal-income | 36% | 1.93 | 22.8 |
+| baseline | 33% | 1.98 | 22.2 |
+| goal-income **[twin]** | 32% | 2.03 | 22.2 |
+
+Twins 4 points apart — an unusually tight floor, because all three bots are nearly the same — and
+the goal bot's average is 34% against 33%. **No measurable difference.** Notably, also no harm:
+unlike every fitted weight set, this does not make the bot worse.
+
+The behavioural check is more informative than the match, as expected:
+
+| bot | declares matching its top-income ambition |
+| --- | --- |
+| baseline | 38% |
+| income at 0.9 | 41% |
+| income at 3.0 | 44% |
+| income at 10 | 43% |
+
+**It works, and it saturates almost immediately.** Ten times the weight buys nothing over three, so
+this is not a tuning problem — the signal is reaching the decision and the decision barely depends
+on it.
+
+The reason is collinearity: **income is nearly a restatement of `cities`**, which already carries a
+weight of 2.0. A city on a Material planet was always counted as a city; the only *new* information
+is which planet it sits on, and that is a refinement rather than a new dimension. The declare
+decision meanwhile is dominated by the `standing` term, and the worked example in section 2 showed
+it turning on margins of 0.01.
+
+**What this says about steps 2-4.** The remaining three are worth more than this one precisely
+because they add information the evaluator has *no* proxy for: declare-readiness (initiative, lead
+strength, enabling cards) and rival proximity to locking an ambition are not restatements of any
+existing feature. Income was the cheapest step, not the biggest, and it is now available for
+feasibility in step 2 — where it is an input to *whether an ambition is winnable*, rather than
+another term competing with `cities`.
+
 ### How this gets validated — not with win rates
 
 The arena's floor is 12-21 points and these effects will be smaller. Use what actually worked:

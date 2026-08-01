@@ -68,7 +68,17 @@ export function rules(state: GameState, color: ColorId, s: SystemId): boolean {
  * count planet types, and for the outrage a razed city provokes. The one deliberate exception is
  * setup's initial seeding, which runs before any leader could have acted.
  */
-export function planetResource(state: GameState, s: SystemId): Resource | undefined {
+/**
+ * What a planet produces when taxed.
+ *
+ * Takes the narrowest thing that answers the question rather than a whole `GameState`, so the AI can
+ * ask it from an `ObservedState` — a bot re-implementing which planets make Material would be the
+ * same rules knowledge in two places, and the copy would be the one that goes stale.
+ */
+export function planetResource(
+  state: { readonly planetTypes: Readonly<Partial<Record<SystemId, Resource>>> },
+  s: SystemId,
+): Resource | undefined {
   const changed = state.planetTypes[s]
   if (changed !== undefined) return changed
   return RESOURCES.find((r) => r === systemInfo(s).resource)

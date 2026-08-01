@@ -1,0 +1,33 @@
+/**
+ * The goal-layer bot: the baseline, plus what the position can earn.
+ *
+ * docs/19 section 4, step 1. Separate from `heuristicBot` rather than an edit to it, because
+ * `heuristicBot` *is* the frozen baseline and a change that alters its behaviour is a new bot by
+ * definition (`baseline.ts`). Adding the signal as features weighted zero by default means the two
+ * differ by exactly these numbers and nothing else — which is the only way the arena can attribute a
+ * difference to the idea rather than to whatever else moved.
+ */
+
+import { heuristicBotWith } from './heuristic.js'
+import { WEIGHTS } from './value.js'
+import type { Bot } from './bot.js'
+import type { Weights } from './value.js'
+
+/**
+ * Income priced against the resources it will become.
+ *
+ * A city on a Material planet is roughly one Material a turn for the rest of the chapter, so it is
+ * worth some multiple of a held resource rather than a fraction of one — `resourcesDeclared` is
+ * 0.45, and two or three turns of yield puts income near double that. The undeclared rate keeps the
+ * same quarter-ish discount held resources use, since income toward an ambition nobody has declared
+ * is a prospect rather than a prize.
+ *
+ * Starting points, like every weight here. The arena and the behavioural checks are what move them.
+ */
+export const GOAL_WEIGHTS: Weights = {
+  ...WEIGHTS,
+  incomeDeclared: 0.9,
+  incomeUndeclared: 0.22,
+}
+
+export const goalBot: Bot = heuristicBotWith(GOAL_WEIGHTS, 'goal-income')

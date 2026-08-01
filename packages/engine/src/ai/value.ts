@@ -15,6 +15,7 @@
  */
 
 import { metric } from '../rules/ambitions.js'
+import { incomeFor } from './income.js'
 import { AMBITIONS } from '../state.js'
 import {
   CourtPile,
@@ -116,6 +117,8 @@ export const FEATURES = [
   'standing',
   'resourcesDeclared',
   'resourcesUndeclared',
+  'incomeDeclared',
+  'incomeUndeclared',
   'weapons',
   'cities',
   'starports',
@@ -145,6 +148,14 @@ export const WEIGHTS: Weights = {
   standing: 1,
   resourcesDeclared: 0.45,
   resourcesUndeclared: 0.1125,
+  /*
+   * Income is **off by default**, which is the point of adding it this way. `heuristicBot` is the
+   * frozen baseline (docs/19 section 4) and a weight of zero leaves it byte-identical, so the new
+   * signal can be measured by a bot that turns it on rather than by silently moving the thing it is
+   * being compared against. `GOAL_WEIGHTS` in `goal.ts` is where it is switched on.
+   */
+  incomeDeclared: 0,
+  incomeUndeclared: 0,
   weapons: 0.25,
   cities: 2.0,
   starports: 1.2,
@@ -206,6 +217,20 @@ export function featuresOf(
     else x.resourcesUndeclared += scaled
   }
   x.weapons = countResource(observed.resources, slots, 'Weapon')
+
+  /*
+   * What the position can *earn*, as opposed to what it holds — cities standing on planets that
+   * produce the resource an ambition scores. Split declared from undeclared for the same reason the
+   * held resources are: income toward something nobody has declared is a prospect, not a prize.
+   */
+  const income = incomeFor(observed, self)
+  for (const ambition of AMBITIONS) {
+    const earned = income.get(ambition) ?? 0
+    if (earned === 0) continue
+    const scaled = earned * bias(intent, ambition)
+    if (declared.has(ambition)) x.incomeDeclared += scaled
+    else x.incomeUndeclared += scaled
+  }
 
   // Buildings: power at scoring, plus everything they unlock — tax income, build sites, capacity.
   x.cities = pieces(observed, self, 'City').length
