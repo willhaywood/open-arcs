@@ -1495,7 +1495,76 @@ Not more fitting. The two things that would change the picture:
 Both attack the same bottleneck from opposite sides, and both are engineering rather than tuning.
 Until one lands, **the hand-set weights stand, having now survived four measured attempts.**
 
-## 4. V3 — information-set search
+## 4. The goal layer — playing *toward* an ambition
+
+Sections 3a-3i establish the direction by elimination: **every gain came from widening what the
+evaluator can see, and every attempt to get strength from more search or better-fitted weights
+failed.** This is a representation change, which is the side that has been paying.
+
+### What the bot cannot currently represent
+
+| requirement | what is missing |
+| --- | --- |
+| pick an ambition it *can work toward* | **Capacity.** `metric('Tycoon')` is Material+Fuel *held now*; nothing projects income. |
+| act to advance it | `intent` biases weights, but nothing knows *which actions generate the resource*. |
+| deny rivals theirs | Implicit only, through `mine − best`. No notion of "blue is 2 Relics from locking Keeper". |
+| decide whether to win initiative in order to declare | Not representable: initiative, lead-card strength and declare-enabling cards are invisible. |
+
+The worked examples in section 2 make the first concrete: a bot with three cities on Material planets
+and two Administration cards will not push for Tycoon, because **nothing it looks at can see either
+fact**. `planetResource(state, system)` supplies the first and the hand supplies the second; neither
+is read anywhere in `ai/`.
+
+### The constraint that shapes all of it
+
+**Goals must be derived, never remembered** (section 2b). A remembered plan dies on reload, and in
+multiplayer two clients holding different plans fork the game by who posted first.
+
+That is less limiting than it sounds: **the journal is shared**, so a plan derived from
+`(state, journal)` is deterministic, reproducible on any client and survives reload. What is
+forbidden is bot-local memory, not richness.
+
+The second half of 2b still binds too: intent must not move *within* a turn, or the bot argues with
+itself between two of its own actions. Reading **capacity** (cities, planet types, hand suits)
+rather than **holdings** respects that, because capacity barely moves inside a turn — which is
+precisely why the original design read structure instead of resources.
+
+### The order
+
+1. **Income projection.** `planetResource` for my cities plus hand suits, into expected resources per
+   ambition by chapter end. Smallest change, fixes the worked example, unblocks the rest.
+2. **Feasibility replaces `fitness` in `intentFor`** — "what can I actually get by chapter end
+   against what rivals can" instead of today's structural proxy.
+3. **Declare-readiness as a visible term** — initiative, lead strength, enabling cards. This is what
+   makes "is winning initiative worth it?" answerable at all.
+4. **Explicit denial** — rival proximity to locking an ambition, as its own term rather than only
+   through the relative subtraction.
+
+### How this gets validated — not with win rates
+
+The arena's floor is 12-21 points and these effects will be smaller. Use what actually worked:
+
+- **Behavioural counts.** Every reliable signal in this document was a direct count — pass:lead
+  32:4 → 72:71, cancels 31 → 0, secures 0 → 2. The equivalent here is *"does it declare the ambition
+  it has the most projected income for?"*, which needs no statistics.
+- **Scenario saves.** `saves/` already parks reachable positions for exactly this kind of question.
+  A position with cities on Material planets and Administration in hand, asserting the bot declares
+  Tycoon, fails for a comprehensible reason rather than a statistical one.
+
+### Always keep a snapshot to test against
+
+**`baselineBot` is the frozen current best**, and the rule is simple: **never change it.** A change
+that would alter its behaviour is a *new* bot, not an edit to this one.
+
+Without that, the baseline drifts with the thing under test and no comparison means anything —
+`heuristicBot` today is far stronger than `heuristicBot` at the start of section 2, and if the goal
+layer edits the same code path there is nothing left to measure against.
+
+Drift is caught rather than trusted: **a golden-game test** plays fixed seeds with `baselineBot` and
+asserts exact outcomes, so any accidental change to the shared code path fails loudly and names
+itself. `--seats baseline` puts it in the arena.
+
+## 4a. V3 — information-set search
 
 docs/03 section 5 is aspirational and this plan does not schedule it. Two things it needs that do
 not exist:
