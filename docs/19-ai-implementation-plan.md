@@ -5,6 +5,71 @@ engine as it actually stands rather than as docs/03 anticipated it. Read docs/03
 the value/policy split it argues for is the spine of everything below — and section 9a for how bot
 seats work alongside humans.
 
+## 0. What has been tried — read this before proposing anything
+
+A register of what was **built and measured**, so nothing here gets attempted twice. Each row links
+to the section with the numbers. The short version: **V1 with hand-set weights is the strongest bot,
+and four separate attempts to beat it have failed for one shared reason.**
+
+### The bot as it stands
+
+`heuristicBot` — a hand-tuned linear evaluator, chapter-goal weighting, one ply of lookahead with
+sub-flows resolved, no opponent modelling. It is what `apps/web` plays (`store.ts`). Three-player
+mirror mean power went **2.5 → 16.7 → 22.8 → 24.5 → ~26** over this work, and **every one of those
+gains came from fixing something the evaluator could not see, never from re-tuning what it weighed.**
+
+### Tried and rejected — do not repeat
+
+| attempt | result | section |
+| --- | --- | --- |
+| V2 rollouts, 2-turn horizon, trivial playouts | indistinguishable from V1 | 3a |
+| V2 rollouts, better playout policy | still indistinguishable; V1 ahead on power | 3d |
+| V2 rollouts, chapter-end horizon | V1 ahead on power in 3/3 configurations | 3e |
+| Greedy-on-`valueOf` playout policy | unaffordable — one game did not finish in 10 min | 3d |
+| Fitting weights by regression on returns | 18% wins vs V1's 64% — learns correlations | 3f |
+| Iterating the fit (policy iteration) | R² collapses 0.216 → 0.018; strength flat at the floor | 3g |
+| Regularising the fit toward the hand weights | recovers monotonically toward the prior, never past it | 3h |
+| Fitting from choices (interventional pairs) | correct design, zero signal — label noise ~20x effect | 3i |
+
+### Why they all failed, in one sentence
+
+**There is no cheap, low-variance way to say what one action is worth in this game.** Rollouts need
+it and cannot afford a policy good enough to provide it; every fitting route needs it and the label
+noise swamps the effect. The same wall, four times.
+
+Supporting numbers worth not re-deriving: the engine runs at **0.049 ms/action**; a full game is
+**~24ms** as one playout; a V1 decision costs **~4ms**; the arena's noise floor is **12–21 points of
+win rate at 120 games**, and a choice-labelling pair carries **~9.6 power of noise against a ~0.5
+power effect**.
+
+### Measurement traps already paid for
+
+- **Always run a noise floor.** `npm run arena -- --noise` duplicates a seat's bot under a second
+  name; any gap smaller than the twins' own is not a result (section 3c).
+- **12-game runs rank nothing.** Several early conclusions in section 2 were drawn from samples that
+  cannot resolve what they claimed; the behavioural counts (pass:lead, cancels, secures) stand, the
+  power deltas do not.
+- **The arena is provably fair** — three identical bots come out exactly symmetric, and that is now a
+  test. Null results from it are real nulls (section 3c).
+- **`npm run typecheck` does not cover `scripts/`.** A badly mangled script typechecked clean.
+
+### What would actually move it
+
+Not another search or fitting idea. Both remaining levers are engineering:
+
+1. **A cheaper engine.** `Tracker` copies whole `Map`s per update (section 1). Structural sharing
+   cuts the cost of every playout, and playout count is exactly what the variance arithmetic is
+   short of. Contained behind one module, and the highest-leverage change left.
+2. **A cheap-but-strong playout policy** — what section 3d could not afford. Makes each playout a
+   better estimate rather than needing more of them.
+
+### Known evaluator blind spots, still open
+
+Concrete and cheap to describe, from the worked examples in section 2: **income is invisible** (it
+declares on resources held, never on capacity to generate), **planet types are never read**, and
+**card suits in hand are never read**. A bot with three cities on Material planets and two
+Administration cards will not push for Tycoon, because nothing it looks at can see any of that.
+
 ## 1. The seven prerequisites, verified
 
 docs/03 section 6 lists what the engine must provide. It was written before most of the engine
