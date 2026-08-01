@@ -121,6 +121,7 @@ export const FEATURES = [
   'incomeDeclared',
   'incomeUndeclared',
   'declareReady',
+  'standingContested',
   'weapons',
   'cities',
   'starports',
@@ -163,6 +164,11 @@ export const WEIGHTS: Weights = {
    * bot that switches this on can be attributed a difference. `GOAL_WEIGHTS` turns it on.
    */
   declareReady: 0,
+  /*
+   * Off by default like the other goal-layer additions, so the frozen baseline stays byte-identical
+   * and a bot that switches it on can be attributed the difference. `CONTEST_WEIGHTS` turns it on.
+   */
+  standingContested: 0,
   weapons: 0.25,
   cities: 2.0,
   starports: 1.2,
@@ -204,6 +210,23 @@ export function featuresOf(
     )
     const share = mine === 0 && best === 0 ? 0 : mine > best ? 1 : mine === best ? 0.5 : 0.2
     x.standing += d.marker.high * share * bias(intent, d.ambition)
+
+    /*
+     * How *live* the ambition is, which `share` structurally cannot say: it is a step function over
+     * {0, 0.2, 0.5, 1}, so leading 10-1 and leading 3-2 are the same number to it, and so are being
+     * one behind and eight behind.
+     *
+     * That second case is the expensive one. Being a single Relic short of taking a declared Keeper
+     * is nearly as valuable as holding it — one action flips the whole marker — and `share` prices
+     * it at 0.2, barely above hopeless. This is the term that makes contesting and denying visible:
+     * it peaks when the margin is nothing and decays as the ambition settles, so it values both
+     * defending a fragile lead and attacking a fragile deficit, which are the same situation seen
+     * from two sides.
+     */
+    if (mine > 0 || best > 0) {
+      x.standingContested +=
+        (d.marker.high * bias(intent, d.ambition)) / (1 + Math.abs(mine - best))
+    }
   }
 
   /*

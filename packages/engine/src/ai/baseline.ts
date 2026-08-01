@@ -36,6 +36,7 @@ export const BASELINE_WEIGHTS: Weights = {
   incomeDeclared: 0,
   incomeUndeclared: 0,
   declareReady: 0,
+  standingContested: 0,
   weapons: 0.25,
   cities: 2.0,
   starports: 1.2,

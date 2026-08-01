@@ -46,6 +46,17 @@ export const DECLARE_WEIGHTS: Weights = { ...GOAL_WEIGHTS, declareReady: 0.5 }
 export const declareBot: Bot = heuristicBotWith(DECLARE_WEIGHTS, 'goal-declare', feasibility)
 
 /**
+ * Step 4 weights: how *live* each declared ambition is, on top of everything before it.
+ *
+ * `standingContested` already carries the marker's value scaled by intent, so this multiplier only
+ * says how much a contest is worth relative to a settled standing. A third, to start: a marker one
+ * action from changing hands is worth real attention and is still not yours.
+ */
+export const CONTEST_WEIGHTS: Weights = { ...DECLARE_WEIGHTS, standingContested: 0.35 }
+
+export const contestBot: Bot = heuristicBotWith(CONTEST_WEIGHTS, 'goal-contest', feasibility)
+
+/**
  * Step 2: the same weights, but chapter goals judged by what the position can *produce*.
  *
  * Separate from `goalBot` so the arena can attribute a difference to feasibility rather than to

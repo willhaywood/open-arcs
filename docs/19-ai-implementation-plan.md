@@ -1697,6 +1697,53 @@ attempt to get strength from search (3a-3e) or from re-fitting weights (3f-3i) f
 Step 4 — rival proximity to locking an ambition — is the remaining one with no proxy, and is now the
 best candidate for the same reason this one was.
 
+### Step 4 done: contestedness — no gain, and the prediction behind it was wrong
+
+`standing` scales a marker by a step function over {0, 0.2, 0.5, 1}, so leading 10-1 and leading 3-2
+are the same number to it, and so are being one behind and eight behind. `standingContested` adds the
+margin: `marker x bias / (1 + |mine - best|)`, peaking when the margin is nothing and decaying as an
+ambition settles. It values defending a fragile lead and attacking a fragile deficit — the same
+situation from two sides — and there are tests showing `standing` provably cannot express either.
+
+| 120 games, contest vs declare | contest (twin-averaged) | declare | floor |
+| --- | --- | --- | --- |
+| seed 1 | 33% wins, 20.05 power | 34%, 20.1 | 4 pts / 0.5 |
+| seed 900 | 33.5% wins, 20.95 power | 33%, 20.3 | 5 pts / 1.5 |
+
+**Nothing, in either run, on either metric.**
+
+#### The prediction was wrong, and why is the useful part
+
+Step 3 was expected to work because it added a dimension with no proxy, and it did. Step 4 was
+predicted to be "the remaining one with no proxy" — **that was a mistake, and the reason is in
+`valueOf`'s own definition.**
+
+`valueOf` is **relative**: mine minus the best opponent's, and a rival's score includes *their*
+`standing`. So a rival close to locking Keeper already lowers this bot's value, and the bot already
+prefers actions that pull it back. **Denial was priced from the beginning** — the relative
+subtraction is the proxy, and it was there before any of section 4.
+
+What contestedness adds is only *margin sensitivity* on top of that. Which puts it with steps 1 and
+2 — a refinement of information the evaluator already expressed — rather than with step 3.
+
+#### The pattern across all four steps
+
+| step | kind of change | result |
+| --- | --- | --- |
+| 1 income | refines `cities` | none |
+| 2 feasibility | refines `fitness` | none (one run looked good, did not replicate) |
+| 3 declare-readiness | **new dimension** — hand, initiative, markers | **replicated gain, isolated** |
+| 4 contestedness | refines the relative subtraction | none |
+
+Three refinements, three nulls; one genuinely new dimension, one gain. That is the same shape as
+sections 2 and 3 — **widening what the evaluator can see pays; sharpening what it already sees does
+not** — and it is now the test to apply before building anything else: *is there any existing term,
+however coarse, that already moves with this?* If yes, expect nothing.
+
+The code stays: tested, carried at weight zero, and `--seats contest` makes it a one-line experiment
+if the weights around it change. **`apps/web` continues to play `declareBot`**, which remains the
+measured best.
+
 ### How this gets validated — not with win rates
 
 The arena's floor is 12-21 points and these effects will be smaller. Use what actually worked:
