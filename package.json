@@ -1,5 +1,5 @@
 {
-  "name": "arcs",
+  "name": "open-arcs",
   "private": true,
   "type": "module",
   "workspaces": [
