@@ -24,7 +24,12 @@ import {
   isCardPlay,
   observe,
   playGame,
+  Location,
+  contentsOf,
+  parseFigureId,
   playGameAt,
+  playOut,
+  playoutChoice,
   rolloutBot,
   seatsForGame,
   seedForGame,
@@ -34,7 +39,7 @@ import {
   stepBot,
   trivialBot,
 } from '../src/index.js'
-import type { Bot, FactionId, GameOutcome } from '../src/index.js'
+import type { Action, Bot, FactionId, GameOutcome } from '../src/index.js'
 
 const registry = defaultRegistry()
 const FOUR: readonly FactionId[] = ['red', 'yellow', 'blue', 'white']
@@ -255,6 +260,82 @@ describe('the arena', () => {
      * shorter game — a threshold calibrated against a bug, failing on the fix.
      */
     expect(out.result.continue.kind).toBe('gameOver')
+  })
+
+  it('plays rollouts forward with a policy that builds rather than drifts', () => {
+    /*
+     * A rollout is only as good as the policy inside it. The first version played `trivialBot` —
+     * first legal action — which never taxes deliberately, never builds toward anything, and passes
+     * whenever passing is offered first. A rollout then scored the position an arbitrary
+     * continuation reaches, and V2 came out indistinguishable from V1 over 120 games.
+     *
+     * Asserted on what the policy *chooses*, which is the behaviour that matters and the thing a
+     * silent regression to `trivialBot` would change. Building beats passing; a battle already
+     * started gets rolled rather than abandoned.
+     */
+    const build = { type: 'action/build', faction: 'red', label: 'Build City' } as unknown as Action
+    const pass = { type: 'turn/pass', faction: 'red', label: 'Pass' } as unknown as Action
+    const move = { type: 'action/move-ships', faction: 'red', label: 'Move' } as unknown as Action
+    const cancel = { type: 'battle/cancel', faction: 'red', label: 'Cancel' } as unknown as Action
+    const roll = { type: 'battle/roll', faction: 'red', label: 'Roll 3S' } as unknown as Action
+
+    // `pass` first in the list is exactly what trivialBot would have taken.
+    expect(playoutChoice([pass, move, build])).toBe(build)
+    expect(playoutChoice([pass, move])).toBe(move)
+    expect(playoutChoice([cancel, roll])).toBe(roll)
+    // Nothing but rollbacks on offer still returns something rather than throwing.
+    expect(playoutChoice([cancel])).toBe(cancel)
+  })
+
+  it('actually plays rollouts with that policy, not with the first legal action', () => {
+    /*
+     * Testing `playoutChoice` alone leaves the single line that calls it unverified — a mutation
+     * pointing `playOut` back at `actions[0]` passed every test. So this plays the same position
+     * both ways and requires them to differ: if the wiring regresses, the two are identical.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    let r = startGame(
+      { board: 'Board3Frontiers', factions: [...three], seed: 1, bots: [...three] },
+      registry,
+    )
+
+    const board = (o: ReturnType<typeof observe>): string =>
+      three
+        .map((f) =>
+          ['City', 'Starport', 'Ship']
+            .map((piece) =>
+              o.board.systems.reduce(
+                (n, sys) =>
+                  n +
+                  contentsOf(o.figures, Location.system(sys)).filter((id) => {
+                    const p = parseFigureId(id)
+                    return p.color === f && p.piece === piece
+                  }).length,
+                0,
+              ),
+            )
+            .join('/'),
+        )
+        .join(' ')
+
+    /*
+     * Swept across positions rather than pinned to one. Plenty of positions offer no choice the two
+     * policies disagree about, and the first version of this test picked one of them and failed —
+     * correctly. What matters is that the policy changes the course of a playout *somewhere* in a
+     * real game, and that it does so often rather than once.
+     */
+    let differing = 0
+    for (let i = 0; i < 120; i++) {
+      const c = r.continue
+      if (c.kind !== 'ask') break
+      // Same function, same horizon — only the policy differs, so nothing else can explain a gap.
+      const withPolicy = playOut(r, c.faction, registry, 2, 200)
+      const firstLegal = playOut(r, c.faction, registry, 2, 200, (a) => a[0]!)
+      if (board(withPolicy) !== board(firstLegal)) differing++
+      r = stepBot(r, trivialBot, c.faction, registry).result
+    }
+
+    expect(differing).toBeGreaterThan(10)
   })
 
   it('does not roll out anything but the card play', () => {

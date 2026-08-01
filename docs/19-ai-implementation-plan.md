@@ -1057,6 +1057,60 @@ of win rate** when a genuine difference exists in the field. So:
 - Detecting a small edge needs many hundreds of games. At ~2s a game parallel that is now minutes
   rather than hours, which is exactly what the parallelism was for.
 
+## 3d. Fixing the playout policy — and what it did not fix
+
+V2's playouts ran on `trivialBot`: first legal action. Not merely weak but **biased** — it never
+taxes deliberately, never builds toward anything, and passes whenever passing is offered first. A
+rollout therefore scored the position an arbitrary continuation reaches, which was the leading
+explanation for V2 being indistinguishable from V1.
+
+### The obvious fix is unaffordable, measured
+
+Greedy on `valueOf` — the same function the bot decides with — was written first. It needs an
+`advance` and a full evaluation **per candidate per step**, roughly twenty thousand of each per card
+play. **A single three-player game did not finish in ten minutes.**
+
+That is the standard trap with playout policies: they run tens of thousands of times per decision,
+so they must be cheap in a way a decision procedure need not be.
+
+### What replaced it
+
+`playoutChoice` — an ordered preference over action *types*, needing no lookahead at all: build and
+tax first, finish battles already started, ordinary board play, and play a card rather than pass.
+Crude, but it encodes the two things `trivialBot` got wrong.
+
+Cost with it: 24s a game at `(samples 4, turns 2)`, against ~14s before — about 1.6x.
+
+### It did not make V2 better
+
+| 3-player, 120 games | wins | rank | power |
+| --- | --- | --- | --- |
+| rollout-v2(4x2) | 43% | 1.78 | 25.6 |
+| heuristic-v1 | 35% | 1.86 | 25.4 |
+| rollout-v2(4x2) **[twin]** | 22% | 2.26 | 19.8 |
+
+The twins are the same bot: **21 points apart**, against the 8 points by which V2 leads V1. Averaging
+the two identical instances — the best estimate of V2's true strength — gives 32.5% and 22.7 power
+against V1's 35% and 25.4. **No measurable difference, again.**
+
+### The diagnosis this points at
+
+A rollout adds information only if the playout reveals something the evaluator cannot already see.
+Ours runs **two turns** and is then scored by **the same `valueOf`** the bot would have used
+directly — so it is largely a noisy re-measurement of the evaluator rather than new evidence.
+Averaging four samples reduces that noise; it does not add information.
+
+Two candidates follow, and the arena can now settle them:
+
+1. **Much longer horizons** — to chapter end, where ambitions actually score. That is where the
+   payoff a static evaluator cannot see genuinely lives. Expensive, and the reason `maxSteps` and
+   the cost measurements exist.
+2. **Rollouts are the wrong lever for this game** and the evaluator is what needs the work — in
+   which case the honest next step is learning its weights rather than arguing them.
+
+What is *not* worth doing is another round of hand-tuning against 120-game samples that cannot
+resolve 8 points.
+
 ## 4. V3 — information-set search
 
 docs/03 section 5 is aspirational and this plan does not schedule it. Two things it needs that do

@@ -13,7 +13,7 @@
 
 import { advance, applyExternal, defaultRegistry, rng } from '../index.js'
 import { observe } from '../observe.js'
-import { trivialBot } from './bot.js'
+import { refuses } from './heuristic.js'
 
 import type { RuleRegistry, RuleResult } from '../dispatch.js'
 import type { FactionId } from '../ids.js'
@@ -308,18 +308,94 @@ function settledSamples(
 }
 
 /**
+ * How a playout picks its moves: a light, ordered preference over action types.
+ *
+ * **A rollout is only as good as the policy inside it**, and the first version used `trivialBot` —
+ * first legal action. That is not merely weak, it is *biased*: it never taxes deliberately, never
+ * builds toward anything, and takes whatever the engine happens to offer first. A rollout therefore
+ * scored the position an arbitrary continuation reaches, which is why V2 came out indistinguishable
+ * from V1 over 120 games. There was nothing worth simulating inside the simulation.
+ *
+ * **It is a preference table and not an evaluation, and that is a cost decision with evidence.** The
+ * obvious fix — greedy on `valueOf`, the same function the bot decides with — was written first and
+ * measured: it needs an `advance` and a full evaluation *per candidate per step*, roughly twenty
+ * thousand of each per card play, and a single three-player game did not finish in ten minutes. That
+ * is the standard trap with playout policies: they run tens of thousands of times, so they have to
+ * be cheap in a way a decision procedure does not.
+ *
+ * So this ranks by what the action *is*, needing no lookahead at all. Crude, but it encodes the two
+ * things `trivialBot` got wrong — it builds and taxes rather than drifting, and it plays a card
+ * rather than passing — which is what a rollout needs its continuation to do before the payoff of a
+ * card can show up in it.
+ */
+const PLAYOUT_ORDER: readonly string[] = [
+  // Grow the position: buildings are the engine, and taxing is what feeds it.
+  'action/build',
+  'action/tax-city',
+  // Court cards are lasting abilities; securing beats merely reaching for one.
+  'action/secure',
+  'action/influence',
+  // Finish fights already started rather than leaving them half-resolved.
+  'battle/roll',
+  'battle/hit',
+  'battle/target',
+  'battle/system',
+  'action/battle',
+  'action/repair',
+  // Then ordinary board play.
+  'action/move-ships',
+  'action/move-pick',
+  'action/take',
+  // Play a card rather than sit the round out — the whole reason V1 needed pips priced.
+  'turn/lead',
+  'turn/pivot',
+  'turn/copy',
+  'turn/surpass',
+]
+
+/** Actions that end a turn or give something up; last resort in a playout. */
+const PLAYOUT_LAST: readonly string[] = ['turn/pass', 'turn/end', 'action/skip']
+
+function playoutRank(action: Action): number {
+  if (refuses(action)) return 1000
+  if (PLAYOUT_LAST.includes(action.type)) return 900
+  const i = PLAYOUT_ORDER.indexOf(action.type)
+  return i === -1 ? 500 : i
+}
+
+/** Pick a playout move: best rank, earliest offer among equals — no lookahead, no evaluation. */
+export function playoutChoice(actions: readonly Action[]): Action {
+  let best = actions[0]!
+  let bestRank = Number.POSITIVE_INFINITY
+  for (const action of actions) {
+    const rank = playoutRank(action)
+    if (rank < bestRank) {
+      bestRank = rank
+      best = action
+    }
+  }
+  return best
+}
+
+/**
  * Play a position forward with a cheap policy and report how it looks to `self`.
  *
- * Stops at the first of: the horizon in turns, the step ceiling, or the game ending. `trivialBot`
- * drives it — see `rollout.ts` for why a weak policy is the only affordable one, and why that is the
- * honest limit of V2 as built.
+ * Stops at the first of: the horizon in turns, the step ceiling, or the game ending.
+ *
+ * **The policy is a parameter purely so it can be held constant against the default.** Testing
+ * `playoutChoice` on its own leaves the single line that calls it unverified — a mutation pointing
+ * this at `actions[0]` passed every test. The first attempt at a wiring test compared this against a
+ * hand-rolled loop and passed for the wrong reason: the loop had no turn horizon, so the two
+ * differed however the policy was wired. Same function, same horizon, different policy is the only
+ * comparison that isolates it.
  */
-function playOut(
+export function playOut(
   from: RuleResult,
   self: FactionId,
   reg: RuleRegistry,
   turns: number,
   maxSteps: number,
+  policy: (actions: readonly Action[]) => Action = playoutChoice,
 ): ObservedState {
   let current = from
   const startedIn = turnKey(current.state)
@@ -337,11 +413,7 @@ function playOut(
       if (seen.size > turns + 1) break
     }
     try {
-      current = advance(
-        current.state,
-        trivialBot.decide(observe(current.state, c.faction), c.actions).action,
-        reg,
-      )
+      current = advance(current.state, policy(c.actions), reg)
     } catch {
       // A playout that cannot continue is scored where it stopped, not discarded.
       break

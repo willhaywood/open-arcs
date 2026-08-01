@@ -44,7 +44,7 @@ const PIP_VALUE = 0.5
  * A renamed label degrades rather than breaks: the bot could consider cancelling again, which is a
  * weaker bot, not a stuck one.
  */
-function refuses(action: Action): boolean {
+export function refuses(action: Action): boolean {
   return action.type === 'battle/cancel' || action['label'] === 'Cancel'
 }
 
