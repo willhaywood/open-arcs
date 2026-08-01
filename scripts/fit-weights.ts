@@ -57,6 +57,15 @@ const seed = Number(flag('seed') ?? 10_000)
 const ridges = (flag('ridge') ?? '0,0.03,0.1,0.3,1,3').split(',').map(Number)
 const out = flag('out') ?? 'packages/engine/src/ai/fitted-weights.json'
 const iterations = Math.max(1, Number(flag('iterations') ?? 1))
+/*
+ * Learn from *choices* rather than positions.
+ *
+ * The position collector learns what correlates with winning; this one intervenes — two candidate
+ * actions from the same position, each played out, labelled by the difference in final relative
+ * power. Because both branches start from the same state, every confound about *that state* cancels
+ * in the difference, which is the thing sections 3f-3h could not get round.
+ */
+const choices = argv.includes('--choices')
 const board = flag('board') ?? 'Board3Frontiers'
 const factions = board.startsWith('Board3')
   ? ['red', 'yellow', 'blue']
@@ -117,7 +126,8 @@ const collect = async (weights: Record<string, number> | undefined): Promise<Row
         jobs,
         ...(weights === undefined ? {} : { weights }),
       }
-      const child = spawn('npx', ['vite-node', 'scripts/fit-collect.ts', JSON.stringify(job)], {
+      const script = choices ? 'scripts/fit-choices-collect.ts' : 'scripts/fit-collect.ts'
+      const child = spawn('npx', ['vite-node', script, JSON.stringify(job)], {
         stdio: ['ignore', 'pipe', 'inherit'],
       })
       let buffer = ''
@@ -126,7 +136,12 @@ const collect = async (weights: Record<string, number> | undefined): Promise<Row
         buffer += chunk
         const lines = buffer.split('\n')
         buffer = lines.pop() ?? ''
-        for (const line of lines) if (line.trim() !== '') rows.push(JSON.parse(line) as Row)
+        for (const line of lines) {
+          if (line.trim() === '') continue
+          const raw = JSON.parse(line) as { x?: number[]; d?: number[]; y: number }
+          // The choices collector emits a *difference* vector; both are a row of features to fit.
+          rows.push({ x: raw.x ?? raw.d ?? [], y: raw.y })
+        }
       })
       child.on('exit', (code) => {
         if (code !== 0) failed++
@@ -152,6 +167,7 @@ const collect = async (weights: Record<string, number> | undefined): Promise<Row
 function fit(
   rows: readonly Row[],
   ridge: number,
+  centred: boolean,
 ): {
   weights: Record<string, number>
   rmse: number
@@ -171,10 +187,14 @@ function fit(
    * are on wildly different scales — power reaches 30 where a court claim is a fraction. Unscaled,
    * the penalty would fall almost entirely on the small features.
    */
-  const mean = Array.from(
-    { length: p },
-    (_, j) => train.reduce((n, r) => n + r.x[j]!, 0) / train.length,
-  )
+  /*
+   * Differences are not centred and get no intercept. `w . (xa - xb)` is already the quantity being
+   * predicted, and subtracting a mean from a difference would fit an offset that does not exist —
+   * the model has to pass through the origin because taking neither action changes nothing.
+   */
+  const mean = centred
+    ? Array.from({ length: p }, (_, j) => train.reduce((n, r) => n + r.x[j]!, 0) / train.length)
+    : new Array<number>(p).fill(0)
   const sd = Array.from({ length: p }, (_, j) => {
     const v = train.reduce((n, r) => n + (r.x[j]! - mean[j]!) ** 2, 0) / train.length
     // A feature that never varies carries no information; 1 leaves its fitted weight at zero.
@@ -182,14 +202,15 @@ function fit(
   })
   const z = (r: Row): number[] => Array.from({ length: p }, (_, j) => (r.x[j]! - mean[j]!) / sd[j]!)
 
-  // Normal equations with an intercept column, ridged on the slopes only.
-  const A = Array.from({ length: p + 1 }, () => new Array<number>(p + 1).fill(0))
-  const b = new Array<number>(p + 1).fill(0)
+  // Normal equations. An intercept column only where one is meaningful; see above.
+  const width = centred ? p + 1 : p
+  const A = Array.from({ length: width }, () => new Array<number>(width).fill(0))
+  const b = new Array<number>(width).fill(0)
   for (const r of train) {
-    const v = [1, ...z(r)]
-    for (let i = 0; i <= p; i++) {
+    const v = centred ? [1, ...z(r)] : z(r)
+    for (let i = 0; i < width; i++) {
       b[i]! += v[i]! * r.y
-      for (let j = 0; j <= p; j++) A[i]![j]! += v[i]! * v[j]!
+      for (let j = 0; j < width; j++) A[i]![j]! += v[i]! * v[j]!
     }
   }
   /*
@@ -199,14 +220,15 @@ function fit(
    */
   const lambda = ridge * train.length
   const priorZ = FEATURES.map((f, j) => WEIGHTS[f] * sd[j]!)
-  for (let i = 1; i <= p; i++) {
+  const offset = centred ? 1 : 0
+  for (let i = offset; i < width; i++) {
     A[i]![i]! += lambda
-    b[i]! += lambda * priorZ[i - 1]!
+    b[i]! += lambda * priorZ[i - offset]!
   }
 
   const sol = solve(A, b)
-  const intercept = sol[0]!
-  const zw = sol.slice(1)
+  const intercept = centred ? sol[0]! : 0
+  const zw = centred ? sol.slice(1) : sol
 
   const err = (set: readonly Row[]): number =>
     Math.sqrt(
@@ -234,7 +256,10 @@ let weights: Record<string, number> | undefined = undefined
 
 for (let round = 1; round <= iterations; round++) {
   const playedBy = weights === undefined ? 'hand-set' : `round ${round - 1}`
-  console.log(`\n--- round ${round}: ${games} self-play games played with the ${playedBy} weights`)
+  console.log(
+    `\n--- round ${round}: ${games} self-play games with the ${playedBy} weights` +
+      `${choices ? ', learning from choices' : ''}`,
+  )
   const rows = await collect(weights)
   if (rows.length < p * 20) throw new Error(`too few rows (${rows.length}) to fit ${p} weights`)
 
@@ -246,7 +271,7 @@ for (let round = 1; round <= iterations; round++) {
   console.log(`  ${rows.length} rows`)
   console.log('  ridge      RMSE      R2   |  a few weights')
   for (const ridge of ridges) {
-    const result = fit(rows, ridge)
+    const result = fit(rows, ridge, !choices)
     const r2 = 1 - (result.rmse / result.base) ** 2
     const peek = (['cities', 'weapons', 'courtSecured'] as const)
       .map((f) => `${f} ${(result.weights[f] ?? 0).toFixed(2)}`)

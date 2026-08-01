@@ -1356,6 +1356,80 @@ Worth saying plainly: **the hand-set weights have now survived four measured att
 That is a stronger endorsement than they had before this work, and the tooling to challenge them
 again is in place.
 
+## 3i. Learning from choices — the right idea, blocked by variance
+
+The last route from section 3f, and the only one that attacks the confound rather than damping it.
+`fit-choices-collect.ts` **intervenes** instead of observing: at a decision, take two candidate
+actions from the *same* position, play each to the end of the game, and label the pair by the
+difference in final relative power.
+
+That design is correct, and the reason is worth keeping. Everything about the position — who is
+ahead, how the chapter is going, which markers are out — is identical in both branches, so it
+**cancels in the difference**. A feature that merely marks being behind contributes equally to both
+and drops out; only a feature that changes the outcome survives. This is exactly the confound that
+made weapons fit at −1.59 in section 3f, and differencing removes it by construction.
+
+### It produced no signal at all
+
+| rows | held-out R² |
+| --- | --- |
+| 1,617 | −0.030 |
+| 10,029 | **−0.002** |
+
+Zero, and not for want of data — ten thousand interventions moved it from "slightly worse than
+predicting the mean" to "exactly the mean".
+
+And the arena agrees the weights are noise: 27% and 16% for two identical fitted instances against
+the hand-set weights' 58%.
+
+### Why: the label is far noisier than the effect
+
+`R² ≈ 0` with `RMSE 9.62` means the label's own spread is about **9.6 power**. The effect being
+measured — what one action is worth — is of order **half a power**. So each pair is a measurement
+with roughly twenty times more noise than signal.
+
+**Common random numbers did not save it, and the reason is instructive.** Both branches start from
+the same generator, but two different actions consume draws at different rates, so the streams
+desynchronise immediately and the branches are effectively independent after a few steps. CRN only
+reduces variance while the draws stay aligned, and here they cannot.
+
+Averaging playouts per branch would fix it, and the arithmetic says how much: to get the label's
+noise down near the effect size needs `(9.6 / 0.5)² ≈ 370` playouts **per branch**. That is ~700 per
+pair against two today — turning a five-minute collection into roughly thirty hours.
+
+### Where this leaves the evaluator
+
+Four routes tried, four measured, none beating hand-set weights:
+
+| route | outcome |
+| --- | --- |
+| plain regression on returns (3f) | 18% vs 64% — learns correlations |
+| iterating the fit (3g) | R² collapses 0.216 → 0.018; strength flat at the floor |
+| regularising toward the prior (3h) | recovers monotonically toward the prior, never past it |
+| learning from choices (3i) | correct design, no signal — label noise ~20x the effect |
+
+The common thread is not the fitting. **Every route needs to say what an action was worth, and
+nothing available can say it**: the playout policy is too weak to be a credible simulator of
+consequences (section 3d), the game's own variance is enormous (section 3c — 12–21 points of win
+rate at 120 games), and the effect of one action is small against both.
+
+That is also why V2's rollouts failed (section 3e). It is one problem wearing different hats:
+**there is no cheap, low-variance way to evaluate a candidate action in this game.**
+
+### What would actually move it
+
+Not more fitting. The two things that would change the picture:
+
+1. **A much cheaper engine.** `Tracker` copies whole `Map`s per update (section 1). Structural
+   sharing would cut the cost of every playout, and playout count is exactly what the variance
+   arithmetic above is short of. This is the single highest-leverage change left, and it is a
+   contained one behind one module.
+2. **A stronger playout policy that is still cheap** — the thing section 3d could not afford. It
+   makes each playout a better estimate rather than needing more of them.
+
+Both attack the same bottleneck from opposite sides, and both are engineering rather than tuning.
+Until one lands, **the hand-set weights stand, having now survived four measured attempts.**
+
 ## 4. V3 — information-set search
 
 docs/03 section 5 is aspirational and this plan does not schedule it. Two things it needs that do
