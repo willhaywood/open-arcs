@@ -1,0 +1,67 @@
+# Build the web app and publish it to GitHub Pages.
+#
+# The site is served from https://willhaywood.github.io/open-arcs/, which is a *project* site — so
+# the build needs `BASE_PATH` or every asset URL resolves against the domain root and 404s.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: the deploy needs to publish Pages and prove its identity, nothing else.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Builds the engine's declarations as a side effect, which apps/web's own tsc pass needs.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        env:
+          BASE_PATH: /open-arcs/
+        run: npm run -w apps/web build
+
+      # docs/16 section 3: the build dereferences the public/game-assets symlink and copies all
+      # 73 MB, most of it campaign art the base game never loads. Dropping it takes the deploy to
+      # roughly 17 MB with no visible change. Done here rather than in the build so a local
+      # `npm run build` still produces the complete asset set.
+      - name: Trim campaign art from the deploy
+        run: |
+          cd apps/web/dist/game-assets
+          rm -rf f[0-9][0-9] fate empire arcs-bg.png
+          du -sh . | sed 's/^/deploy size: /'
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
