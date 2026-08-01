@@ -70,6 +70,7 @@ export interface BotDecision {
  * two clients running the bot still agree (docs/03 section 9a).
  */
 export interface Probe {
+  /** The first sample. Equivalent to `samples[0]`, kept for bots that do not average. */
   readonly observed: ObservedState
   /**
    * The action leaves this bot facing the same question — it did not advance the game.
@@ -99,6 +100,28 @@ export interface Probe {
    * also docked the legitimate `Done` that ends a sub-decision.
    */
   readonly actionsAhead: number
+  /**
+   * The position after this action, sampled — several times when the outcome is random.
+   *
+   * **A probe must not see the roll that will really happen.** `state.rng` is a seeded generator
+   * carried in the state, and `advance` is pure, so every candidate was probed from the *same*
+   * generator and returned the exact dice that choice would produce. Committing it then reproduced
+   * them, because the real generator had never moved. The bot was picking pools by outcome rather
+   * than by odds — measurably: it chose two dice over three, which no honest evaluator does, because
+   * that particular roll came up better.
+   *
+   * Nothing was reaching into hidden state. `ObservedState` correctly hides rivals' hands and strips
+   * `rng`. The bot simply asked the engine what would happen and a deterministic engine told it the
+   * truth about the future — the same trap docs/03 flags in HRF, arriving through randomness rather
+   * than through cards.
+   *
+   * So probes run on a **derived generator**, independent of the real one and reproducible from the
+   * journal, which keeps two clients in agreement (docs/03 section 9a). Where randomness is actually
+   * consumed there is more than one sample, and a bot should average over all of them: one sample
+   * removes the cheating but replaces it with noise, and averaging is what turns the choice back
+   * into a judgement about odds.
+   */
+  readonly samples: readonly ObservedState[]
 }
 
 /**

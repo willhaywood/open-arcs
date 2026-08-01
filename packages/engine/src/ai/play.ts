@@ -11,13 +11,14 @@
  * the same moves are the same file (docs/03 section 9a).
  */
 
-import { advance, applyExternal, defaultRegistry } from '../index.js'
+import { advance, applyExternal, defaultRegistry, rng } from '../index.js'
 import { observe } from '../observe.js'
 import type { RuleRegistry, RuleResult } from '../dispatch.js'
 import type { FactionId } from '../ids.js'
 import type { Action } from '../action.js'
 import type { Continue } from '../continue.js'
 import type { GameState } from '../state.js'
+import type { ObservedState } from '../observe.js'
 import type { Bot, BotDecision, Probe } from './bot.js'
 
 /** Is this seat played by a bot? */
@@ -191,6 +192,30 @@ function pipsAhead(cont: Continue, faction: FactionId): number {
  */
 const SETTLE_LIMIT = 10
 
+/**
+ * How many times a random outcome is sampled before it is judged.
+ *
+ * One sample stops the cheating but replaces it with noise — the bot would pick a dice pool off a
+ * single imaginary roll, which is worse than a human picking by odds. A handful of samples is enough
+ * for more dice to beat fewer, which is the judgement that was missing. Only paid where randomness
+ * is actually consumed, so ordinary Move and Build probes are unaffected.
+ */
+const SAMPLES = 5
+
+/**
+ * The same position with a generator that is *not* the one the game will use.
+ *
+ * Derived from the journal length rather than from `state.rng`, so it is reproducible on any client
+ * holding the same journal — which is what keeps two clients running the bot in agreement — while
+ * being independent of the roll that will really happen. The salt separates samples from each other.
+ *
+ * Every candidate at a decision is sampled with the *same* salts, deliberately: comparing options
+ * under common random numbers is what lets a real difference between them show through the noise.
+ */
+function probeFrom(state: GameState, salt: number): GameState {
+  return { ...state, rng: rng((state.journal.length + 1) * 0x9e3779b1 + salt * 0x85ebca77) }
+}
+
 function settle(
   result: RuleResult,
   faction: FactionId,
@@ -228,6 +253,56 @@ function settle(
     current = advance(current.state, decline ?? resolve(current, c.actions), reg)
   }
   return current
+}
+
+/**
+ * Every outcome worth weighing for one action, as this bot would see them.
+ *
+ * One sample unless the action actually consumed randomness — detected by the generator having
+ * moved, which is exact and costs nothing, rather than by guessing from the action's type.
+ */
+function sampleOutcomes(
+  state: GameState,
+  action: Action,
+  reg: RuleRegistry,
+  faction: FactionId,
+): readonly ObservedState[] {
+  const base = probeFrom(state, 0)
+  const first = advance(base, action, reg)
+  const out = [observe(first.state, faction)]
+  // The generator moving is what "random" means here; a Move or a Build leaves it untouched.
+  if (first.state.rng.seed === base.rng.seed) return out
+  for (let i = 1; i < SAMPLES; i++) {
+    try {
+      out.push(observe(advance(probeFrom(state, i), action, reg).state, faction))
+    } catch {
+      // A sample that cannot be applied is dropped rather than allowed to sink the whole candidate.
+    }
+  }
+  return out
+}
+
+/** The extra settled samples for a random action, beyond the first the caller already has. */
+function settledSamples(
+  state: GameState,
+  action: Action,
+  faction: FactionId,
+  reg: RuleRegistry,
+  resolve: (result: RuleResult, actions: readonly Action[]) => Action,
+): readonly ObservedState[] {
+  const base = probeFrom(state, 0)
+  const first = advance(base, action, reg)
+  if (first.state.rng.seed === base.rng.seed) return []
+  const out: ObservedState[] = []
+  for (let i = 1; i < SAMPLES; i++) {
+    try {
+      const settled = settle(advance(probeFrom(state, i), action, reg), faction, reg, resolve)
+      out.push(observe(settled.state, faction))
+    } catch {
+      // As above: a failed sample is one fewer opinion, not a reason to discard the candidate.
+    }
+  }
+  return out
 }
 
 /**
@@ -277,9 +352,11 @@ export function stepBot(
   const resolve = (at: RuleResult, options: readonly Action[]): Action => {
     const shallow = (action: Action): Probe | undefined => {
       try {
-        const after = advance(at.state, action, reg)
+        const samples = sampleOutcomes(at.state, action, reg, faction)
+        const after = advance(probeFrom(at.state, 0), action, reg)
         return {
-          observed: observe(after.state, faction),
+          observed: samples[0]!,
+          samples,
           repeats: false,
           actionsAhead: pipsAhead(after.continue, faction),
         }
@@ -292,7 +369,7 @@ export function stepBot(
 
   const lookahead = (action: Action): Probe | undefined => {
     try {
-      const next = advance(result.state, action, reg)
+      const next = advance(probeFrom(result.state, 0), action, reg)
       const c = next.continue
       /*
        * Going in circles is landing back on a question already put this turn **without unwinding**.
@@ -318,8 +395,17 @@ export function stepBot(
        * candidates have to share to be comparable.
        */
       const settled = settle(next, faction, reg, resolve)
+      /*
+       * `repeats` and `actionsAhead` come from the first sample alone: both are questions about the
+       * shape of the game — which question comes next, how many pips are left — and neither is
+       * affected by how the dice fall.
+       */
       return {
         observed: observe(settled.state, faction),
+        samples: [
+          observe(settled.state, faction),
+          ...settledSamples(result.state, action, faction, reg, resolve),
+        ],
         repeats: at !== undefined && at >= depth,
         actionsAhead: pipsAhead(settled.continue, faction),
       }

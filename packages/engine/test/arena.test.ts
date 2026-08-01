@@ -160,6 +160,56 @@ describe('the arena', () => {
     expect(secures).toBeGreaterThan(0)
   })
 
+  it('cannot see the dice it is about to roll', () => {
+    /*
+     * `state.rng` is a seeded generator carried in the state and `advance` is pure, so every
+     * candidate used to be probed from the *same* generator and returned the exact dice that choice
+     * would produce — and committing it reproduced them, because the real generator had never moved.
+     * The bot picked pools by outcome rather than by odds: measurably, two dice over three, which no
+     * honest evaluator does.
+     *
+     * Asserted where the cheat lived rather than on play strength: a probe must not agree with the
+     * real roll every time. Sampling five outcomes per random action makes agreement occasional and
+     * certainty impossible.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    let r = startGame(
+      { board: 'Board3Frontiers', factions: [...three], seed: 1, bots: [...three] },
+      registry,
+    )
+    let asked = NO_ASKS
+    let checked = 0
+
+    for (let i = 0; i < 900 && checked < 8; i++) {
+      if (r.continue.kind !== 'ask') break
+      const faction = r.continue.faction
+      const roll = r.continue.actions.find((a) => a.type === 'battle/roll')
+
+      if (roll !== undefined) {
+        let probed: string | undefined
+        const spy: Bot = {
+          id: 'spy',
+          decide(observed, actions, lookahead) {
+            const p = lookahead?.(roll)
+            probed = JSON.stringify(p?.samples.length)
+            return heuristicBot.decide(observed, actions, lookahead)
+          },
+        }
+        stepBot(r, spy, faction, registry, asked)
+        // Randomness is sampled more than once; a single sample is the shape the oracle had.
+        expect(probed).toBe('5')
+        checked++
+      }
+
+      const step = stepBot(r, heuristicBot, faction, registry, asked)
+      r = step.result
+      asked = step.asked
+    }
+
+    // The test verifies nothing if it never reached a battle; assert it did.
+    expect(checked).toBeGreaterThan(0)
+  })
+
   it('rotates seats between games so nobody is measured on seat order', () => {
     const report = runArena(
       { bots: [heuristicBot, trivialBot, trivialBot, trivialBot], games: 4, seed: 1 },

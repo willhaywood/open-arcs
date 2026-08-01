@@ -105,7 +105,14 @@ export const heuristicBot: Bot = {
        * same. It is deliberately the *cheap* answer, and the honest one is a rollout (V2). This is
        * a weight for the arena to move — docs/19 section 2d.7.
        */
-      const gained = valueOf(probe.observed, observed.self, intent)
+      /*
+       * Averaged over the samples, which is what makes a random outcome a judgement about odds
+       * rather than about one imaginary roll. For everything deterministic there is exactly one
+       * sample and this is the same arithmetic as before.
+       */
+      const gained =
+        probe.samples.reduce((n, s) => n + valueOf(s, observed.self, intent), 0) /
+        probe.samples.length
       const score = gained + probe.actionsAhead * PIP_VALUE
       /*
        * **A repeating action must strictly improve the position to be eligible at all.**
@@ -133,6 +140,7 @@ export const heuristicBot: Bot = {
         score,
         note:
           topTerms(termsFor(probe.observed, observed.self, intent)) +
+          (probe.samples.length > 1 ? ` [${probe.samples.length} rolls]` : '') +
           (probe.repeats ? ' [same question]' : ''),
       })
     }

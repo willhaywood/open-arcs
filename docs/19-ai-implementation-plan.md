@@ -823,6 +823,65 @@ out. The honest read is that the bot now converts an advantage it already had.
 The cost is ~3.5x per decision. Acceptable for the arena and invisible at UI pacing, but it is the
 budget V2's rollouts would want, so the two will have to be sized against each other.
 
+## 2k. The bot could see the dice
+
+Asked what V2 would add over V1, checking the answer turned up something worse than a gap: **the
+lookahead could see the roll that was about to happen.**
+
+```
+[Battle blue in 1-Arrow — choose dice]
+   Roll 1S 1A 0R  -> 2 hits, 0 self   <- CHOSE
+   Roll 3S 0A 0R  -> 1 hits, 0 self
+```
+
+It took two dice over three. More dice is strictly more expected hits, so no honest evaluator does
+that — it picked the pool whose *particular* roll came up better.
+
+### Why, and why it is not sloppiness
+
+`state.rng` is a seeded generator carried in the state, which is what makes the journal replayable
+and gives undo, save and load for free (docs/01). `advance` is pure, so it returns a new state with
+the generator moved and leaves the original alone. Every candidate was therefore probed from the
+**same** generator and returned exactly what that choice would produce — and committing it
+reproduced the roll, because the real generator had never moved.
+
+Nothing reached into hidden state. `ObservedState` correctly hides rivals' hands and strips `rng`.
+The bot just asked a deterministic engine what would happen, and it was told the truth about the
+future. **The hidden-information side was closed and the randomness side was open** — the same trap
+docs/03 flags in HRF, arriving through the other door.
+
+It was also worse than choosing dice well: `settle` resolves battles while scoring other candidates,
+so the bot chose **whether to attack at all** knowing how the fight would go.
+
+### The fix
+
+Probes run on a **derived generator**, seeded from the journal rather than from `state.rng` — so it
+is reproducible on any client holding the same journal, which multiplayer needs, and independent of
+the roll that will really happen. Where randomness is actually consumed (detected by the generator
+having moved, not by guessing from the action type) the harness takes **five samples** and the bot
+averages over them.
+
+One sample would have removed the cheating and replaced it with noise: choosing a pool off a single
+imaginary roll is worse than a human choosing by odds. Averaging is what turns it back into a
+judgement about odds. Every candidate is sampled with the *same* salts — common random numbers — so
+a real difference between options shows through the noise.
+
+### What it cost
+
+| three-player, 12 games | oracle | honest |
+| --- | --- | --- |
+| mirror — mean power | 24.5 | **22.6** |
+| v two trivial — mean power | 38.3 | **36.7** |
+| runtime, mirror | 44s | 120s |
+
+**Strength drops, and that is the number becoming true rather than the bot getting worse.** Every
+figure recorded before this section was inflated in battle-heavy play; the ones here are the first
+that mean anything.
+
+The cost is real: sampling multiplies the already-3.5x sub-flow resolution wherever dice are
+involved. That is now the binding constraint on V2's rollout budget, and section 3's re-measurement
+should be done against these numbers rather than the original 0.044ms.
+
 ## 3. V2 — rollouts
 
 Extends V1's loop rather than replacing it, exactly as docs/03 section 2 promises.
