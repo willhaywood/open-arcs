@@ -136,6 +136,36 @@ export interface Probe {
  */
 export type Lookahead = (action: Action) => Probe | undefined
 
+export interface RolloutOptions {
+  /** Playouts per candidate; averaged, so this is the accuracy-against-noise dial. */
+  readonly samples: number
+  /**
+   * Turns to play past your own before scoring.
+   *
+   * 0 stops at the end of your own turn — enough to see what the card actually bought. Higher lets
+   * rivals reply, which is the thing a static evaluator cannot do at all.
+   */
+  readonly lookaheadTurns: number
+  /** Hard ceiling on engine steps per playout, so an unexpected loop cannot hang a turn. */
+  readonly maxSteps: number
+}
+
+/**
+ * Play an action out to a horizon and report how the position looks, several times over.
+ *
+ * The V2 counterpart of `Lookahead`, and split for the same reason: a rollout has to **drive the
+ * engine**, and only the harness holds the full `GameState`. Handing that to a bot to drive would
+ * undo the redaction that makes cheating a compile error, so the harness plays and the bot judges.
+ *
+ * **The options come from the caller, not the harness.** They were briefly a harness constant, which
+ * silently made every configuration identical — two bots built with different horizons played the
+ * same games and the arena compared them to each other. How deep to look is the bot's policy.
+ *
+ * Returns an empty array when the harness cannot roll out, which a bot must treat as "evaluate this
+ * some other way" rather than as "this action is worthless".
+ */
+export type Rollout = (action: Action, options: RolloutOptions) => readonly ObservedState[]
+
 export interface Bot {
   readonly id: string
   /**
@@ -146,6 +176,7 @@ export interface Bot {
     observed: ObservedState,
     actions: readonly Action[],
     lookahead?: Lookahead,
+    rollout?: Rollout,
   ): BotDecision
 }
 

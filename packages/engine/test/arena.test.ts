@@ -21,7 +21,10 @@ import {
   defaultRegistry,
   formatReport,
   heuristicBot,
+  isCardPlay,
+  observe,
   playGame,
+  rolloutBot,
   runArena,
   runBots,
   startGame,
@@ -208,6 +211,86 @@ describe('the arena', () => {
 
     // The test verifies nothing if it never reached a battle; assert it did.
     expect(checked).toBeGreaterThan(0)
+  })
+
+  it('rolls out the card play, and only the card play', () => {
+    /*
+     * V2 spends its budget where it pays. The card play is the highest-weight decision in the game
+     * (docs/19 section 2d.1) and the one V1 still settles with a flat `PIP_VALUE`; everything
+     * downstream V1 already resolves by playing it out a ply, so a rollout adds far less there.
+     *
+     * Confining it is also what keeps a game affordable — the engine runs at 0.049 ms/action and a
+     * game is ~700 decisions, so rolling out everything is minutes per game.
+     *
+     * Asserted through `considered.note`, which only the rollout path writes, so it distinguishes
+     * "V2 decided this" from "V2 delegated to V1" — the two are otherwise indistinguishable from
+     * outside.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    const v2 = rolloutBot({ samples: 2, lookaheadTurns: 1, maxSteps: 200 })
+    const out = runBots(
+      startGame(
+        { board: 'Board3Frontiers', factions: [...three], seed: 1, bots: [...three] },
+        registry,
+      ),
+      three,
+      v2,
+      registry,
+      3_000,
+    )
+
+    const rolled = out.decisions.filter((d) =>
+      (d.considered ?? []).some((c) => c.note?.includes('playouts') === true),
+    )
+    expect(rolled.length).toBeGreaterThan(10)
+    // Every rolled decision is a card play; nothing else burns the budget.
+    for (const d of rolled) expect(isCardPlay((d.considered ?? []).map((c) => c.action))).toBe(true)
+    /*
+     * And it still plays a whole game rather than stalling on the extra work. Asserted on the game
+     * ending rather than on a decision count: the count was pinned at 400 while the rollout options
+     * were being ignored, and once they were honoured a shallower horizon produced a legitimately
+     * shorter game — a threshold calibrated against a bug, failing on the fix.
+     */
+    expect(out.result.continue.kind).toBe('gameOver')
+  })
+
+  it('does not roll out anything but the card play', () => {
+    /*
+     * The guard tested directly rather than through a game, because removing it does not *fail* a
+     * game-level test — it makes one take minutes, which is the least useful signal a test can give
+     * (the same lesson as the livelock bound above). Here the bot is handed a non-card-play ask and
+     * a rollout it must not call, so the wrong behaviour is instant rather than slow.
+     *
+     * The guard belongs to the bot rather than the harness: which decisions deserve a rollout is a
+     * bot's policy. Putting it in the harness made this one unreachable, and a mutation caught that
+     * by passing every test with it deleted.
+     */
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    const v2 = rolloutBot({ samples: 2, lookaheadTurns: 1, maxSteps: 50 })
+    let r = startGame(
+      { board: 'Board3Frontiers', factions: [...three], seed: 1, bots: [...three] },
+      registry,
+    )
+
+    // Step to the first ask that is *not* a card play — the Prelude, a pip, a target.
+    let found = false
+    for (let i = 0; i < 200 && !found; i++) {
+      if (r.continue.kind !== 'ask') break
+      if (isCardPlay(r.continue.actions)) {
+        r = stepBot(r, trivialBot, r.continue.faction, registry).result
+        continue
+      }
+      found = true
+    }
+    expect(found).toBe(true)
+    if (r.continue.kind !== 'ask') throw new Error('expected an ask to test against')
+
+    let called = 0
+    v2.decide(observe(r.state, r.continue.faction), r.continue.actions, undefined, () => {
+      called++
+      return []
+    })
+    expect(called).toBe(0)
   })
 
   it('rotates seats between games so nobody is measured on seat order', () => {

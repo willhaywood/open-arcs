@@ -884,6 +884,9 @@ should be done against these numbers rather than the original 0.044ms.
 
 ## 3. V2 — rollouts
 
+**Built.** `rollout.ts` plus the playout driver in `play.ts`. What follows is the plan as written;
+section 3a records what it actually does and what the arena says about it.
+
 Extends V1's loop rather than replacing it, exactly as docs/03 section 2 promises.
 
 - `chooseAction` gains a rollout evaluator: from each candidate, play to a horizon with `PolicyFn`
@@ -896,6 +899,90 @@ Extends V1's loop rather than replacing it, exactly as docs/03 section 2 promise
 
 **Re-measure before starting.** The 9ms figure is from today's `Tracker`. If it has not moved, V2 is
 worth doing at ~100 rollouts; if the copy cost has grown, fix `Tracker` first.
+
+## 3a. V2 as built, and what it is worth
+
+### Re-measured first, as section 3 requires
+
+```
+engine        0.049 ms/action   (was 0.044 — Tracker has not regressed)
+full game     ~24 ms as one playout
+V1 decision   4.05 ms           (settle + sub-flow resolution + dice sampling)
+```
+
+A game is ~700 decisions, so rolling out *every* decision is minutes per game. The original plan's
+"~100 rollouts per decision" was costed before `settle`, sub-flow resolution and dice sampling
+existed, and it is no longer affordable.
+
+### So it rolls out one decision, not all of them
+
+**Only the card play** — lead, pivot, copy, surpass, pass. That is the highest-weight decision in the
+game (section 2d.1) and the last one V1 still settles with a flat `PIP_VALUE`. Everything downstream
+V1 already resolves by playing it out a ply (section 2j), so a rollout adds far less there. ~70 of a
+game's ~700 decisions, and the cost lands where the plan wanted it.
+
+Everything else delegates to `heuristicBot` — the shape docs/03 section 2 argues for: search where
+it pays, evaluate where it does not.
+
+`Rollout` is the V2 counterpart of `Lookahead` and is split for the same reason: a playout has to
+*drive the engine*, and only the harness holds the full state. The harness plays, the bot judges.
+
+### The honest weakness
+
+Playouts run on **`trivialBot`** — first legal action — because a stronger policy costs a lookahead
+per step and multiplies the playout by the branching factor. `trivialBot` is not merely weak, it is
+**biased**: it takes whatever the engine offers first.
+
+That bias is measurable and it is not subtle. At `lookaheadTurns: 0` the bot **passes**, because
+passing ends the turn immediately and is scored at once, while leading hands the pips to `trivialBot`
+to waste. Deeper horizons dilute it — every seat's turn is played equally badly — and at 2 turns the
+same position is played rather than passed. **A rollout is only as good as the policy inside it**,
+and this one is poor.
+
+### Two traps found in the building
+
+- **The options were decorative.** `stepBot` hardcoded `DEFAULT_ROLLOUT` and ignored what
+  `rolloutBot(...)` was constructed with, so every configuration played identically — and an arena
+  match between "depth 0" and "depth 2" was two copies of the same bot. Fixed by passing the options
+  through `Rollout`, where they belong: how deep to look is a bot's policy, not the harness's.
+- **A guard that could not fail.** The harness also tested `isCardPlay` before calling the bot, which
+  made the bot's own guard unreachable — a mutation deleting it passed every test. The harness now
+  offers rollouts at every ask and the bot decides where to spend them, which is both better layering
+  and a live check.
+
+### What the arena says — and the measurement lesson
+
+The first comparison looked decisive:
+
+| 3-player, 12 games | wins | rank | power |
+| --- | --- | --- | --- |
+| rollout-v2 | 50% | 1.58 | 26.8 |
+| heuristic-v1 (x2 seats) | 25% | 2.17 | 21.9 |
+
+On a 33% baseline that reads as a clear win for V2. **It is not yet evidence.**
+
+The run that showed why was meant to compare horizons: `depth 2` against `depth 0` against V1. It
+came back with depth-2 on **0% wins** and depth-0 on 42% — a colossal gap. Except the options were
+being ignored at the time, so *both rollout bots were byte-identical configurations*. Two copies of
+the same bot, over 12 games with seats rotated, scored 0% and 42%.
+
+**That is the noise floor, and it is enormous.** Twelve games cannot separate two bots, let alone
+rank three. Every 12-game figure in this document — including the 50/25 above and the comparisons in
+sections 2h through 2j — is a sample far too small for the confidence its presentation implies.
+
+Two things follow, and they are more valuable than the V2 result itself:
+
+1. **Report a noise floor beside any comparison.** Running a bot against a copy of itself and
+   reporting the spread costs one extra arena run and tells you what a difference has to exceed
+   before it means anything. Nothing in section 2 did this.
+2. **Games have to get cheaper before tuning can proceed.** At ~11s a game a 100-game run is 18
+   minutes, and weight tuning needs many such runs. Arena games are completely independent, so
+   parallelising them across worker threads is the single highest-value change available — the
+   engine already promises it runs in a Worker. That, not another weight, is what unblocks V3 and
+   any further tuning.
+
+The accurate summary of V2 today: **built, honest, plausibly better than V1, and not yet
+demonstrated to be.**
 
 ## 4. V3 — information-set search
 

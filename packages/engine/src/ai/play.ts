@@ -13,13 +13,15 @@
 
 import { advance, applyExternal, defaultRegistry, rng } from '../index.js'
 import { observe } from '../observe.js'
+import { trivialBot } from './bot.js'
+
 import type { RuleRegistry, RuleResult } from '../dispatch.js'
 import type { FactionId } from '../ids.js'
 import type { Action } from '../action.js'
 import type { Continue } from '../continue.js'
 import type { GameState } from '../state.js'
 import type { ObservedState } from '../observe.js'
-import type { Bot, BotDecision, Probe } from './bot.js'
+import type { Bot, BotDecision, Probe, RolloutOptions } from './bot.js'
 
 /** Is this seat played by a bot? */
 export function isBotSeat(bots: readonly FactionId[] | undefined, faction: FactionId): boolean {
@@ -306,6 +308,49 @@ function settledSamples(
 }
 
 /**
+ * Play a position forward with a cheap policy and report how it looks to `self`.
+ *
+ * Stops at the first of: the horizon in turns, the step ceiling, or the game ending. `trivialBot`
+ * drives it — see `rollout.ts` for why a weak policy is the only affordable one, and why that is the
+ * honest limit of V2 as built.
+ */
+function playOut(
+  from: RuleResult,
+  self: FactionId,
+  reg: RuleRegistry,
+  turns: number,
+  maxSteps: number,
+): ObservedState {
+  let current = from
+  const startedIn = turnKey(current.state)
+  const seen = new Set<string>([startedIn])
+  let leftOwnTurn = false
+
+  for (let i = 0; i < maxSteps; i++) {
+    const c = current.continue
+    if (c.kind !== 'ask') break
+    const here = turnKey(current.state)
+    if (here !== startedIn) leftOwnTurn = true
+    if (leftOwnTurn) {
+      seen.add(here)
+      // `seen` includes your own turn, so the horizon counts turns *past* it.
+      if (seen.size > turns + 1) break
+    }
+    try {
+      current = advance(
+        current.state,
+        trivialBot.decide(observe(current.state, c.faction), c.actions).action,
+        reg,
+      )
+    } catch {
+      // A playout that cannot continue is scored where it stopped, not discarded.
+      break
+    }
+  }
+  return observe(current.state, self)
+}
+
+/**
  * Take exactly one bot decision, and apply it.
  *
  * **One action, not a whole turn.** The caller drives the loop, which is what lets the UI pace the
@@ -367,6 +412,33 @@ export function stepBot(
     return bot.decide(observe(at.state, faction), options, shallow).action
   }
 
+  /*
+   * The V2 half: play a candidate out several times and hand back the positions.
+   *
+   * Built here for the same reason as `lookahead` — driving the engine needs the full state, which a
+   * bot must never hold. Each sample is re-seeded from the journal so the playout is reproducible on
+   * any client and independent of the roll the game will really make; without that a rollout would
+   * be played against the actual future, which is docs/19 section 2k's oracle compounded over every
+   * simulated turn rather than a single roll.
+   *
+   * **Offered at every ask; the bot decides where to spend it.** Which decisions deserve a rollout
+   * is a bot's policy, not the harness's business — putting the test here made the bot's own guard
+   * unreachable, which a mutation caught by passing every test with the guard removed. The harness
+   * provides the capability and costs nothing until it is called.
+   */
+  const rollout = (action: Action, options: RolloutOptions): readonly ObservedState[] => {
+    const out: ObservedState[] = []
+    for (let s = 0; s < options.samples; s++) {
+      try {
+        const seeded = advance(probeFrom(result.state, s + 977), action, reg)
+        out.push(playOut(seeded, faction, reg, options.lookaheadTurns, options.maxSteps))
+      } catch {
+        // One fewer opinion, not a reason to drop the candidate.
+      }
+    }
+    return out
+  }
+
   const lookahead = (action: Action): Probe | undefined => {
     try {
       const next = advance(probeFrom(result.state, 0), action, reg)
@@ -413,7 +485,12 @@ export function stepBot(
       return undefined
     }
   }
-  const decision = bot.decide(observe(result.state, faction), result.continue.actions, lookahead)
+  const decision = bot.decide(
+    observe(result.state, faction),
+    result.continue.actions,
+    lookahead,
+    rollout,
+  )
   return {
     result: applyExternal(result, decision.action, registry),
     decision,
