@@ -34,6 +34,7 @@ import { colorOf, figureArt } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
 import { CardPill, LeaderCardReader, cardArt, cardName } from './LeaderCardReader.js'
 import type { DraftKind } from './LeaderCardReader.js'
+import { asset } from '../assets.js'
 
 /**
  * The Prelude action each resource buys, as printed on the board. Reference text for the
@@ -48,7 +49,7 @@ const PRELUDE: Record<Resource, string> = {
 }
 
 const iconFor = (r: Resource, outraged: boolean): string =>
-  `/game-assets/icon/${r.toLowerCase()}${outraged ? '-outrage' : ''}.webp`
+  asset(`game-assets/icon/${r.toLowerCase()}${outraged ? '-outrage' : ''}.webp`)
 
 interface FactionBoard {
   faction: FactionId
@@ -329,7 +330,7 @@ function InitiativeMark({
           : `${board.faction} holds the initiative and leads this round`
       }
     >
-      <img src="/game-assets/icon/initiative.webp" alt="Initiative marker" />
+      <img src={asset('game-assets/icon/initiative.webp')} alt="Initiative marker" />
       {seized && !mini ? <span className="pb-init-label">Seized</span> : null}
     </div>
   )
@@ -356,7 +357,7 @@ function Slot({
   return (
     <div className={`pb-slot${locked ? ' locked' : ''}`} title={title}>
       {mini ? null : (
-        <img className="pb-keys" src={`/game-assets/icon/keys-${keys}.webp`} alt={`${keys} keys`} />
+        <img className="pb-keys" src={asset(`game-assets/icon/keys-${keys}.webp`)} alt={`${keys} keys`} />
       )}
       <div className="pb-well">
         {resource === undefined ? null : (
@@ -546,7 +547,7 @@ function Secured({
             {card.suit !== undefined ? (
               <img
                 className="pb-guild-suit"
-                src={`/game-assets/icon/${card.suit.toLowerCase()}.webp`}
+                src={asset(`game-assets/icon/${card.suit.toLowerCase()}.webp`)}
                 alt={card.suit}
               />
             ) : null}
@@ -554,7 +555,7 @@ function Secured({
             {card.keys !== undefined ? (
               <img
                 className="pb-guild-keys"
-                src={`/game-assets/icon/keys-${card.keys}.webp`}
+                src={asset(`game-assets/icon/keys-${card.keys}.webp`)}
                 alt={`${card.keys} keys`}
               />
             ) : null}

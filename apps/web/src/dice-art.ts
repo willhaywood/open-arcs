@@ -14,6 +14,7 @@
  */
 
 import type { DieType, Tally } from '@arcs/engine'
+import { asset } from './assets.js'
 
 const B = (): Tally => ({ self: 0, intercept: 0, hits: 0, buildings: 0, keys: 0 })
 
@@ -60,7 +61,7 @@ export const FACE_ART: readonly number[] = [4, 1, 5, 2, 3, 6]
  * face has been rolled yet; 1..6 are rolled faces and go through `FACE_ART`.
  */
 export function dieArt(die: DieType, face: number): string {
-  const base = `/game-assets/icon/${die.toLowerCase()}-die`
+  const base = asset(`game-assets/icon/${die.toLowerCase()}-die`)
   if (face <= 0) return `${base}.webp`
   return `${base}-${FACE_ART[face - 1] ?? face}.webp`
 }

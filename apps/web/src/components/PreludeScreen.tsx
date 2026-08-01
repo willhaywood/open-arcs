@@ -34,9 +34,10 @@ import { useState } from 'react'
 import { store } from '../store.js'
 import { colorOf } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
+import { asset } from '../assets.js'
 
 const iconFor = (r: Resource, outraged: boolean): string =>
-  `/game-assets/icon/${r.toLowerCase()}${outraged ? '-outrage' : ''}.webp`
+  asset(`game-assets/icon/${r.toLowerCase()}${outraged ? '-outrage' : ''}.webp`)
 
 /** The Prelude action each resource buys, as printed on the player board. */
 const PRINTED: Record<Resource, string> = {
@@ -183,7 +184,7 @@ export function PreludeScreen({
                       onClick={() => store.apply(a)}
                       title={String(a['label'])}
                     >
-                      <img src={`/game-assets/court/${id}.webp`} alt={courtCard(id).name} />
+                      <img src={asset(`game-assets/court/${id}.webp`)} alt={courtCard(id).name} />
                       <span>
                         <span className="pr-card-name">{courtCard(id).name}</span>
                         <br />

@@ -30,6 +30,7 @@ import { store } from '../store.js'
 import { colorOf, figureArt } from '../theme.js'
 import { useRoll } from './Dice3D.js'
 import { CardPill } from './LeaderCardReader.js'
+import { asset } from '../assets.js'
 
 /** The battle context the hit/finish actions carry. */
 interface Ctx {
@@ -340,7 +341,7 @@ function PieceCell({
 }): JSX.Element {
   const art =
     status === 'destroyed'
-      ? `/game-assets/figure/${EMPTY_ART[piece.piece] ?? 'ship-empty'}.webp`
+      ? asset(`game-assets/figure/${EMPTY_ART[piece.piece] ?? 'ship-empty'}.webp`)
       : figureArt(piece.color, PIECE_ART[piece.piece] ?? 'ship', status === 'damaged')
 
   const selectable = action !== undefined

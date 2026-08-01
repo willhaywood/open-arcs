@@ -26,6 +26,7 @@ import { useState } from 'react'
 import { SETUP_CARDS } from '../setups.js'
 import { store } from '../store.js'
 import { colorOf } from '../theme.js'
+import { asset } from '../assets.js'
 
 const ALL_FACTIONS: FactionId[] = ['red', 'yellow', 'blue', 'white']
 
@@ -35,9 +36,9 @@ const ALL_FACTIONS: FactionId[] = ['red', 'yellow', 'blue', 'white']
  * setup on each side** (a 2-player setup backs onto a 4-player one), so the player count varies on
  * the fronts and no per-count back exists to use.
  */
-const CARD_BACK = '/game-assets/setup/setup-back.webp'
+const CARD_BACK = asset('game-assets/setup/setup-back.webp')
 /** `apps/web/public/game-assets` is a symlink to `assets/images`, so this is served as-is. */
-const BANNER = '/game-assets/arcsheader.jpg'
+const BANNER = asset('game-assets/arcsheader.jpg')
 
 /** Fisher-Yates. The deck order is cosmetic, so it does not come from the game seed. */
 function shuffled<T>(items: readonly T[]): T[] {

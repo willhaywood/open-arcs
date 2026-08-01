@@ -1,6 +1,7 @@
 import { parseCardId } from '@arcs/engine'
 import type { Suit } from '@arcs/engine'
 import { useState } from 'react'
+import { asset } from '../assets.js'
 
 const SUIT_COLOR: Record<Suit, string> = {
   Administration: '#3f6fd0',
@@ -24,7 +25,7 @@ const SUIT_ABBR: Record<Suit, string> = {
 export function CardFace({ cardId }: { cardId: string }): JSX.Element {
   const card = parseCardId(cardId)
   const [broken, setBroken] = useState(false)
-  const src = `/game-assets/action/${card.suit.toLowerCase()}-${card.strength}.webp`
+  const src = asset(`game-assets/action/${card.suit.toLowerCase()}-${card.strength}.webp`)
 
   if (broken) {
     return (

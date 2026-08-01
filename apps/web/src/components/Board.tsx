@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from 'react'
 import { store } from '../store.js'
 import { colorOf, figureArt } from '../theme.js'
 import { Battle } from './Battle.js'
+import { asset } from '../assets.js'
 
 interface Props {
   state: GameState
@@ -387,7 +388,7 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
         */}
         <image
           className="map-plate"
-          href="/game-assets/map-no-slots.webp"
+          href={asset('game-assets/map-no-slots.webp')}
           x={0}
           y={0}
           width={MAP_SIZE.width}
@@ -406,7 +407,7 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
         {outOfPlayClusters(state.board.clusters).map((i) => (
           <image
             key={`out-${i}`}
-            href={`/game-assets/map-out-${i}.webp`}
+            href={asset(`game-assets/map-out-${i}.webp`)}
             x={0}
             y={0}
             width={MAP_SIZE.width}
@@ -871,7 +872,7 @@ function EmptySlot({ at }: { at: readonly [number, number] }): JSX.Element {
   const [bx, by] = at
   return (
     <image
-      href="/game-assets/figure/building-empty.webp"
+      href={asset('game-assets/figure/building-empty.webp')}
       x={bx - size / 2}
       y={by - size / 2}
       width={size}

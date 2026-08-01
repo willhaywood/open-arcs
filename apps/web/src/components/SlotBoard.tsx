@@ -36,8 +36,9 @@ import { CITIES_PER_FACTION, groupSlots, slotRow } from '../slots.js'
 import type { SlotInfo } from '../slots.js'
 import { store } from '../store.js'
 import { colorOf, figureArt } from '../theme.js'
+import { asset } from '../assets.js'
 
-const iconFor = (r: Resource): string => `/game-assets/icon/${r.toLowerCase()}.webp`
+const iconFor = (r: Resource): string => asset(`game-assets/icon/${r.toLowerCase()}.webp`)
 
 /** The resource a token id names, e.g. `Fuel#5`. */
 const resourceOf = (token: string): Resource => token.slice(0, token.indexOf('#')) as Resource
@@ -299,7 +300,7 @@ function Slot({
     >
       <img
         className="sb-keys"
-        src={`/game-assets/icon/keys-${slot.keys}.webp`}
+        src={asset(`game-assets/icon/keys-${slot.keys}.webp`)}
         alt={`${slot.keys} keys`}
       />
       <div className="sb-well">

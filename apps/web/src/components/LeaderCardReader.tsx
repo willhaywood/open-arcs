@@ -17,11 +17,12 @@ import { createPortal } from 'react-dom'
 
 import { store } from '../store.js'
 import { colorOf } from '../theme.js'
+import { asset } from '../assets.js'
 
 export type DraftKind = 'leader' | 'lore'
 
 export function cardArt(id: string, kind: DraftKind): string {
-  return `/game-assets/${kind}/${id}.webp`
+  return asset(`game-assets/${kind}/${id}.webp`)
 }
 
 export function cardName(id: string, kind: DraftKind): string {

@@ -12,6 +12,7 @@ import type { GameState, RoundPlay } from '@arcs/engine'
 
 import { colorOf } from '../theme.js'
 import { CardFace } from './CardFace.js'
+import { asset } from '../assets.js'
 
 export function PlayedCards({ state }: { state: GameState }): JSX.Element {
   const lead = state.roundPlays.find((p) => p.kind === 'lead')
@@ -58,7 +59,7 @@ function Slot({
                 {p.kind === 'copy' ? (
                   <img
                     className="cardface"
-                    src="/game-assets/action/card-back.webp"
+                    src={asset('game-assets/action/card-back.webp')}
                     alt="face down"
                   />
                 ) : (

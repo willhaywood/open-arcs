@@ -15,6 +15,7 @@ import type { Action, Ambition, AmbitionMarker, Continue, GameState } from '@arc
 import { useState } from 'react'
 
 import { store } from '../store.js'
+import { asset } from '../assets.js'
 
 /** Vertical centre of each ambition box, as a fraction of the panel height. */
 const ROW_Y: Record<Ambition, string> = {
@@ -30,7 +31,7 @@ const HEX_X = ['18%', '50%', '82%']
 const HEX_Y = '11.8%'
 
 function markerSrc(m: AmbitionMarker): string {
-  return `/game-assets/ambition/ambition-values-${m.high}-${m.low}.webp`
+  return asset(`game-assets/ambition/ambition-values-${m.high}-${m.low}.webp`)
 }
 
 export function AmbitionTrack({
@@ -103,7 +104,7 @@ export function AmbitionTrack({
       <div className="ambition-panel">
         <img
           className="ambition-art"
-          src="/game-assets/ambitions.webp"
+          src={asset('game-assets/ambitions.webp')}
           alt="Ambitions"
           onError={() => setArtBroken(true)}
         />
@@ -143,13 +144,13 @@ export function AmbitionTrack({
 
       <div className="chapter-strip">
         <img
-          src={`/game-assets/chapter-${Math.min(Math.max(state.chapter, 1), 5)}.webp`}
+          src={asset(`game-assets/chapter-${Math.min(Math.max(state.chapter, 1), 5)}.webp`)}
           alt={`Chapter ${state.chapter}`}
         />
       </div>
 
       <div className="goal-row">
-        <img src={`/game-assets/goal-${threshold}.webp`} alt={`${threshold} power`} />
+        <img src={asset(`game-assets/goal-${threshold}.webp`)} alt={`${threshold} power`} />
         <span>to win</span>
       </div>
     </div>

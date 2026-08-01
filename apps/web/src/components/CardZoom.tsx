@@ -13,6 +13,7 @@
 import { courtCard } from '@arcs/engine'
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { asset } from '../assets.js'
 
 export function CardZoom({
   cardId,
@@ -50,7 +51,7 @@ export function CardZoom({
         <span className="cm-frame" aria-hidden="true" />
         <img
           className="court-modal-art"
-          src={`/game-assets/court/${cardId}.webp`}
+          src={asset(`game-assets/court/${cardId}.webp`)}
           alt={card.name}
         />
         <div className="court-modal-side">

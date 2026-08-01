@@ -20,8 +20,9 @@ import { dieArt } from '../dice-art.js'
 import { store } from '../store.js'
 import { colorOf } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
+import { asset } from '../assets.js'
 
-const resourceIcon = (r: string): string => `/game-assets/icon/${r.toLowerCase()}.webp`
+const resourceIcon = (r: string): string => asset(`game-assets/icon/${r.toLowerCase()}.webp`)
 
 /** The resource a token id names, e.g. `Fuel#5`. */
 const resourceOf = (token: string): string => token.slice(0, token.indexOf('#'))
@@ -36,7 +37,7 @@ function Price({ n }: { n: number }): JSX.Element {
   return (
     <img
       className="raid-price"
-      src={`/game-assets/icon/${plate}.webp`}
+      src={asset(`game-assets/icon/${plate}.webp`)}
       alt={`${n} key${n === 1 ? '' : 's'}`}
       title={`${n} key${n === 1 ? '' : 's'}`}
     />
@@ -149,7 +150,7 @@ export function RaidModal({ cont }: { cont: Continue }): JSX.Element | null {
                 title={`Take ${courtCard(id).name} for ${cost} key${cost === 1 ? '' : 's'}`}
                 onClick={() => store.apply(a)}
               >
-                <img src={`/game-assets/court/${id}.webp`} alt={courtCard(id).name} />
+                <img src={asset(`game-assets/court/${id}.webp`)} alt={courtCard(id).name} />
                 <span className="raid-name">{courtCard(id).name}</span>
                 <Price n={cost} />
               </button>

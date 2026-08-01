@@ -17,6 +17,7 @@ import { useState } from 'react'
 
 import { colorOf, figureArt } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
+import { asset } from '../assets.js'
 
 interface Slot {
   n: number
@@ -72,7 +73,7 @@ export function CourtPanel({ state }: { state: GameState }): JSX.Element {
         }
       >
         {deckLeft > 0 ? (
-          <img src="/game-assets/court/court-back.webp" alt="" />
+          <img src={asset('game-assets/court/court-back.webp')} alt="" />
         ) : null}
         <span className="court-draw-n">{deckLeft}</span>
       </div>
@@ -90,7 +91,7 @@ export function CourtPanel({ state }: { state: GameState }): JSX.Element {
           {s.cardId !== undefined && (
             <img
               className="court-art"
-              src={`/game-assets/court/${s.cardId}.webp`}
+              src={asset(`game-assets/court/${s.cardId}.webp`)}
               alt={s.name}
               onError={(e) => {
                 ;(e.target as HTMLImageElement).style.visibility = 'hidden'

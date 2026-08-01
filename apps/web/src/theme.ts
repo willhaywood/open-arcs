@@ -1,4 +1,5 @@
 import type { ColorId } from '@arcs/engine'
+import { asset } from './assets.js'
 
 export const FACTION_COLOR: Record<string, string> = {
   red: '#d94b3f',
@@ -32,7 +33,7 @@ const COLOR_LETTER: Record<string, string> = {
 export function figureArt(color: string, piece: string, damaged = false): string | null {
   const letter = COLOR_LETTER[color]
   if (letter === undefined) return null
-  return `/game-assets/figure/${letter}-${piece}${damaged ? '-damaged' : ''}.webp`
+  return asset(`game-assets/figure/${letter}-${piece}${damaged ? '-damaged' : ''}.webp`)
 }
 
 /* The resource abbreviation and color tables that lived here were only ever read by the
