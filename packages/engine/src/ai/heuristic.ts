@@ -9,7 +9,8 @@
  * (docs/03 section 9a), and it is why tie-breaking is positional rather than random.
  */
 
-import { intentFor } from './intent.js'
+import { intentFor, structuralFitness } from './intent.js'
+import type { Fitness } from './intent.js'
 import { WEIGHTS, termsFor, topTerms, valueOf } from './value.js'
 import type { Weights } from './value.js'
 import type { Action } from '../action.js'
@@ -60,14 +61,19 @@ function describe(action: Action): string {
  * find out whether fitting produced a better *player* rather than merely a better predictor of the
  * outcome under the policy that generated the data.
  */
-export function heuristicBotWith(weights: Weights, id = 'heuristic-v1'): Bot {
+export function heuristicBotWith(
+  weights: Weights,
+  id = 'heuristic-v1',
+  /** How chapter goals are judged. Swappable so a stronger answer can be measured against the frozen one. */
+  fitness: Fitness = structuralFitness,
+): Bot {
   return {
   id,
   decide(observed: ObservedState, actions: readonly Action[], lookahead?: Lookahead): BotDecision {
     const first = actions[0]
     if (first === undefined) throw new Error('heuristicBot: no actions on offer')
 
-    const intent = intentFor(observed, observed.self)
+    const intent = intentFor(observed, observed.self, fitness)
 
     /*
      * Without lookahead there is nothing to evaluate — scoring an action without applying it is

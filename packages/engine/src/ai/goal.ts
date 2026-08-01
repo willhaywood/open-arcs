@@ -8,6 +8,7 @@
  * difference to the idea rather than to whatever else moved.
  */
 
+import { feasibility } from './feasibility.js'
 import { heuristicBotWith } from './heuristic.js'
 import { WEIGHTS } from './value.js'
 import type { Bot } from './bot.js'
@@ -31,3 +32,12 @@ export const GOAL_WEIGHTS: Weights = {
 }
 
 export const goalBot: Bot = heuristicBotWith(GOAL_WEIGHTS, 'goal-income')
+
+/**
+ * Step 2: the same weights, but chapter goals judged by what the position can *produce*.
+ *
+ * Separate from `goalBot` so the arena can attribute a difference to feasibility rather than to
+ * feasibility-and-income together — the two changes touch different halves of the bot, and rolling
+ * them into one bot would make a null result unreadable.
+ */
+export const feasibilityBot: Bot = heuristicBotWith(GOAL_WEIGHTS, 'goal-feasible', feasibility)

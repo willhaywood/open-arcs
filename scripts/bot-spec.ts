@@ -10,7 +10,7 @@
  * measuring one thing and printing another, and nothing downstream could tell.
  */
 
-import { baselineBot, goalBot, heuristicBot, heuristicBotWith, rolloutBot, trivialBot } from '@arcs/engine'
+import { baselineBot, feasibilityBot, goalBot, heuristicBot, heuristicBotWith, rolloutBot, trivialBot } from '@arcs/engine'
 import type { Bot, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
@@ -22,6 +22,7 @@ export type BotSpec =
   | { readonly kind: 'trivial' }
   | { readonly kind: 'baseline' }
   | { readonly kind: 'goal' }
+  | { readonly kind: 'feasible' }
   | {
       readonly kind: 'heuristic'
       /** Evaluator weights; omitted means the hand-set ones. Sent as data so a shard can rebuild it. */
@@ -41,6 +42,8 @@ export function buildBot(spec: BotSpec): Bot {
       return baselineBot
     case 'goal':
       return goalBot
+    case 'feasible':
+      return feasibilityBot
     case 'trivial':
       return trivialBot
     case 'heuristic':
@@ -63,6 +66,7 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'trivial') return { kind: 'trivial' }
   if (kind === 'baseline') return { kind: 'baseline' }
   if (kind === 'goal') return { kind: 'goal' }
+  if (kind === 'feasible') return { kind: 'feasible' }
   if (kind === 'heuristic') {
     // `heuristic:fitted` plays the weights `npm run fit` last wrote.
     if (rest[0] !== 'fitted') return { kind: 'heuristic' }

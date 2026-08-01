@@ -54,7 +54,16 @@ const payoutOf = (high: number): number => high
  * holding it with". Warlord and Tyrant are the exception: trophies and captives *are* the
  * structure, since they cannot be spent away.
  */
-function fitness(observed: ObservedState, self: FactionId, ambition: Ambition): number {
+/**
+ * How well a faction is set up to *win* an ambition, ignoring what it might buy this turn.
+ *
+ * A parameter rather than a fixed function so a stronger answer can be swapped in and measured
+ * against this one — `heuristicBot` is the frozen baseline (docs/19 section 4) and changing this in
+ * place would move the baseline along with the thing being compared to it.
+ */
+export type Fitness = (observed: ObservedState, self: FactionId, ambition: Ambition) => number
+
+export const structuralFitness: Fitness = (observed, self, ambition) => {
   const mine = (piece: string): number =>
     observed.board.systems.reduce(
       (n, s) =>
@@ -85,6 +94,7 @@ function fitness(observed: ObservedState, self: FactionId, ambition: Ambition): 
   }
 }
 
+
 /**
  * How strong the opposition is. 0 = clear run, approaching 1 = someone has it locked up.
  *
@@ -106,7 +116,11 @@ function contest(observed: ObservedState, self: FactionId, ambition: Ambition): 
   return best / (best + 4)
 }
 
-export function intentFor(observed: ObservedState, self: FactionId): ChapterIntent {
+export function intentFor(
+  observed: ObservedState,
+  self: FactionId,
+  fitness: Fitness = structuralFitness,
+): ChapterIntent {
   const declared = new Map(observed.declared.map((d) => [d.ambition, d.marker]))
   const bestAvailable = Math.max(0, ...observed.ambitionable.map((m) => m.high))
 

@@ -1590,6 +1590,57 @@ existing feature. Income was the cheapest step, not the biggest, and it is now a
 feasibility in step 2 — where it is an input to *whether an ambition is winnable*, rather than
 another term competing with `cities`.
 
+### Step 2 done: feasibility — a real improvement in *judgement*, not yet in *strength*
+
+`structuralFitness` answers Tycoon with "how many cities and starports do I have", counting every
+city the same whether it stands on Material or on Psionic. So a faction whose territory is entirely
+Relic rates its Tycoon prospects exactly as highly as one sitting on the Material belt.
+
+`feasibility` answers with the planets actually underneath — cities on planets that produce what the
+ambition scores. `intentFor` is now parameterised on its fitness function, so the frozen baseline
+keeps `structuralFitness` and nothing about it moves; the golden game still passes.
+
+The improvement in judgement is real and is pinned by tests: the same city on Material and on Relic
+produces *different* Tycoon prospects, and `structuralFitness` provably cannot tell them apart. It
+also still obeys the flap rule — it reads the planets under its cities, never the resources those
+cities have produced.
+
+**But it does not show up as strength, and one run nearly said it did.**
+
+| 120 games | feasible (twin-averaged) | baseline | twin gap = the floor |
+| --- | --- | --- | --- |
+| seed 1 | 24.5 power | 22.9 | 0.8 |
+| seed 900 | 22.7 power | 22.6 | **1.7** |
+
+The first run's 1.6-point power gap cleared its floor of 0.8 and looked like the first positive
+result of this section. **It did not replicate.** Pooled over 240 games the gap is ~0.85 power
+against a floor averaging ~1.25 — nothing. Reporting the first run alone would have been wrong, and
+the only reason it was not is that a second run on independent seeds was cheap enough to insist on.
+
+That is worth stating as a rule rather than an anecdote: **at this noise floor, a single arena run is
+a hypothesis, not a result.** Replicate on independent seeds before believing anything, including —
+especially — a result you were hoping for.
+
+### Where steps 1 and 2 leave the goal layer
+
+Both are built, both are correct, both are measurably better at the thing they were meant to fix, and
+neither moves the needle:
+
+| step | judgement | strength |
+| --- | --- | --- |
+| 1 income | declares matching top income 38% → 44% | none |
+| 2 feasibility | tells Material cities from Relic ones; structural fitness cannot | none |
+
+The common explanation is the one step 1 already found: **these are refinements of information the
+evaluator already had a proxy for.** Cities were always counted; knowing *which* planet is a
+sharpening, not a new dimension. And both feed `intent`, which only *biases weights* — it never
+changes what the bot is able to see about a position.
+
+Steps 3 and 4 are different in kind, and that is now the reason to expect more from them.
+**Declare-readiness** (initiative, lead-card strength, cards that permit declaring) and **rival
+proximity to locking an ambition** have *no* existing proxy anywhere in `featuresOf` — they are
+things the bot currently cannot represent at all, rather than things it represents coarsely.
+
 ### How this gets validated — not with win rates
 
 The arena's floor is 12-21 points and these effects will be smaller. Use what actually worked:
