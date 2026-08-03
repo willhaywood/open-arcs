@@ -11,43 +11,17 @@
  * leader is ringed only when genuinely ahead and a tie is shown as a tie.
  */
 
-import { CourtPile, Location, contentsOf, courtCard, courtSlots, parseFigureId } from '@arcs/engine'
-import type { FactionId, GameState } from '@arcs/engine'
+import { CourtPile, contentsOf, courtSlots } from '@arcs/engine'
+import type { GameState } from '@arcs/engine'
 import { useState } from 'react'
 
+import { readSlot } from '../court-slot.js'
 import { colorOf, figureArt } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
 import { asset } from '../assets.js'
 
-interface Slot {
-  n: number
-  cardId: string | undefined
-  name: string
-  kind: 'guild' | 'vox' | undefined
-  agents: { faction: FactionId; count: number }[]
-  leader: FactionId | undefined
-}
-
-function read(state: GameState, n: number): Slot {
-  const cardId = contentsOf(state.courtCards, CourtPile.slot(n))[0]
-  const on = contentsOf(state.figures, Location.court(n)).map((id) => parseFigureId(id).color)
-  const agents = state.factions
-    .map((faction) => ({ faction, count: on.filter((c) => c === faction).length }))
-    .filter((a) => a.count > 0)
-    .sort((a, b) => b.count - a.count)
-
-  // Strict majority only — a tie leaves nobody able to secure.
-  const leader =
-    agents.length > 0 && (agents.length === 1 || agents[0]!.count > agents[1]!.count)
-      ? agents[0]!.faction
-      : undefined
-
-  const card = cardId === undefined ? undefined : courtCard(cardId)
-  return { n, cardId, name: card?.name ?? 'empty', kind: card?.kind, agents, leader }
-}
-
 export function CourtPanel({ state }: { state: GameState }): JSX.Element {
-  const slots = courtSlots().map((n) => read(state, n))
+  const slots = courtSlots().map((n) => readSlot(state, n))
   const deckLeft = contentsOf(state.courtCards, CourtPile.deck()).length
   const [open, setOpen] = useState<number | null>(null)
 

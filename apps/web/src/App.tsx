@@ -11,6 +11,7 @@ import { ActionTray } from './components/ActionTray.js'
 import { BotPanel } from './components/BotPanel.js'
 import { PreludeScreen } from './components/PreludeScreen.js'
 import { SlotBoard } from './components/SlotBoard.js'
+import { CardShelf } from './components/CardShelf.js'
 import { RaidModal } from './components/RaidModal.js'
 import { Hand } from './components/Hand.js'
 import { LogPanel } from './components/LogPanel.js'
@@ -135,6 +136,9 @@ export function App(): JSX.Element {
 
       {/* Spending raid keys after a battle. */}
       <RaidModal cont={cont} />
+
+      {/* Influence, Secure and Ransack — the court decisions, as the cards themselves. */}
+      <CardShelf state={state} cont={cont} />
     </div>
   )
 }

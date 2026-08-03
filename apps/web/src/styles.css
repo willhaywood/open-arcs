@@ -4064,11 +4064,13 @@ button {
   filter: grayscale(1);
 }
 /* A card and its magnifier, the reader sitting on the corner of the card it reads. */
-.raid-slot {
+.raid-slot,
+.shelf-slot {
   position: relative;
   display: inline-flex;
 }
-.raid-read {
+.raid-read,
+.shelf-read {
   position: absolute;
   right: 5px;
   top: 5px;
@@ -4084,7 +4086,8 @@ button {
   border-radius: 3px;
   cursor: pointer;
 }
-.raid-read:hover {
+.raid-read:hover,
+.shelf-read:hover {
   background: rgba(9, 11, 16, 0.95);
   border-color: var(--gold);
 }
@@ -4097,12 +4100,14 @@ button {
 .raid-shelf {
   margin-top: 12px;
 }
-.raid-items {
+.raid-items,
+.shelf-items {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
-.raid-item {
+.raid-item,
+.shelf-item {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4115,7 +4120,8 @@ button {
   transition: border-color 0.12s, background 0.12s, transform 0.12s, box-shadow 0.12s;
 }
 /* Same rest/hover split as the map and the battle window: quiet shelf, unmistakable pick. */
-.raid-item:hover {
+.raid-item:hover,
+.shelf-item:hover {
   background: rgba(201, 169, 97, 0.16);
   border-color: var(--gold);
   transform: translateY(-3px);
@@ -4133,8 +4139,9 @@ button {
   height: auto;
   border-radius: 3px;
 }
-.raid-name {
-  max-width: 96px;
+.raid-name,
+.shelf-name {
+  max-width: 110px;
   font-family: var(--font-display);
   font-size: 9.5px;
   font-weight: 700;
@@ -4606,4 +4613,106 @@ button {
   font-size: 11px;
   color: var(--muted);
   font-style: normal;
+}
+
+
+/* --- card shelf: the court decisions, as the cards themselves (docs/15 S1) --- */
+
+/*
+ * Wider than the raid shelf because it holds up to six court cards at a readable size, where the
+ * raid holds a handful of goods. The chrome is otherwise the raid's — same console, same gold, and
+ * deliberately so: both are "pick a card off a shelf", and looking different would imply they work
+ * differently.
+ */
+.shelf-modal {
+  width: min(860px, 100%);
+  border-color: rgba(201, 169, 97, 0.5);
+}
+.shelf-modal::before {
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.shelf-items {
+  margin-top: 12px;
+  justify-content: center;
+}
+/*
+ * Bigger than the raid's 84px card. This is the primary decision surface for the court rather than
+ * a post-battle aside, so the art carries as much as it can before the magnifier is needed — the
+ * body text still needs the magnifier, which is why the reader sits on every card.
+ */
+.shelf-item img {
+  width: 110px;
+  height: auto;
+  border-radius: 3px;
+  display: block;
+}
+/* Who stands on the card. Drawn the way the court rail draws it — see `court-slot.ts`. */
+.shelf-agents {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  min-height: 18px;
+}
+.shelf-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.shelf-agent img {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+.shelf-agent em {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+}
+/*
+ * The strict-majority leader, ringed. A tie rings nobody, because a tie secures nothing — the
+ * distinction the court rail exists to make, carried here so the shelf cannot imply otherwise.
+ */
+.shelf-agent.leads img {
+  outline: 1.5px solid var(--gold);
+  outline-offset: 1px;
+  border-radius: 50%;
+}
+.shelf-agent.leads em {
+  color: var(--gold);
+}
+/*
+ * Anything the Ask offers besides the cards — guild alternatives, a way back to the pip menu, a
+ * trait follow-up. Quiet, and below the shelf: the cards are the decision, these are the ways of
+ * not taking it.
+ */
+.shelf-alts {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(201, 169, 97, 0.18);
+}
+.shelf-alt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 7px;
+}
+.shelf-alt {
+  padding: 6px 12px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(201, 169, 97, 0.28);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.shelf-alt:hover {
+  background: rgba(201, 169, 97, 0.16);
+  border-color: var(--gold);
 }
