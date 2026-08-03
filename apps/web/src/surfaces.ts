@@ -41,6 +41,7 @@ export type Surface =
   | 'prelude'
   | 'slots'
   | 'raid'
+  | 'shelf'
   | 'battle'
   | 'tray'
   | 'map'
@@ -72,6 +73,20 @@ const SLOTS = ['resources/arrange-move', 'resources/arrange-discard', 'resources
 
 /** Raiding is a shelf of cards and resources with prices on them. */
 const RAID = ['battle/raid-take', 'battle/settle']
+
+/**
+ * The court decisions that pick a **card**, drawn as a shelf of the cards themselves (docs/15 S1).
+ *
+ * All three carry the same `{ faction, slot, then }` payload, which is what makes one surface right
+ * for them. Three decisions docs/15 grouped under S1 are deliberately *not* here, because they do
+ * not share that shape: `leaders/beloved` carries no card (a yes/no, so S6),
+ * `turn/bards-declare` picks an ambition rather than a card, and `leaders/generous-give` picks a
+ * card *and* a recipient. See the header of `CardShelf.tsx`.
+ *
+ * `leaders/bold` stays in the panel because it is only the door — the picks it leads to are
+ * ordinary `action/influence` actions, which this surface already claims.
+ */
+export const SHELF = ['action/influence', 'action/secure', 'action/ransack']
 
 /**
  * The battle window owns the engagement from target through to the last hit.
@@ -124,9 +139,6 @@ const PANEL = [
   'action/move-more',
   'action/tax-city',
   'action/repair',
-  'action/influence',
-  'action/secure',
-  'action/ransack',
   'action/guide-pick',
   'action/guide-move',
   'action/martyr',
@@ -177,6 +189,7 @@ const TABLE: readonly (readonly [Surface, readonly string[]])[] = [
   ['prelude', PRELUDE],
   ['slots', SLOTS],
   ['raid', RAID],
+  ['shelf', SHELF],
   ['battle', BATTLE],
   ['map', MAP],
   ['ambitions', AMBITIONS_SURFACE],
