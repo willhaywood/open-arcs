@@ -26,6 +26,7 @@ import {
   courtCard,
   courtSlots,
   parseFigureId,
+  slotKeys,
   slotsOf,
 } from '../index.js'
 import type { FactionId } from '../ids.js'
@@ -118,6 +119,7 @@ export const FEATURES = [
   'standing',
   'resourcesDeclared',
   'resourcesUndeclared',
+  'resourcesGuarded',
   'incomeDeclared',
   'incomeUndeclared',
   'declareReady',
@@ -151,6 +153,12 @@ export const WEIGHTS: Weights = {
   standing: 1,
   resourcesDeclared: 0.45,
   resourcesUndeclared: 0.1125,
+  /*
+   * Slot armour, off by default for the same reason as the goal-layer features below: the frozen
+   * baseline has to stay byte-identical so a bot that switches this on can be attributed the
+   * difference. `GUARD_WEIGHTS` in `guard.ts` turns it on.
+   */
+  resourcesGuarded: 0,
   /*
    * Income is **off by default**, which is the point of adding it this way. `heuristicBot` is the
    * frozen baseline (docs/19 section 4) and a weight of zero leaves it byte-identical, so the new
@@ -247,6 +255,38 @@ export function featuresOf(
     else x.resourcesUndeclared += scaled
   }
   x.weapons = countResource(observed.resources, slots, 'Weapon')
+
+  /*
+   * **Where a token sits, not just that you hold it.**
+   *
+   * A resource slot's printed key cost is armour: `offerRaid` prices each steal at `slotKeys(slot)`
+   * and skips any the raider cannot afford, so the same Relic is far harder to take from a 3-key
+   * slot than a 1-key one. The board is deliberately uneven about this — `CITY_SLOT_KEYS` is
+   * `[3, 1, 1, 2, 1, 3]`, so there are only two genuinely safe slots, one middling and three that a
+   * single key empties, plus Ancient Holdings' card slot at four, the dearest thing on the table.
+   *
+   * Nothing read the arrangement before this, which had a consequence beyond weak play: the arrange
+   * decision had **no gradient at all**. Every ordering scored identically, so the bot had neither a
+   * reason to prefer one nor a reason to stop, and simply shuffled. This gives it both — once the
+   * row is sorted, no move improves it and `Done` wins on merit.
+   *
+   * Scaled by `keys - 1` rather than by `keys`, so this prices *placement only*. How much you hold
+   * is already priced by `resourcesDeclared` / `resourcesUndeclared` above; adding another term
+   * proportional to the count would double-count it. A token in the cheapest slot therefore
+   * contributes nothing here, which is the right zero: that is where an unprotected token sits.
+   *
+   * Worth is the same ambition-scaled value the features above use, so what counts as "valuable"
+   * follows what is actually being contested this chapter rather than a fixed table. Weapons feed no
+   * ambition and take `bias`'s floor: they are worth protecting, just not as prizes.
+   */
+  for (const slot of slots) {
+    const token = contentsOf(observed.resources, slot)[0]
+    if (token === undefined) continue
+    const resource = token.slice(0, token.indexOf('#')) as Resource
+    const ambition = AMBITION_OF[resource]
+    const worth = ambition === undefined ? 0.5 : bias(intent, ambition)
+    x.resourcesGuarded += worth * (slotKeys(slot) - 1)
+  }
 
   /*
    * What the position can *earn*, as opposed to what it holds — cities standing on planets that

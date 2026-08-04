@@ -26,6 +26,7 @@ export * from './ai/declare-ready.js'
 export * from './ai/heuristic.js'
 export * from './ai/baseline.js'
 export * from './ai/goal.js'
+export * from './ai/guard.js'
 export * from './ai/play.js'
 export * from './ai/rollout.js'
 export * from './ai/arena.js'
@@ -47,7 +48,7 @@ export {
   StartSetup,
 } from './rules/setup.js'
 export { TurnModule, StartChapter } from './rules/turn.js'
-export { StandardActionsModule, canTake } from './rules/standard-actions.js'
+export { ARRANGE_MOVE_CAP, StandardActionsModule, canTake } from './rules/standard-actions.js'
 export {
   AmbitionsModule,
   MARKERS,

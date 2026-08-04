@@ -190,6 +190,25 @@ export interface GameState {
   /** Accumulated power per faction — the score. Only seated factions are present. */
   readonly power: Readonly<Partial<Record<FactionId, number>>>
 
+  /**
+   * Repositioning moves made in the arrange step currently open, reset when it closes.
+   *
+   * The arrange menu is the one place in the game whose options form a **cycle**: with a free slot
+   * you may shuffle a held token between slots forever, each move a legal position the engine will
+   * re-offer. Everywhere else a repeat spends something — a pip, a token, a piece — and so
+   * terminates on its own.
+   *
+   * Bounding it here makes termination a property of the rules rather than something every bot has
+   * to rediscover. Three separate bots have livelocked on this menu: `trivialBot` (which takes the
+   * first option offered and so never reached `Done`), and any evaluator that finds two arrangements
+   * equal — which is common, since resources of the same kind are interchangeable.
+   *
+   * Only *repositioning* is counted. Landing an arrival, ejecting and discarding all consume a
+   * token, so they already terminate, and capping them could strand a player with an illegal row
+   * and no way to make it legal — a dead end, which is worse than a loop. See `ARRANGE_MOVE_CAP`.
+   */
+  readonly arrangeMoves?: number
+
   /** Every external action applied so far — the save format. */
   readonly journal: readonly string[]
   readonly log: readonly string[]

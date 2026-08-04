@@ -37,6 +37,7 @@ for (let i = job.shard; i < job.games; i += job.jobs) {
       board: job.board,
       factions,
       ...(job.stuckAfter === undefined ? {} : { stuckAfter: job.stuckAfter }),
+      ...(job.leadersAndLore === undefined ? {} : { leadersAndLore: job.leadersAndLore }),
     },
     registry,
   )

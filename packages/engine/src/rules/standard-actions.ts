@@ -1874,11 +1874,22 @@ export function arrangeThen(state: GameState, faction: FactionId, then: PipRetur
  *   - **discard** a token outright, which is how an arriving token is refused and how a stranded
  *     one is shed.
  */
+/**
+ * Repositioning moves allowed per arrange step, after which only settling moves and `Done` remain.
+ *
+ * Six, because the board has six city slots: any arrangement is reachable from any other well
+ * inside that, so the cap cannot stop a player reaching the row they want. It exists to bound the
+ * *cycle*, not to ration the decision — see `GameState.arrangeMoves` for why the cycle is unique to
+ * this menu and why capping it here rather than teaching each bot to detect loops.
+ */
+export const ARRANGE_MOVE_CAP = 6
+
 function offerArrange(state: GameState, faction: FactionId, then: PipReturn): Continue {
   const usable = slotsOf(state, faction)
   const waiting = overflowTokens(state.resources, faction)
   const stranded = strandedTokens(state, faction)
   const held = heldTokens(state.resources, usable)
+  const repositioned = state.arrangeMoves ?? 0
   const options: Action[] = []
 
   // Anything that is not already settled where it belongs may be picked up: the arrivals, the
@@ -1892,6 +1903,12 @@ function offerArrange(state: GameState, faction: FactionId, then: PipReturn): Co
       if (slot === from) continue
       const occupant = contentsOf(state.resources, slot)[0]
       const arriving = from === undefined || !usable.includes(from)
+      /*
+       * Shuffling a token you already hold is optimisation, and the only move that can cycle. Once
+       * the cap is reached it stops being offered — but an *arriving* token must always be able to
+       * land, or a full row could never be settled and `Done` would never appear.
+       */
+      if (!arriving && repositioned >= ARRANGE_MOVE_CAP) continue
       if (occupant === undefined) {
         options.push({
           type: 'resources/arrange-move',
@@ -1974,7 +1991,18 @@ function performArrangeMove(
         `${parseResourceToken(swap).resource} (${slotKeys(to)}-key slot)`,
   )
 
-  const next: GameState = { ...state, resources, log }
+  /*
+   * Only repositioning counts against the cap. A move that lands an arriving token, ejects or
+   * discards consumes one, so those already terminate; counting them could exhaust the budget
+   * before the row is legal and leave no way to settle it.
+   */
+  const repositioning = eject === undefined && from !== undefined && slotsOf(state, faction).includes(from)
+  const next: GameState = {
+    ...state,
+    resources,
+    log,
+    arrangeMoves: (state.arrangeMoves ?? 0) + (repositioning ? 1 : 0),
+  }
   return { state: next, continue: offerArrange(next, faction, then) }
 }
 
@@ -2630,7 +2658,8 @@ export const StandardActionsModule: RuleModule = {
           action['then'] as PipReturn,
         )
       case 'resources/arrange-done':
-        return { state, continue: C.then(action['then'] as Action) }
+        // The step is over, so the repositioning budget resets for the next one.
+        return { state: { ...state, arrangeMoves: 0 }, continue: C.then(action['then'] as Action) }
       /*
        * No longer offered — the arrange step above replaced it. Still handled, because journals
        * recorded before that change contain it and a save is only a journal: dropping the case

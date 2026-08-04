@@ -53,6 +53,19 @@ const jobs = Math.max(1, Number(flag('jobs') ?? 1))
 const names = (flag('seats') ?? 'heuristic,trivial,trivial,trivial').split(',')
 const specs: BotSpec[] = names.map(parseSpec)
 const board = flag('board') ?? (specs.length === 3 ? 'Board3Frontiers' : 'Board4MixUp1')
+
+/*
+ * Leaders and lore, off by default.
+ *
+ * The arena could not run an expansion game at all until now, which is why nothing in docs/19 has
+ * ever been measured on one — and the bot is blind to leaders and lore precisely because there was
+ * no way to see whether sight helped. `--lore N` deals N lore per player alongside the expansion
+ * leaders; `--lore 0` leaves the base game exactly as it was, so every number already recorded
+ * stays comparable.
+ */
+const lorePerPlayer = Number(flag('lore') ?? 0)
+const leadersAndLore =
+  lorePerPlayer > 0 ? { expansion: true, lorePerPlayer } : undefined
 const factions = (
   specs.length === 3 ? ['red', 'yellow', 'blue'] : ['red', 'yellow', 'blue', 'white']
 ) as FactionId[]
@@ -73,7 +86,8 @@ const labelled = bots.map((b, i) => ({ ...b, id: ids[i]! }))
 
 console.log(
   `Arena: ${ids.join(' vs ')} — ${games} games from seed ${seed}` +
-    ` on ${board}, ${jobs} job${jobs === 1 ? '' : 's'}` +
+    ` on ${board}${leadersAndLore === undefined ? '' : ` +leaders&lore x${lorePerPlayer}`}` +
+    `, ${jobs} job${jobs === 1 ? '' : 's'}` +
     (jobs > 1 ? ` (of ${availableParallelism()} cores)` : ''),
 )
 if (noise) console.log('Noise floor: the last two seats are the same bot; their gap is the floor.\n')
@@ -99,7 +113,12 @@ if (jobs === 1) {
   const registry = defaultRegistry()
   const outcomes: GameOutcome[] = []
   for (let i = 0; i < games; i++) {
-    const o = playGameAt(labelled, i, { seed, board, factions }, registry)
+    const o = playGameAt(
+      labelled,
+      i,
+      { seed, board, factions, ...(leadersAndLore === undefined ? {} : { leadersAndLore }) },
+      registry,
+    )
     outcomes.push(o)
     show(o, i)
   }
@@ -133,6 +152,7 @@ if (jobs === 1) {
       factions,
       shard,
       jobs,
+      ...(leadersAndLore === undefined ? {} : { leadersAndLore }),
     }
     const child = spawn('npx', ['vite-node', 'scripts/arena-shard.ts', JSON.stringify(job)], {
       stdio: ['ignore', 'pipe', 'inherit'],

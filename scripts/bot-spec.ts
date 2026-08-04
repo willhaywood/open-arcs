@@ -10,7 +10,7 @@
  * measuring one thing and printing another, and nothing downstream could tell.
  */
 
-import { baselineBot, contestBot, declareBot, feasibilityBot, goalBot, heuristicBot, heuristicBotWith, rolloutBot, trivialBot } from '@arcs/engine'
+import { baselineBot, contestBot, declareBot, feasibilityBot, goalBot, guardBot, heuristicBot, heuristicBotWith, rolloutBot, trivialBot } from '@arcs/engine'
 import type { Bot, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
@@ -25,6 +25,7 @@ export type BotSpec =
   | { readonly kind: 'feasible' }
   | { readonly kind: 'declare' }
   | { readonly kind: 'contest' }
+  | { readonly kind: 'guard' }
   | {
       readonly kind: 'heuristic'
       /** Evaluator weights; omitted means the hand-set ones. Sent as data so a shard can rebuild it. */
@@ -50,6 +51,8 @@ export function buildBot(spec: BotSpec): Bot {
       return declareBot
     case 'contest':
       return contestBot
+    case 'guard':
+      return guardBot
     case 'trivial':
       return trivialBot
     case 'heuristic':
@@ -75,6 +78,7 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'feasible') return { kind: 'feasible' }
   if (kind === 'declare') return { kind: 'declare' }
   if (kind === 'contest') return { kind: 'contest' }
+  if (kind === 'guard') return { kind: 'guard' }
   if (kind === 'heuristic') {
     // `heuristic:fitted` plays the weights `npm run fit` last wrote.
     if (rest[0] !== 'fitted') return { kind: 'heuristic' }
@@ -128,6 +132,15 @@ export interface ArenaJob {
   readonly board: string
   readonly factions: readonly string[]
   readonly stuckAfter?: number
+  /**
+   * Leaders and lore, when the run is measuring an expansion game.
+   *
+   * Must cross the process boundary explicitly, like `ids` and for the same reason: a shard that
+   * quietly defaulted to the base game would play a *different* game from the serial path under the
+   * same seed, and the parallel and serial runs would stop agreeing — the one property that makes
+   * `--jobs` safe to trust for a real measurement.
+   */
+  readonly leadersAndLore?: { readonly expansion: boolean; readonly lorePerPlayer: number }
   /** Which games this shard plays: indices `shard`, `shard + jobs`, `shard + 2*jobs`, … */
   readonly shard: number
   readonly jobs: number
