@@ -13,22 +13,39 @@
  * `WEIGHTS`, so `heuristicBot` and the frozen baseline stay byte-identical and any difference this
  * makes can be attributed to switching it on rather than lost in a moved reference point.
  *
- * ## What to expect when measuring it, before running anything
+ * ## It has been measured, and it does **not** demonstrably win more games
  *
- * Raids are not rare — a measured 8 baseline games saw **3.9 resources stolen per game** and 18.8
- * arrange menus faced — so the decision has real surface area. But the effect is narrow: this does
- * not stop raids, it changes *which* token is taken, a few times a game. Against the recorded noise
- * floor (two identical configurations, 30 games rotated, **20 points of win rate apart**) that is
- * unlikely to separate at small game counts. Measure on mean power with a `--noise` twin over
- * several hundred games, and treat anything inside the twin gap as unproven — the register in
- * docs/19 section 0 exists because a result that looked good on one seed evaporated on another.
+ * Expansion games (`--lore 3`), three players, seats rotated, against the same bot twinned with
+ * itself to establish the floor (docs/19 section 3j):
  *
- * ## The claim that does not need an arena run
+ * | games | vs `baseline` | vs **its own twin** |
+ * | --- | --- | --- |
+ * | 120 | 16 points, 1.9 power | 16 points, 1.9 power |
+ * | 1000 | 2 points, 0.6 power | 2 points, 0.5 power |
  *
- * Independent of whether it wins more games: before this, **no feature read the arrangement**, so
- * every ordering of a row scored identically. The bot could not prefer a good arrangement and,
- * more to the point, had no reason to *stop* rearranging. This gives the decision a gradient and
- * therefore a terminating condition.
+ * The effect equals the noise floor exactly, on both metrics, at both counts. **There is no
+ * statistical evidence that slot armour contributes to winning.** Do not cite the raw win rate as
+ * support; it is indistinguishable from two copies of one bot disagreeing with each other.
+ *
+ * Raids are not the reason to doubt it — a measured 8 baseline games saw 3.9 resources stolen per
+ * game and 18.8 arrange menus faced, so the decision has real surface area. The effect is simply
+ * narrow: it changes *which* token is taken, not whether raids happen.
+ *
+ * ## What is proven, which is narrower and needs no arena
+ *
+ * Before this, **no feature read the arrangement**, so every ordering of a row scored identically
+ * and the evaluator could not prefer a good one. That blind spot is closed, and `guard.test.ts`
+ * pins it. That is a correctness claim about what the bot can *see*, not a claim about strength.
+ *
+ * An earlier version of this note also claimed it gave the arrange decision a terminating
+ * condition. That is no longer a reason to keep it: `ARRANGE_MOVE_CAP` bounds the cycle in the
+ * rules, which is stronger and does not depend on any bot's scoring.
+ *
+ * ## Before promoting the weight
+ *
+ * It stays at 0 in `WEIGHTS` until there is evidence this run did not produce. Note also that
+ * games failing to finish rose with the number of `guard` seats (4/1000 with one, 15/1000 with
+ * two), which hints at a cycle the arrange cap does not cover — see docs/19 section 3j.
  */
 
 import { heuristicBotWith } from './heuristic.js'
