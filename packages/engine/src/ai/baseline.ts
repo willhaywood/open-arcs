@@ -32,6 +32,9 @@ export const BASELINE_WEIGHTS: Weights = {
   standing: 1,
   resourcesDeclared: 0.45,
   resourcesUndeclared: 0.1125,
+  // Off in the baseline by definition: it predates slot armour, and reads only what is held, never
+  // where it sits.
+  resourcesGuarded: 0,
   // Off in the baseline by definition: it predates income projection entirely.
   incomeDeclared: 0,
   incomeUndeclared: 0,
