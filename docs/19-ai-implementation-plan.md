@@ -30,6 +30,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Iterating the fit (policy iteration) | R² collapses 0.216 → 0.018; strength flat at the floor | 3g |
 | Regularising the fit toward the hand weights | recovers monotonically toward the prior, never past it | 3h |
 | Fitting from choices (interventional pairs) | correct design, zero signal — label noise ~20x effect | 3i |
+| Slot armour (`resourcesGuarded`) | **no measurable effect** — the gap *was* the noise floor, at both 120 and 1000 games | 3j |
 
 ### Why they all failed, in one sentence
 
@@ -38,9 +39,20 @@ it and cannot afford a policy good enough to provide it; every fitting route nee
 noise swamps the effect. The same wall, four times.
 
 Supporting numbers worth not re-deriving: the engine runs at **0.049 ms/action**; a full game is
-**~24ms** as one playout; a V1 decision costs **~4ms**; the arena's noise floor is **12–21 points of
-win rate at 120 games**, and a choice-labelling pair carries **~9.6 power of noise against a ~0.5
-power effect**.
+**~24ms** as one playout; a V1 decision costs **~4ms**; and a choice-labelling pair carries **~9.6
+power of noise against a ~0.5 power effect**.
+
+The arena's noise floor, measured directly by twinning a bot against itself:
+
+| games | win-rate gap between identical bots | mean-power gap |
+| --- | --- | --- |
+| 30 | ~20 points | — |
+| 120 | 16 points | 1.9 |
+| 1000 | **2 points** | **0.5** |
+
+**A thousand games is what it costs to resolve a 2-point difference**, and with `--jobs 12` that is
+about 40 minutes rather than the hours it once implied. There is no longer an excuse for running a
+comparison without its twin.
 
 ### Measurement traps already paid for
 
@@ -1494,6 +1506,49 @@ Not more fitting. The two things that would change the picture:
 
 Both attack the same bottleneck from opposite sides, and both are engineering rather than tuning.
 Until one lands, **the hand-set weights stand, having now survived four measured attempts.**
+
+### 3j. Slot armour — a widening that did *not* pay
+
+The first thing to widen the evaluator's view and produce **no measurable gain**, which makes it the
+most useful entry in this register: it is the counter-example to "widening always works".
+
+**The idea, and it is sound.** A resource slot's printed key cost is what a Rival must spend to steal
+from it — `offerRaid` prices each steal at `slotKeys(slot)` and skips any the raider cannot afford.
+The board is uneven on purpose (`CITY_SLOT_KEYS` is `[3, 1, 1, 2, 1, 3]`, plus Ancient Holdings at
+four), so the same token is far safer in one slot than another, and the best row puts what is worth
+most where it is dearest to take. Nothing read the arrangement at all before this.
+
+`resourcesGuarded` prices placement only — each held token's ambition-scaled worth times
+`slotKeys - 1`, so the cheapest slot contributes nothing and holding more is not double-counted.
+Switched on by `guardBot` (`GUARD_WEIGHTS`, 0.3); weight **0** in `WEIGHTS`, so the baseline is
+untouched.
+
+**The measurement, on expansion games (`--lore 3`), three players, seats rotated:**
+
+| games | `guard` vs `baseline` | `guard` vs **its own twin** |
+| --- | --- | --- |
+| 120 | 16 points, 1.9 power | **16 points, 1.9 power** |
+| 1000 | 2 points, 0.6 power | **2 points, 0.5 power** |
+
+The effect equals the noise floor exactly, on both metrics, at both game counts. **There was never a
+signal.** The sharpest illustration is inside the 120-game twin run, where the two *identical* bots
+finished at 41% and 25% — straddling the opponent at 34%. Whichever twin you looked at, you could
+have concluded the feature was a clear win or a clear loss.
+
+**Kept anyway, at weight 0**, and the reason is worth stating precisely so it is not overclaimed
+later. What is proven is narrow and does not need an arena: before this, *every ordering of a row
+scored identically*, so the evaluator could not prefer a good arrangement — a blind spot, now closed
+and pinned by `guard.test.ts`. What is **not** proven is that seeing it wins more games. Promoting
+the weight needs evidence this run did not produce.
+
+**The trap this entry exists to record.** The 120-game result was reported as favourable *before* its
+twin was run — precisely the mistake the "always run a noise floor" rule at the top of this document
+already warned about. Run the control in the same batch as the comparison, not after it looks good.
+
+**One loose thread.** Games that fail to finish rose with the number of `guard` seats — 4/1000 with
+one seat, 15/1000 with two. Suggestive rather than proven, since the seat rotation also changes which
+games are played, but it hints that `guardBot` still reaches a cycle the arrange cap does not cover.
+Seeds 247, 50, 218, 147 and 275 reproduce it.
 
 ## 4. The goal layer — playing *toward* an ambition
 
