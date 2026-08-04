@@ -38,7 +38,7 @@ Still open, and deliberately not built:
 
 ## 2. Screens
 
-The house rule is already written down in docs/10: *decisions get screens, not buttons*. Five
+The house rule is already written down in docs/10: *decisions get screens, not buttons*. Six
 surfaces exist; the rest of the game's decisions are still rendered as a list of labelled buttons
 in `ActionPanel`, including several where the label cannot carry the decision at all.
 
@@ -47,33 +47,57 @@ already built and generalise:
 
 | # | Surface | Status | Shape |
 | --- | --- | --- | --- |
-| S1 | `CardShelf` | generalise from `RaidModal` | pick a card, with its text readable |
+| ~~S1~~ | `CardShelf` | **done** | pick a card, with its text readable |
 | ~~S2~~ | `PreludeScreen` | **done** for the Prelude | pick a resource token |
 | S3 | Map targeting | extend existing click-the-map | pick a system or a piece |
 | ~~S4~~ | `DiceTray` | **done** | pick which dice to reroll |
 | ~~S5~~ | `SlotBoard` | **done** | arrange tokens across your slots |
 | S6 | Confirm strip | new, small | a genuine yes/no |
 
-### S1 — `CardShelf`: every court-card decision
+### ~~S1~~ — `CardShelf`: the court-card decisions — **built**
 
-`RaidModal` already is this screen: a shelf of cards at readable size, a magnifier opening
-`CardZoom`, and a price or cost badge. Generalising it costs little and retires the largest group
-of button-list decisions in the game.
+`CardShelf` is `RaidModal`'s shape generalised to the court: a shelf of cards at readable size, a
+magnifier opening `CardZoom`, and the irreversible act on the card itself. Agent counts come from
+`readSlot` in `court-slot.ts`, extracted from `CourtPanel` so the rail and the shelf cannot
+disagree — the ring marks a **strict** majority, which is the whole question of whether a card can
+be secured, and a tie rings nobody.
 
-| Decision | Action | Notes |
+**The group was smaller than this entry claimed.** Only four of the nine listed decisions share the
+`{ faction, slot, then }` payload a card shelf is built on. Sorting them out was most of the work:
+
+| Decision | Action | Outcome |
 | --- | --- | --- |
-| Influence | `action/influence` | the most-used court decision in the game |
-| Influential's second influence | `action/influence` + `again` | leader12 |
-| Secure | `action/secure` | needs the agent counts on each card |
-| Ransack after a razed city | `action/ransack` | battle's and Ruthless's, same action |
-| Bold — influence any number, once each | `leaders/bold` | **multi-select** variant |
-| Generous — give a Guild card away | `leaders/generous-give` | picks from *your* secured pile |
-| Beloved — influence after defending | `leaders/beloved` | |
-| Galactic Bards | `turn/bards-declare` | |
-| Populist Demands — declare | vox | ambition markers, not cards — may want its own |
+| Influence | `action/influence` | **drawn** — the most-used court decision in the game |
+| Influential's second influence | `action/influence` + `again` | **drawn**, free: same action, same payload |
+| Secure | `action/secure` | **drawn**, with the agent counts the decision turns on |
+| Ransack after a razed city | `action/ransack` | **drawn** — battle's and Ruthless's, same action |
+| Bold — influence any number | `leaders/bold` | **free**: only the door. See below |
+| Beloved — influence after defending | `leaders/beloved` | not a card decision — carries no card at all. **S6** |
+| Galactic Bards | `turn/bards-declare` | picks an *ambition*, not a card. Belongs with the ambition track |
+| Generous — give a Guild card away | `leaders/generous-give` | card **and** recipient — a matrix, not a shelf |
+| Populist Demands — declare | vox | already on the ambitions surface |
 
-Securing and influencing both need **agents-on-card** rendered, which `CourtPanel` already draws;
-the shelf should reuse that rather than inventing a second representation.
+**Bold needed no code.** `leaders/bold` is only the door; the picks behind it are ordinary
+`action/influence` actions carrying `then: leaders/bold`, which the shelf draws like any other
+influence while the engine re-offers. The "multi-select variant" this entry anticipated is just the
+shelf staying open.
+
+#### The lesson worth keeping
+
+A first cut drew only the card picks — and `offerInfluence` and `offerSecure` wrap their options in
+`withAlts`, which appends `action/guild-alt`. The shelf is claimed ahead of the tray, so those
+alternatives were **offered by the engine and rendered by nobody**: the fourth instance of the bug
+`surfaces.ts` exists to prevent, introduced by the very change that was meant to retire the button
+lists. `turn/pips` and `leaders/after-declare` were being dropped the same way.
+
+`surfaceFor` could not catch it. Ownership was correctly declared throughout — an owner that renders
+nothing is the same unplayable game as no owner, and the existing invariant cannot tell them apart.
+
+So the fix was not another list. `shelfParts` partitions an Ask **exhaustively** into cards,
+everything else, and the way out, and `apps/web/test/court-slot.test.ts` asserts over real play that
+the three parts account for every action. A new action type reaching one of these Asks is drawn
+without anyone having to notice it. **Any future surface claiming a mixed Ask wants the same
+treatment**: claiming an Ask means drawing all of it, and enumerating what to draw is what fails.
 
 ### S2 — token decisions: **the Prelude is done**
 
@@ -138,18 +162,27 @@ Not everything deserves a screen. These are genuine yes/no and only need to stop
 *actions*:
 
 Ruthless squeeze, Ambitious gain, Tactical / Charismatic ordering, catapult continue, Sprinter
-Drives, "ransack nothing", the Mythic decline.
+Drives, the Mythic decline — and **Beloved** (`leaders/beloved`), which S1 listed as a card decision
+until the work found it carries no card at all.
 
 A slim prompt strip above the action panel — question, two buttons — is enough, and it keeps the
 panel meaning "the ordinary things you may do on your turn".
+
+*"Ransack nothing" has left this list*: it is a real engine action on the Ransack Ask, so the card
+shelf draws it in the row beside the cards rather than as a separate confirm. Worth noting as the
+distinction this section turns on — a yes/no the engine models as **one** action wants a strip, and
+one it models as **two** belongs with whatever surface owns the Ask.
 
 ### Sequencing
 
 1. ~~S5 + the section 1 engine work.~~ **Done.**
 2. ~~S2 for the Prelude.~~ **Done** — and it carries the arrange door, so the two landed together.
 3. ~~S4 — the reroll tray.~~ **Done.**
-4. **S1.** Largest group, and `RaidModal` has already proven the pattern.
-5. **S3**, then **S6**, plus the small token picker S2 left behind.
+4. ~~S1 — the card shelf.~~ **Done**, and it reclassified three of its own entries: Beloved is S6,
+   Galactic Bards belongs with the ambition track, and Generous wants a card-and-recipient surface
+   of its own. Those three are the S1 leftovers, and none of them is a shelf.
+5. **S3**, then **S6** — which is now larger by one — plus the small token picker S2 left behind,
+   and Generous whenever the matrix is worth building.
 
 ---
 
