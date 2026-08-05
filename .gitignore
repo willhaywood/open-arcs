@@ -18,3 +18,7 @@ packages/engine/src/ai/fitted-weights*.json
 # Wrangler's local state — the emulated Durable Object storage `wrangler dev` writes to. It
 # persists between runs, which is convenient locally and meaningless to anyone else.
 .wrangler/
+
+# Vite's local env overrides. `VITE_MULTIPLAYER_URL` points a dev build at a local Worker; it is
+# per-developer and must not decide where anyone else's build talks to.
+*.env.local

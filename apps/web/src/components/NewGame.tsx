@@ -20,11 +20,15 @@
  */
 
 import { boardsFor, leaderPool, lorePool, maxLorePerPlayer } from '@arcs/engine'
-import type { FactionId } from '@arcs/engine'
+import type { FactionId, NewGameOptions } from '@arcs/engine'
 import { useState } from 'react'
 
 import { SETUP_CARDS } from '../setups.js'
 import { store } from '../store.js'
+import { ShareGame } from './ShareGame.js'
+import { MultiplayerClient } from '../multiplayer/client.js'
+import type { CreatedGame } from '../multiplayer/client.js'
+import { MULTIPLAYER_URL, multiplayerEnabled } from '../multiplayer/config.js'
 import { colorOf } from '../theme.js'
 import { asset } from '../assets.js'
 
@@ -51,6 +55,15 @@ function shuffled<T>(items: readonly T[]): T[] {
 }
 
 export function NewGame(): JSX.Element {
+  /**
+   * A created multiplayer game, waiting for its links to be shared.
+   *
+   * Held here rather than in the store because until someone takes a seat there is no game to play
+   * locally — only a set of links. The store learns about it when `ShareGame` hands back a seat.
+   */
+  const [created, setCreated] = useState<CreatedGame | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [players, setPlayers] = useState(4)
   const [deck, setDeck] = useState<string[]>(() => shuffled(boardsFor(4).map((b) => b.name)))
   const [picked, setPicked] = useState<string | null>(null)
@@ -87,6 +100,43 @@ export function NewGame(): JSX.Element {
     deal(n) // a different count is a different deck
   }
 
+  /** The options this screen has assembled, shared by the local and multiplayer paths. */
+  function chosenOptions(): NewGameOptions | null {
+    if (picked === null) return null
+    const seats = ALL_FACTIONS.slice(0, players)
+    return {
+      board: picked,
+      factions: seats,
+      seed,
+      ...(leaders ? { leadersAndLore: { expansion, lorePerPlayer } } : {}),
+      ...(bots.length > 0 ? { bots: seats.filter((f) => bots.includes(f)) } : {}),
+    }
+  }
+
+  /**
+   * Create the game on the server and show its links.
+   *
+   * Bot seats are deliberately not sent: a bot in a joined game would never publish its moves and
+   * every client would diverge silently (see `store.botsAvailable`). The option is dropped here
+   * rather than disabled above, so choosing bots and then choosing multiplayer does something
+   * predictable instead of quietly playing a different game than the one on screen.
+   */
+  async function createShared(): Promise<void> {
+    const options = chosenOptions()
+    if (options === null || MULTIPLAYER_URL === null) return
+    const { bots: _dropped, ...withoutBots } = options
+    setCreating(true)
+    setCreateError(null)
+    try {
+      const client = new MultiplayerClient(MULTIPLAYER_URL)
+      setCreated(await client.create(withoutBots, withoutBots.factions))
+    } catch (e) {
+      setCreateError((e as Error).message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
   function enterGame(): void {
     if (picked === null) return
     const seats = ALL_FACTIONS.slice(0, players)
@@ -102,6 +152,31 @@ export function NewGame(): JSX.Element {
   }
 
   const drawn = picked !== null ? SETUP_CARDS[picked] : undefined
+
+  /*
+   * Once a game exists on the server this screen is only in the way — the links are the thing that
+   * matters, and losing them loses the seats.
+   */
+  if (created !== null) {
+    return (
+      <div className="newgame">
+        {/* The banner stays: this is still the start screen, one step further in. */}
+        {hasBanner ? (
+          <div className="ng-banner">
+            <img src={BANNER} alt="Arcs" onError={() => setHasBanner(false)} />
+          </div>
+        ) : (
+          <h1 className="ng-wordmark">Arcs</h1>
+        )}
+        <ShareGame
+          game={created}
+          onEnter={(seatToken) => {
+            void store.joinSession(MULTIPLAYER_URL!, { gameId: created.gameId, seatToken })
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="newgame">
@@ -296,6 +371,21 @@ export function NewGame(): JSX.Element {
             {picked === null ? 'Take a card' : 'Start game'}
           </button>
         )}
+
+        {/* Absent entirely when the build has no server configured — see `multiplayer/config.ts`. */}
+        {multiplayerEnabled() ? (
+          <div className="ng-online">
+            <button
+              className="ghost ng-online-go"
+              onClick={() => void createShared()}
+              disabled={picked === null || creating}
+            >
+              {creating ? 'Creating…' : 'Play online with friends'}
+            </button>
+            <em>one link each</em>
+            {createError !== null ? <span className="ng-online-error">{createError}</span> : null}
+          </div>
+        ) : null}
       </div>
     </div>
   )

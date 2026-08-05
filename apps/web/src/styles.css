@@ -4716,3 +4716,142 @@ button {
   background: rgba(201, 169, 97, 0.16);
   border-color: var(--gold);
 }
+
+/* --- multiplayer: creating a game, and handing out its links --------------- */
+
+/*
+ * Written in the start screen's own vocabulary (docs/10 section 2ab) rather than a second one:
+ * gold letterspaced caps on the display face, body copy in the system sans, and the existing
+ * `ng-field` / `ng-redeal` / `ng-start` idioms reused rather than re-invented. `--accent` stays
+ * out of it — the blue means "live and clickable now", and a link waiting to be copied is not.
+ */
+
+/* The door to multiplayer, under a hairline so it reads as a separate offer from Start. */
+.ng-online {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(201, 169, 97, 0.2);
+}
+.ng-online-go {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: none;
+  border: 1px solid rgba(201, 169, 97, 0.45);
+  border-radius: 3px;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.ng-online-go:hover:not(:disabled) {
+  background: rgba(201, 169, 97, 0.14);
+  border-color: var(--gold);
+}
+.ng-online-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ng-online em {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ng-online-error {
+  font-size: 11px;
+  color: #c98b8b;
+}
+
+/* --- the share screen ----------------------------------------------------- */
+
+.mp-share {
+  padding-top: 22px;
+}
+.mp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/*
+ * The seat, in its own colour — the same cue the player boards and the court rail use, so "which
+ * one is mine" is answered the way it is answered everywhere else. Outlined rather than filled:
+ * filled chips are how the game marks a seat that is *in play*, and these are addresses.
+ */
+.mp-seat {
+  /* Fixed, not min-width: the longest label is "watching", and ragged chips make the links below
+     them fail to line up — which is the column anyone actually reads. */
+  width: 92px;
+  box-sizing: border-box;
+  flex: none;
+  padding: 5px 9px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--muted);
+}
+/*
+ * The one place on this screen showing data rather than titling, so it stays monospace: a URL is
+ * checked by eye, and the display face makes that harder rather than prettier.
+ */
+.mp-link {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--text);
+  background: rgba(9, 11, 16, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+.mp-link:focus {
+  outline: none;
+  border-color: rgba(201, 169, 97, 0.5);
+}
+.mp-copy {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  min-width: 76px;
+}
+.mp-copy:hover {
+  color: var(--gold);
+  border-color: rgba(201, 169, 97, 0.5);
+}
+.mp-go {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.mp-enter {
+  width: auto;
+  padding-inline: 22px;
+}
