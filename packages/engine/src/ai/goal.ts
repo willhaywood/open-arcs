@@ -57,6 +57,90 @@ export const CONTEST_WEIGHTS: Weights = { ...DECLARE_WEIGHTS, standingContested:
 export const contestBot: Bot = heuristicBotWith(CONTEST_WEIGHTS, 'goal-contest', feasibility)
 
 /**
+ * Step 5 weights: the expansion's ambition-paired lore, held versus switched on.
+ *
+ * Ten cards (lore19-28) do nothing until the ambition they name is declared, by anyone. Two weights
+ * rather than one because **the gap between them is the whole mechanism**: the bot values a declare
+ * by valuing the position it produces, and declaring is what converts an armed card to a live one,
+ * so `loreLive - loreArmed` is precisely the pull toward declaring what your lore wants. One scaled
+ * count could not express it.
+ *
+ * **Measured, and it loses.** `loreBot` finishes 2-3 points of win rate and ~0.9 power *behind*
+ * `contestBot` — the same bot without these weights — against a twin floor of 0-1 point, over 999
+ * games. Both variants tried lose by the same margin: the flat count these weights were first set
+ * for, and the `bias`-scaled version now in `value.ts`, which was meant to stop the pull arguing
+ * with `feasibility` and did not help at all (docs/19 section 3k).
+ *
+ * So this bot exists to document a negative, not to be played. The weights stay at 0 in `WEIGHTS`;
+ * what is proven is that the evaluator *can* tell a live card from a dormant one, not that acting on
+ * the difference is worth anything. Before reviving it, read 3k — the likeliest explanation is that
+ * a live card's benefit already reaches the evaluator through its effects on the board, making this
+ * a second price for something already counted.
+ */
+export const LORE_WEIGHTS: Weights = { ...CONTEST_WEIGHTS, loreLive: 0.6, loreArmed: 0.2 }
+
+export const loreBot: Bot = heuristicBotWith(LORE_WEIGHTS, 'goal-lore', feasibility)
+
+/**
+ * What declaring costs, weighed against what it earns.
+ *
+ * Built on `CONTEST_WEIGHTS` rather than on the lore weights, which measured worse (section 3k).
+ *
+ * An audit of 40 games found the shipped bot declaring 8.7 times a game and the *frozen baseline*
+ * 12.8 — winning those at 34% against a 33% chance line, which is to say its declarations were worth
+ * nothing. The cause is not that it declares badly on the merits; it is that declaring was **free**.
+ * Zeroing the played card costs the initiative fight, and no feature read `lead.zeroed`, so a
+ * hopeless declaration and a skip came out ~0.001 apart on values near 0.76 and the tie-break took
+ * the marker.
+ *
+ * `-0.35` per point of surrendered strength, to start: zeroing a 4 costs about 1.4 power of
+ * expected value, near a fresh ship, which is the order of what losing the initiative is worth.
+ * High enough that a declaration has to earn its place, low enough that a real prospect still buys
+ * it — declaring already moves income from `incomeUndeclared` (0.22) to `incomeDeclared` (0.9), so
+ * a speculative declare backed by taxable cities keeps paying for itself.
+ *
+ * Starting point, like every weight here, and two of the last three ideas measured as nothing or
+ * worse (sections 3j, 3k). The arena is owed a run with its twin before any of this is believed.
+ */
+export const DECLARE_COST_WEIGHTS: Weights = { ...CONTEST_WEIGHTS, leadZeroed: -0.35 }
+
+export const declareCostBot: Bot = heuristicBotWith(DECLARE_COST_WEIGHTS, 'goal-cost', feasibility)
+
+/**
+ * **What the game ships.** One name for "the bot a human plays against", so that is a decision
+ * rather than whichever import `store.ts` happened to reach for.
+ *
+ * Everything the goal layer measured as good, and nothing it measured as bad:
+ *
+ *   - income (`GOAL_WEIGHTS`), declare-readiness (`DECLARE_WEIGHTS`) and contest
+ *     (`CONTEST_WEIGHTS`), each added and measured in turn — docs/19 section 4.
+ *   - the price of declaring (`leadZeroed`), which is the one below.
+ *
+ * **Deliberately excluded**, both measured and both left at 0 in `WEIGHTS`:
+ *
+ *   - `loreLive` / `loreArmed` — 2-3 points of win rate *worse* against a 0-1 point floor, in two
+ *     variants (section 3k). Shipping it would knowingly weaken the bot.
+ *   - `resourcesGuarded` — no measurable effect either way (section 3j). Left off because a change
+ *     with no evidence behind it is a change that cannot be defended later, not because it harms.
+ *
+ * **On `leadZeroed`, be precise about what it bought.** It did *not* measurably improve strength:
+ * 999 games against `contestBot` came out +1 point of win rate, the twin control 2 points, and a
+ * second run put it 2 points the other way — noise, twice over. What it changed is behaviour a
+ * human sees. Declarations on ambitions *nobody* could score went 13-21% to **zero**, declared-and-won
+ * rose from 58% to 65% against a 33% chance line, and declarations fell from 8.7 a game to 6.7.
+ * A bot burning its played card on an Empath nobody holds a Psionic for looks broken, and it did
+ * that one time in five. That is the case for shipping it, and it is an opponent-quality case
+ * rather than a strength one.
+ *
+ * The known cost: it declares from a lead 87% of the time, up from 68%, so it banks more and
+ * gambles less. If the striving behaviour matters more than the tidiness, `-0.2` removes the dead
+ * declarations without pushing it that far.
+ */
+export const STANDARD_WEIGHTS: Weights = DECLARE_COST_WEIGHTS
+
+export const standardBot: Bot = heuristicBotWith(STANDARD_WEIGHTS, 'standard', feasibility)
+
+/**
  * Step 2: the same weights, but chapter goals judged by what the position can *produce*.
  *
  * Separate from `goalBot` so the arena can attribute a difference to feasibility rather than to

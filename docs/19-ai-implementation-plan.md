@@ -31,6 +31,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Regularising the fit toward the hand weights | recovers monotonically toward the prior, never past it | 3h |
 | Fitting from choices (interventional pairs) | correct design, zero signal — label noise ~20x effect | 3i |
 | Slot armour (`resourcesGuarded`) | **no measurable effect** — the gap *was* the noise floor, at both 120 and 1000 games | 3j |
+| Lore activation (`loreLive`/`loreArmed`) | **measurably worse** — 2-3 points behind against a 0-1 point floor, in two variants | 3k |
 
 ### Why they all failed, in one sentence
 
@@ -1549,6 +1550,47 @@ already warned about. Run the control in the same batch as the comparison, not a
 one seat, 15/1000 with two. Suggestive rather than proven, since the seat rotation also changes which
 games are played, but it hints that `guardBot` still reaches a cycle the arrange cap does not cover.
 Seeds 247, 50, 218, 147 and 275 reproduce it.
+
+### 3k. Lore activation — a widening that made the bot *worse*
+
+Stronger than section 3j's null, and more useful: this one has a sign. Two variants, four runs of 999
+games each with a matched twin control, and the feature loses every time.
+
+**The idea.** The expansion's ten ambition-paired lore cards (lore19-28) do nothing until the
+ambition they name is declared, by anyone (`loreActive`). Holding Tycoon's Ambition while nobody has
+declared Tycoon is a card face-down. Two features rather than one — `loreArmed` for held-but-dormant,
+`loreLive` for switched-on — because the bot values a declaration by valuing the position it leads
+to, and declaring is exactly what converts armed to live. So `loreLive - loreArmed` is the pull
+toward declaring what your lore wants, with no rule saying so. The mechanism works and is tested.
+
+**The numbers**, `lore` vs two `contest` bots, expansion games, seats rotated:
+
+| variant | vs `contest` | twin floor |
+| --- | --- | --- |
+| flat count (0.6 / 0.2) | −2 points, −0.6 to −1.0 power | 1 point, 0.2 power |
+| scaled by `bias` | −2 to −3 points, −0.8 to −0.9 power | **0 points, 0.1 power** |
+
+**The hypothesis that failed.** The flat version was thought to lose because a constant pull argues
+with `feasibility` — the signal that judges whether an ambition is worth declaring, which these bots
+already carry. Scaling each card by `bias(intent, itsAmbition)` should have made the card *amplify*
+that judgement rather than override it. It changed nothing: the scaled variant lost by the same
+margin, against the tightest floor yet measured. **The shape of the pull is not the problem.**
+
+**What is left to suspect**, for anyone tempted to rebuild this:
+
+  - **The weights are too large.** `loreLive` at 0.6 sits near a fresh ship. If a paired card is
+    worth much less, the feature is mostly injecting error into an evaluator whose other terms are
+    tuned. A weight sweep would test it — and is exactly the tuning this register says has never
+    paid off here.
+  - **The card is already priced, through its effects.** More likely, and the more interesting
+    possibility. A live card's benefit reaches the evaluator anyway — as ships on the board, as
+    actions taken more cheaply, as resources gained. Counting the card *as well* double-prices what
+    is already visible. That would explain why no shape of the term helps: the information is not
+    new, and the same lesson appears elsewhere in this register.
+
+**Kept at weight 0**, inert, with the mechanism pinned by `lore-activation.test.ts`. What is proven
+is only that the evaluator *can* distinguish a live card from a dormant one, which it could not
+before. That it should *act* on the distinction is now measured false twice.
 
 ## 4. The goal layer — playing *toward* an ambition
 

@@ -14,6 +14,7 @@
  * should be treated as suspicious rather than confirmed.
  */
 
+import { LORE_AMBITION, hasLore, loreActive } from '../lore.js'
 import { metric } from '../rules/ambitions.js'
 import { declareReadiness } from './declare-ready.js'
 import { incomeFor } from './income.js'
@@ -124,6 +125,9 @@ export const FEATURES = [
   'incomeUndeclared',
   'declareReady',
   'standingContested',
+  'loreLive',
+  'loreArmed',
+  'leadZeroed',
   'weapons',
   'cities',
   'starports',
@@ -177,6 +181,18 @@ export const WEIGHTS: Weights = {
    * and a bot that switches it on can be attributed the difference. `CONTEST_WEIGHTS` turns it on.
    */
   standingContested: 0,
+  /*
+   * Lore activation, off by default like the rest of the goal layer, so the frozen baseline stays
+   * byte-identical and a bot that switches it on can be attributed the difference.
+   * `LORE_WEIGHTS` in `goal.ts` turns them on.
+   */
+  loreLive: 0,
+  loreArmed: 0,
+  /*
+   * The price of declaring, off by default like the rest. `DECLARE_COST_WEIGHTS` in `goal.ts` turns
+   * it on.
+   */
+  leadZeroed: 0,
   weapons: 0.25,
   cities: 2.0,
   starports: 1.2,
@@ -289,6 +305,44 @@ export function featuresOf(
   }
 
   /*
+   * **Ambition-paired lore: held, versus actually switched on.**
+   *
+   * The expansion's ten paired cards (lore19-28) do nothing at all until the ambition they name is
+   * declared — by *anyone*, not necessarily by the holder (`loreActive`). So holding Tycoon's
+   * Ambition while nobody has declared Tycoon is a card face-down: real potential, no effect.
+   *
+   * Splitting the two states is what makes declaring attractive for the right reason. The bot
+   * evaluates `ambition/declare` by valuing the position it leads to, and declaring Tycoon is
+   * exactly what turns an armed Tycoon card live — so a held card raises the value of declaring its
+   * ambition *automatically*, with no rule anywhere saying "declare what your lore wants". The pull
+   * is the difference between the two weights, which is why they are separate features rather than
+   * one scaled count.
+   *
+   * **Scaled by how much the faction wants that ambition, and the flat version was measured worse.**
+   * The first cut counted each card as 1, on the reasoning that `intent` already reaches this
+   * decision through every other term and multiplying here would price the same preference twice.
+   * The arena disagreed: flat weights came out ~2 points of win rate and ~0.8 power *behind* the
+   * same bot without them, against a 1-point noise floor (docs/19 section 3k).
+   *
+   * The likely reason is that a flat pull argues with `feasibility` — the signal that judges whether
+   * an ambition is worth declaring at all, and which the bots carrying these weights already use. A
+   * card should tip a close call toward its ambition, not drag the bot into one the board does not
+   * support. `bias` is exactly that judgement, so scaling by it makes the card *amplify* a
+   * preference rather than *create* one.
+   *
+   * A per-card table is still the obvious refinement and is still deliberately not authored — a live
+   * Warlord's Cruelty and a live Tycoon's Charm are not equally useful, but docs/19 section 0 is a
+   * list of things that looked worth more than they measured.
+   */
+  for (const [loreId, paired] of Object.entries(LORE_AMBITION)) {
+    if (!hasLore(observed, self, loreId)) continue
+    const want = bias(intent, paired as Ambition)
+    // `loreActive` is the engine's own gate, so this cannot drift from what the cards actually do.
+    if (loreActive(observed, self, loreId)) x.loreLive += want
+    else x.loreArmed += want
+  }
+
+  /*
    * What the position can *earn*, as opposed to what it holds — cities standing on planets that
    * produce the resource an ambition scores. Split declared from undeclared for the same reason the
    * held resources are: income toward something nobody has declared is a prospect, not a prize.
@@ -349,6 +403,28 @@ export function featuresOf(
    * which is what makes it the first of these additions with no existing proxy.
    */
   x.declareReady = declareReadiness(observed, self, intent)
+
+  /*
+   * **What declaring costs, which nothing here could previously see.**
+   *
+   * Declaring zeroes your played card: it counts as strength 0, so any same-suit card surpasses it
+   * and the initiative usually goes. That is a real price, and the evaluator was blind to it — an
+   * audit over 40 games found declaring a hopeless ambition and skipping it differed by ~0.001 on
+   * values around 0.76, so the choice was effectively a coin flip and the bot took the marker
+   * because it was free. The frozen baseline declares 12.8 times a game and wins those at 34%
+   * against a 33% chance line.
+   *
+   * Priced as the **strength surrendered** rather than a flat penalty, because that is what varies:
+   * zeroing a 6 gives up far more of the initiative fight than zeroing a 2.
+   *
+   * This deliberately does *not* judge which ambitions are winnable. Declaring one you hold nothing
+   * for is sound when you can tax cities into it, or have ships to take trophies with — and that
+   * case is already priced, by `feasibility` and by declaring moving income from the
+   * `incomeUndeclared` bucket to `incomeDeclared`. Making the *cost* visible is what lets those
+   * gains be weighed against something instead of being free.
+   */
+  const lead = observed.lead
+  x.leadZeroed = lead !== undefined && lead.faction === self && lead.zeroed ? lead.strength : 0
 
   // Tempo — cards are options. Easy to over-price, and hard to justify beyond that.
   x.tempo = observed.handSizes[self] ?? 0
