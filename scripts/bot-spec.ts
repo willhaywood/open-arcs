@@ -10,7 +10,7 @@
  * measuring one thing and printing another, and nothing downstream could tell.
  */
 
-import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, goalBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rolloutBot, trivialBot } from '@arcs/engine'
+import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, goalBot, standardBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rolloutBot, trivialBot } from '@arcs/engine'
 import type { Bot, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
@@ -28,6 +28,7 @@ export type BotSpec =
   | { readonly kind: 'guard' }
   | { readonly kind: 'lore' }
   | { readonly kind: 'cost' }
+  | { readonly kind: 'standard' }
   | {
       readonly kind: 'heuristic'
       /** Evaluator weights; omitted means the hand-set ones. Sent as data so a shard can rebuild it. */
@@ -59,6 +60,8 @@ export function buildBot(spec: BotSpec): Bot {
       return loreBot
     case 'cost':
       return declareCostBot
+    case 'standard':
+      return standardBot
     case 'trivial':
       return trivialBot
     case 'heuristic':
@@ -75,7 +78,14 @@ export function buildBot(spec: BotSpec): Bot {
   }
 }
 
-/** Parse a `--seats` entry: `trivial`, `heuristic`, `rollout[:samples:turns]`, `rollout:4:chapter`. */
+/**
+ * Parse a `--seats` entry.
+ *
+ * `standard` is the bot the game ships; the rest are the measurement ladder behind it, in the order
+ * they were built: `baseline` (frozen), `goal`, `feasible`, `declare`, `contest`, then the three
+ * measured additions `guard`, `lore` and `cost`. Plus `trivial`, `heuristic[:weights]` and
+ * `rollout[:samples:turns]`.
+ */
 export function parseSpec(name: string): BotSpec {
   const [kind, ...rest] = name.trim().split(':')
   if (kind === 'trivial') return { kind: 'trivial' }
@@ -87,6 +97,7 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'guard') return { kind: 'guard' }
   if (kind === 'lore') return { kind: 'lore' }
   if (kind === 'cost') return { kind: 'cost' }
+  if (kind === 'standard') return { kind: 'standard' }
   if (kind === 'heuristic') {
     // `heuristic:fitted` plays the weights `npm run fit` last wrote.
     if (rest[0] !== 'fitted') return { kind: 'heuristic' }
@@ -115,7 +126,10 @@ export function parseSpec(name: string): BotSpec {
       ...(chapter ? { untilChapterEnd: true } : {}),
     }
   }
-  throw new Error(`Unknown bot "${name}" — known: trivial, heuristic, rollout[:samples:turns]`)
+  throw new Error(
+    `Unknown bot "${name}" — known: standard, baseline, goal, feasible, declare, contest, ` +
+      `guard, lore, cost, trivial, heuristic, rollout[:samples:turns]`,
+  )
 }
 
 /**
