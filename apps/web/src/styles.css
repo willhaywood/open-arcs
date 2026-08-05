@@ -1544,8 +1544,45 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-right: auto;
+  /* The push to the right-hand end moved to `.pb-hand`, which now follows this. */
   margin-left: 10px;
+}
+/* Cards in hand. Grouped with the supply rather than with power: both answer "what is left to
+   spend". See PlayerBoards.tsx — the count is public, only the contents are not. */
+.pb-hand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
+  margin-right: auto;
+}
+.pb-hand-art {
+  /* The card back, at the same visual weight as the ship and agent tokens beside it. */
+  width: 13px;
+  height: auto;
+  display: block;
+  border-radius: 1.5px;
+  opacity: 0.9;
+}
+.pb-hand b {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+/* Dimmed, not flagged. An empty supply is a wall you have hit; an empty hand is how a chapter
+   ordinarily ends, so it should read as spent rather than as a warning. */
+.pb-hand.out {
+  opacity: 0.4;
+}
+.pb-hand.mini {
+  margin-left: 7px;
+}
+.pb-hand.mini .pb-hand-art {
+  width: 10px;
+}
+.pb-hand.mini b {
+  font-size: 11px;
 }
 .pb-sup {
   display: inline-flex;

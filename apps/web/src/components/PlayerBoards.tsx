@@ -14,6 +14,7 @@
 
 import {
   AGENTS_PER_FACTION,
+  CardLocation,
   Location,
   RESOURCES,
   SHIPS_PER_FACTION,
@@ -75,6 +76,16 @@ interface FactionBoard {
   /** Pieces still in the supply — what you have left to build or place. */
   shipsLeft: number
   agentsLeft: number
+  /**
+   * Cards held, for everyone including rivals.
+   *
+   * Public information: `observe.ts` lists hand *size* among the things every player can see, and
+   * only the contents among the hidden. It matters more since rivals' hands stopped being rendered
+   * in a joined game (docs/17 section 2a) — at a table you can see how many cards someone is
+   * holding, and without this the digital version was strictly less informative than the physical
+   * one.
+   */
+  handSize: number
 }
 
 /** How many of a piece are still in a faction's supply, rather than on the board or taken. */
@@ -105,6 +116,7 @@ function read(state: GameState, faction: FactionId): FactionBoard {
     trophies: contentsOf(state.figures, Location.trophies(faction)).length,
     captives: contentsOf(state.figures, Location.captives(faction)).length,
     secured: securedCards(state, faction),
+    handSize: contentsOf(state.cards, CardLocation.hand(faction)).length,
     leader: state.leaders[faction],
     lore: state.lores[faction] ?? [],
   }
@@ -142,6 +154,7 @@ function FullBoard({ board }: { board: FactionBoard }): JSX.Element {
       <header className="pb-head">
         <NamePlate faction={board.faction} />
         <Supply board={board} />
+        <HandCount board={board} />
         <span className="pb-power">
           <b>{board.power}</b> power
         </span>
@@ -212,6 +225,7 @@ function MiniBoard({ board }: { board: FactionBoard }): JSX.Element {
       <header className="pb-head">
         <NamePlate faction={board.faction} mini />
         <Supply board={board} mini />
+        <HandCount board={board} mini />
         <span className="pb-power">
           <b>{board.power}</b>
         </span>
@@ -586,6 +600,29 @@ function BoardFrame(): JSX.Element {
  * place. Cities already show as the tokens covering the slots, so only ships and agents need
  * saying.
  */
+/**
+ * Cards in hand, as a count.
+ *
+ * Sits with the supply rather than with power, because it is the same kind of fact: what this
+ * player still has to spend. It carries the `margin-right: auto` that pushes power to the far end,
+ * so it is the last thing in the left-hand group.
+ *
+ * An empty hand is dimmed rather than flagged red the way an empty supply is. Running out of ships
+ * is a constraint you have hit; playing your last card is the ordinary end of a chapter.
+ */
+function HandCount({ board, mini = false }: { board: FactionBoard; mini?: boolean }): JSX.Element {
+  const n = board.handSize
+  return (
+    <span
+      className={`pb-hand${n === 0 ? ' out' : ''}${mini ? ' mini' : ''}`}
+      title={`${n} card${n === 1 ? '' : 's'} in hand`}
+    >
+      <img className="pb-hand-art" src={asset('game-assets/icon/card-back-small.webp')} alt="cards in hand" />
+      <b>{n}</b>
+    </span>
+  )
+}
+
 function Supply({ board, mini = false }: { board: FactionBoard; mini?: boolean }): JSX.Element {
   const pieces = [
     { art: 'ship', n: board.shipsLeft, of: SHIPS_PER_FACTION, label: 'ships' },
