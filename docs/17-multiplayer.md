@@ -115,7 +115,7 @@ SSE or WebSockets later if it feels sluggish.
 
 | | Fit | Why |
 | --- | --- | --- |
-| **Cloudflare Workers + Durable Objects** | **Best** | One Durable Object *per game* is exactly this shape: single-threaded per game, so the compare-and-set is free, and it holds the journal in memory with storage behind it. Pairs with Cloudflare Pages, which docs/16 already recommends. |
+| **Cloudflare Workers + Durable Objects** | **Best** | One Durable Object *per game* is exactly this shape: single-threaded per game, so the compare-and-set is free, and it holds the journal in memory with storage behind it. Serves the static client from the same Worker, so there is one origin and one deploy (4c). |
 | **Supabase** | Very good | A `games` table with `journal jsonb[]`, plus Realtime for push. Least code of all — possibly no server code at all, just RLS policies. |
 | Cloudflare Workers + D1/KV | Fine | Needs the compare-and-set done by hand. |
 | Firebase | Fine | Same shape as Supabase. |
@@ -175,8 +175,9 @@ the next project needs.
 
 - **Cloudflare** — one Durable Object *per game* is exactly this problem's shape: single-threaded
   per game, so the compare-and-set in section 4 is free rather than something to engineer. docs/16
-  already points at Cloudflare Pages for the static site, so the whole thing lands in one account
-  with no CORS. The bet is on edge compute and stateless APIs.
+  already points at Cloudflare for the static site, and a Worker can serve that itself — so the
+  whole thing lands in one account, one origin, one deploy. The bet is on edge compute and
+  stateless APIs.
 - **Supabase** — Postgres plus auth, storage, Realtime and edge functions: a general-purpose
   backend. If future projects need **accounts, user data or relational queries**, this is the
   stronger foundation, and paying $25 buys something this project alone does not need.
@@ -189,7 +190,7 @@ rewrite; only Realtime is really Supabase-shaped.
 ## 4b. Decision, and the portability contract
 
 **Cloudflare Durable Objects for v1** (section 4a has the reasoning: it is free at this scale, one
-object per game is exactly the shape, and docs/16 already points at Cloudflare Pages).
+object per game is exactly the shape, and docs/16 already points at Cloudflare).
 
 **And it must stay possible to move to a small Node + Postgres box without a redesign.** That is a
 constraint on how the server is written, not a promise to write it twice — so this section states
@@ -237,6 +238,47 @@ bytes, which is irrelevant here — the notification carries a length, and the c
 A second implementation of a four-method interface, and a DNS change. The engine is untouched — it
 is pure TypeScript with no I/O and already runs in both places. The client is untouched, because of
 rule 2. That is the whole point of writing the rules down before the code exists rather than after.
+
+## 4c. One Worker, one origin
+
+The client and the API are deployed together, as a single Worker: `wrangler.toml` declares
+`apps/web/dist` as its assets, and asset routing serves a file when the path matches one and falls
+through to the Worker when it does not. `run_worker_first = ["/games", "/games/*"]` pins the API
+routes so that fall-through is a guarantee rather than a coincidence.
+
+The earlier assumption was two origins — a static host for the client, a Worker for the API — and
+that assumption is what produced the CORS header, the preflight on every append, and
+`VITE_MULTIPLAYER_URL`. Same-origin deletes all three rather than configuring around them:
+
+- **No preflight.** A cross-origin `POST` with a JSON content-type costs an `OPTIONS` round trip
+  before the real one. Every append paid it. Same-origin requests do not.
+- **Nothing to configure.** The API base is the empty string, so there is no hostname baked into the
+  bundle at build time and no second name to get wrong or to renew a certificate for.
+- **One deploy.** The client and the server version together, so the protocol cannot skew between
+  them — which for a design where every client replays the same journal is the failure that matters.
+
+`access-control-allow-origin: *` stays on the API. It costs one header, it keeps the two-terminal
+dev loop working (vite on 5173, Worker on 8787), and it keeps rule 2 honest: a Node deployment on a
+separate host still serves the same contract. Nothing in production depends on it.
+
+**This does not weaken the portability contract.** Assets are static file serving — the one
+capability every host has. The Node + Postgres pivot in 4b serves `dist` from `express.static` or a
+CDN in front of it, and rule 2 is untouched either way, because the client asks for `/games/...`
+without an opinion about who answers.
+
+### Unset, empty, and set
+
+`VITE_MULTIPLAYER_URL` has three states, and the distinction that matters is unset versus empty:
+
+| Value | Meaning | Where |
+| --- | --- | --- |
+| unset | multiplayer off; hotseat only | GitHub Pages |
+| `""` | same origin | Cloudflare |
+| an absolute URL | a server elsewhere | the two-terminal dev loop |
+
+Vite folds this to a literal, so the check is on `typeof`, not on truthiness — the two off-looking
+values mean opposite things. GitHub Pages is kept as a hotseat-only fallback rather than retired: it
+has no server behind it and never will, but that is the entire game minus the links.
 
 ## 5. Option 2 — server-authoritative *(if you don't trust the table)*
 

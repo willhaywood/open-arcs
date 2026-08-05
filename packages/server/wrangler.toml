@@ -1,13 +1,30 @@
-# Cloudflare deployment for the multiplayer server. docs/17 section 4b is the decision.
+# Cloudflare deployment for the whole site — static client and multiplayer API, one Worker.
+# docs/17 section 4b is the platform decision and 4c is the same-origin one.
 #
 # `wrangler dev` runs this locally on workerd — the same runtime as production — so no Cloudflare
 # account is needed to develop against it, and no cloud dev environment exists to keep in sync.
 # Only the adapter needs this: `handle()` and `MemoryStore` are plain vitest, which is what keeps
 # the everyday loop free of platform tooling.
 
-name = "arcs-multiplayer"
+# Sets the public hostname (`open-arcs.<subdomain>.workers.dev`), which the shared links are built
+# from — so it is fixed once anyone has been sent one. Matches the repo and the GitHub Pages path.
+name = "open-arcs"
 main = "src/cloudflare/worker.ts"
 compatibility_date = "2026-08-05"
+
+# The built client, served from the same origin as the API. Relative to this file, which is why it
+# climbs out of the package: the deployable unit is the site, not the server.
+#
+# The directory must exist before `wrangler dev` or `wrangler deploy` will start, so both are
+# fronted by a build — see the root `serve` and `deploy` scripts.
+[assets]
+directory = "../../apps/web/dist"
+
+# Asset routing serves a file when one matches the path and falls through to the Worker when none
+# does, which already routes the API correctly — every `/games/...` path is a 404 in `dist`. Naming
+# the routes anyway makes that a guarantee rather than a coincidence: without it, the day someone
+# adds a `games/` folder to the client is the day the API starts quietly returning HTML.
+run_worker_first = ["/games", "/games/*"]
 
 [[durable_objects.bindings]]
 name = "GAMES"

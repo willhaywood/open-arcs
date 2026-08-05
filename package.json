@@ -6,6 +6,7 @@
     "packages/*",
     "apps/*"
   ],
+  "comment": "build:site sets VITE_MULTIPLAYER_URL to the empty string on purpose — empty means same origin, unset means multiplayer off. See apps/web/src/multiplayer/config.ts.",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
@@ -14,7 +15,9 @@
     "arena": "vite-node scripts/arena.ts",
     "audit": "vite-node scripts/ambition-audit.ts",
     "fit": "vite-node scripts/fit-weights.ts",
-    "serve": "npm run dev --workspace @arcs/server"
+    "build:site": "VITE_MULTIPLAYER_URL= npm run build --workspace @arcs/web",
+    "serve": "npm run build:site && npm run dev --workspace @arcs/server",
+    "deploy": "npm run build:site && npm run deploy --workspace @arcs/server"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

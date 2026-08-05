@@ -32,10 +32,13 @@ const json = (body: unknown, status = 200): Response =>
     headers: {
       'content-type': 'application/json',
       /*
-       * The client is served from a different origin (GitHub Pages or Cloudflare Pages) to the API,
-       * so CORS is not optional. Wide open is right for v1: every endpoint is already
-       * capability-secured by an unguessable id, so an origin check would add no security while
-       * breaking local development and the eventual custom domain.
+       * Production is same-origin — one Worker serves the client and these routes (docs/17 section
+       * 4c) — so nothing deployed needs this header. It stays for the arrangements that do: the
+       * two-terminal dev loop (vite on 5173, this on 8787), and any host that serves `dist`
+       * separately from the API, which rule 2 says must keep working.
+       *
+       * Wide open is right for v1: every endpoint is already capability-secured by an unguessable
+       * id, so an origin check would add no security while breaking both of those.
        */
       'access-control-allow-origin': '*',
     },

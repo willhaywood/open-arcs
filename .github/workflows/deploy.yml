@@ -1,8 +1,17 @@
-# Build the web app and publish it to GitHub Pages.
+# Publish the site to two places, from one push.
 #
-# The site is served from https://willhaywood.github.io/open-arcs/, which is a *project* site — so
-# the build needs `BASE_PATH` or every asset URL resolves against the domain root and 404s.
-name: Deploy to GitHub Pages
+#   - **Cloudflare** — one Worker serving the client *and* the multiplayer API on the same origin.
+#     This is the real deployment: docs/17 section 4c. Served from the domain root, so no
+#     `BASE_PATH`, and `VITE_MULTIPLAYER_URL` is the empty string, which means "same origin".
+#   - **GitHub Pages** — the same client with multiplayer switched off, at
+#     https://willhaywood.github.io/open-arcs/. A *project* site, so the build needs `BASE_PATH` or
+#     every asset URL resolves against the domain root and 404s.
+#
+# Pages is kept rather than replaced. It has no server behind it, so it can only ever be hotseat —
+# but that is the whole game minus the links, it costs nothing, and it is the fallback if the Worker
+# is ever misconfigured. The two builds differ in both environment variables, so they cannot share a
+# build step; they are separate jobs and run in parallel.
+name: Deploy
 
 on:
   push:
@@ -17,11 +26,12 @@ permissions:
 
 # Let a running deploy finish rather than cancelling it half-published.
 concurrency:
-  group: pages
+  group: deploy
   cancel-in-progress: false
 
 jobs:
-  build:
+  # --- Cloudflare: the client and the API, one origin -------------------------------------------
+  cloudflare:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -37,6 +47,58 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Root script rather than the workspace one, because it is what sets VITE_MULTIPLAYER_URL to
+      # the empty string. Getting that wrong is silent: the site builds and serves, and the online
+      # button is simply missing.
+      - name: Build the client
+        run: npm run build:site
+
+      - name: Trim campaign art from the deploy
+        run: |
+          cd apps/web/dist/game-assets
+          rm -rf f[0-9][0-9] fate empire arcs-bg.png
+          du -sh . | sed 's/^/deploy size: /'
+
+      # Wrangler comes from the lockfile, so CI deploys with the same version as `npm run deploy`
+      # locally. `--config` makes the working directory irrelevant; the asset path inside it is
+      # resolved relative to the file, not to the shell.
+      - name: Deploy the Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN is not set — skipping the Worker deploy."
+            exit 0
+          fi
+          # An unset secret arrives as the empty string, not as an absent variable. Only one of
+          # these is a valid account id, so drop it rather than hand wrangler a blank one and rely
+          # on it treating that the same as never having been told. Written as an `if` and not
+          # `[ -z … ] && unset …`, which under `bash -e` fails the step whenever the variable *is*
+          # set — the test returns 1 and it is the last command in the script.
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            unset CLOUDFLARE_ACCOUNT_ID
+          fi
+          npx wrangler deploy --config packages/server/wrangler.toml
+
+  # --- GitHub Pages: the same client, hotseat only ----------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # No VITE_MULTIPLAYER_URL at all, which is what switches multiplayer off — see
+      # apps/web/src/multiplayer/config.ts for why unset and empty mean different things.
       - name: Build
         env:
           BASE_PATH: /open-arcs/
