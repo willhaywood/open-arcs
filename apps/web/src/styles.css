@@ -477,8 +477,59 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 5vh;
+  /* The page's bottom breathing room moved to `.ng-attrib`, which now sits below this. */
+  margin-bottom: 20px;
   font-size: 13px;
+}
+/* The footnote: quietest thing on the screen, and the only place the ownership line appears
+   where someone arriving from a shared link will actually see it. See Attribution.tsx. */
+.ng-attrib {
+  /* 46ch broke the sentence over three lines and left "Arcs." alone on the last one. */
+  max-width: 58ch;
+  /* Narrower than 58ch the max-width stops applying, and without this the text meets the edge. */
+  padding: 0 16px;
+  box-sizing: border-box;
+  margin-bottom: 5vh;
+  text-align: center;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.ng-attrib-note {
+  opacity: 0.72;
+  /* Evens the two lines rather than filling the first and orphaning the rest of the second. */
+  text-wrap: balance;
+}
+.ng-attrib-links {
+  margin-top: 7px;
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+}
+.ng-attrib a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--line);
+}
+/* The mark sits with the text rather than on it: inline-flex so the underline runs under both,
+   and a nudge up because a 12px glyph on an 11.5px line otherwise rides low. */
+.ng-attrib-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ng-gh-mark {
+  flex: none;
+  position: relative;
+  top: -0.5px;
+}
+.ng-attrib a:hover {
+  color: var(--gold);
+  text-decoration-color: var(--gold-dim);
+}
+.ng-attrib-sep {
+  opacity: 0.5;
 }
 .newgame-load .ghost {
   background: transparent;

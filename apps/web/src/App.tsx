@@ -3,6 +3,7 @@ import { useRef } from 'react'
 
 import { ActionPanel } from './components/ActionPanel.js'
 import { AmbitionTrack } from './components/AmbitionTrack.js'
+import { Attribution } from './components/Attribution.js'
 import { Board } from './components/Board.js'
 import { CourtPanel } from './components/CourtPanel.js'
 import { DraftScreen } from './components/DraftScreen.js'
@@ -70,6 +71,7 @@ export function App(): JSX.Element {
       <div className="newgame-wrap">
         <NewGame />
         <div className="newgame-load">{loadControl}or load a saved game</div>
+        <Attribution />
       </div>
     )
   }
