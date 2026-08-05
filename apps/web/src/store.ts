@@ -30,6 +30,10 @@ import type {
 } from '@arcs/engine'
 import { useSyncExternalStore } from 'react'
 
+import { Session } from './multiplayer/session.js'
+import { remember } from './multiplayer/link.js'
+import type { GameLink } from './multiplayer/link.js'
+
 type Listener = () => void
 
 class GameStore {
@@ -37,6 +41,16 @@ class GameStore {
   private options: NewGameOptions | null = null
   private readonly registry = defaultRegistry()
   private readonly listeners = new Set<Listener>()
+
+  /**
+   * The multiplayer session, when this game is a joined one.
+   *
+   * `null` for a local hotseat game, which stays the default and the way the rules are tested
+   * (docs/17 section 7). Multiplayer is a second mode, not a replacement — so everything below has
+   * to behave identically when this is null, and the two hooks that use it are the only places that
+   * know it exists.
+   */
+  private session: Session | null = null
 
   subscribe = (cb: Listener): (() => void) => {
     this.listeners.add(cb)
@@ -131,8 +145,29 @@ class GameStore {
   }
 
   /** Take exactly one bot action now — the Step button, and the engine of `run`. */
+  /**
+   * Whether bot seats may run at all.
+   *
+   * **False in a joined game, deliberately.** Bot moves are applied by `stepBotOnce`, which sets
+   * state directly rather than going through `apply` — so they would never reach the publish hook.
+   * Every client would compute its own bot move, keep it locally, and then append the server's
+   * entries on top of it: divergence, silently, with no error anywhere.
+   *
+   * docs/17 section 6a has the real design — whichever client notices a bot's turn computes and
+   * posts it, with the `expectedLength` check making the race harmless. It also names the price:
+   * the bot must be **deterministic** given observed state and a journal-derived seed, or two
+   * clients disagree and the game forks by who posted first. That is true of the current evaluator
+   * and not of a rollout bot, so it is a decision to make rather than an oversight to fix quietly.
+   *
+   * Until then, refusing to run is the honest behaviour. A missing feature is recoverable; a
+   * corrupted journal is not.
+   */
+  botsAvailable(): boolean {
+    return this.session === null
+  }
+
   stepBotOnce(): void {
-    if (this.result === null) return
+    if (this.result === null || !this.botsAvailable()) return
     const faction = this.botTurn()
     if (faction === undefined) return
     const out = stepBot(this.result, standardBot, faction, this.registry, this.botAsked)
@@ -152,6 +187,8 @@ class GameStore {
    */
   private scheduleBot(): void {
     this.clearBotTimer()
+    // See `botsAvailable` — a bot seat in a joined game would diverge silently.
+    if (!this.botsAvailable()) return
     if (this.botMode !== 'run' || this.botTurn() === undefined) return
     this.timer = setTimeout(() => {
       this.timer = null
@@ -166,7 +203,56 @@ class GameStore {
     }
   }
 
+  // --- multiplayer ----------------------------------------------------------
+
+  /**
+   * Join a game over the network. The session owns polling; this owns the state it writes into.
+   */
+  async joinSession(baseUrl: string, link: GameLink): Promise<void> {
+    this.leaveSession()
+    this.clearBotTimer()
+    const session = new Session(baseUrl, link, {
+      current: () => this.result,
+      adopt: (options, result) => {
+        this.options = options
+        this.result = result
+        this.generation += 1
+        this.lastDecision = null
+        this.emit()
+      },
+      applyRemote: (action) => {
+        if (this.result === null) return
+        /*
+         * The second hook. Identical to `apply` except that it does **not** publish — an action that
+         * arrived from the server must not be sent back to it, which would append it twice.
+         */
+        this.result = applyExternal(this.result, action, this.registry)
+        this.emit()
+      },
+    })
+    this.session = session
+    remember(link)
+    await session.join()
+  }
+
+  leaveSession(): void {
+    this.session?.leave()
+    this.session = null
+  }
+
+  /** The joined game's link, or `null` when playing locally. */
+  sessionLink(): GameLink | null {
+    return this.session?.link ?? null
+  }
+
+  /** A spectator holds no seat and may watch only. */
+  isSpectator(): boolean {
+    return this.session?.isSpectator ?? false
+  }
+
   start(options: NewGameOptions): void {
+    // Starting a local game abandons any joined one; they are different games by definition.
+    this.leaveSession()
     this.clearBotTimer()
     this.forgetBotTurn()
     this.options = options
@@ -190,8 +276,19 @@ class GameStore {
       this.botUiVersion += 1
     }
     this.clearBotTimer()
+    /*
+     * The first hook. Read the length *before* applying: that is what the server compares against,
+     * and it is what makes a double-tap or a stale tab a no-op rather than a duplicated action.
+     */
+    const expectedLength = this.result.state.journal.length
     this.result = applyExternal(this.result, action, this.registry)
     this.emit()
+    /*
+     * Published without waiting. The move is already on screen, and the only outcome needing a
+     * response is a conflict — which `Session.publish` resolves by replaying the authoritative
+     * journal, so there is nothing here to await or unwind.
+     */
+    void this.session?.publish(action, expectedLength)
     this.scheduleBot()
   }
 
