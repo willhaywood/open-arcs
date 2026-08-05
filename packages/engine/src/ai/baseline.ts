@@ -40,6 +40,12 @@ export const BASELINE_WEIGHTS: Weights = {
   incomeUndeclared: 0,
   declareReady: 0,
   standingContested: 0,
+  // Off in the baseline by definition: it predates the expansion's ambition-paired lore entirely.
+  loreLive: 0,
+  loreArmed: 0,
+  // Off in the baseline by definition: it never priced what declaring costs, which is why it
+  // declares almost every marker it can and wins them at chance.
+  leadZeroed: 0,
   weapons: 0.25,
   cities: 2.0,
   starports: 1.2,
