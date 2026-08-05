@@ -9,8 +9,10 @@ Three properties the engine already has do most of the work:
 - **A game *is* its journal.** `{ version, options, journal }` — an ordered list of compact
   action strings (docs/11). Replaying it reproduces state byte for byte. A server never needs to
   store or understand game state; it stores **an append-only list of strings**.
-- **The journal is tiny.** Entries average 49 characters. A 300-action game is about **14 KB** of
-  JSON — the whole game, not a delta.
+- **The journal is small.** Measured on a real 466-action game: entries average **136 characters**
+  and the whole game is **73 KB** of compact JSON — the whole game, not a delta. (This entry
+  previously said 49 characters and 14 KB, which was roughly a third of the truth. The conclusion
+  survives comfortably; the figure did not.)
 - **Turns are strictly sequential.** `state.current` names the one faction that may act. Nothing
   simultaneous exists in the base game — `multiAsk` is a placeholder that nothing emits. So there
   is no concurrent input to reconcile, no conflict resolution, no lockstep. Just "is it your turn".
@@ -33,9 +35,15 @@ This is a known boundary, not a discovery — `observe.ts` says so in its own he
 > leak: the RNG seed. A bot holding the seed can predict every future die roll.
 
 `observe(state, faction)` already exists and returns an `ObservedState` that omits `rng` and
-`journal`. It was built for the AI (docs/03) and is currently used only in tests. It is the right
-place to build a player view — though note it currently omits `cards` entirely, so it would need
-*widening* to include your own hand, not just narrowing.
+`journal`. It is the right place to build a player view, and **two things this entry used to say
+about it are no longer true**:
+
+- It is not "used only in tests". It is core to the AI and reaches production through `store.ts`
+  and `Board.tsx`.
+- It no longer "omits `cards` entirely, so it would need *widening*". `ObservedState` now carries
+  `hand` — your own card ids, never anyone else's — plus public `handSizes`. **That widening was
+  the work option 2 was costed against, and it is already done**, which makes section 5 materially
+  cheaper than it reads.
 
 **Two honest positions:**
 
@@ -111,6 +119,68 @@ SSE or WebSockets later if it feels sluggish.
 **Effort:** a weekend. The client change is small — `store.ts` already funnels everything through
 `applyExternal`, so "also POST it" and "replay tail on poll" are two hooks in one file.
 
+## 4a. What it costs
+
+Prices checked **5 August 2026**, and both vendors change them — re-check before committing spend.
+The workload below is measured from a real game, not assumed.
+
+### The shape: you are buying requests, not bandwidth
+
+A 466-action game is 73 KB of journal. Polling is what dominates — three players at one poll every
+2.5 seconds over a three-hour game is **12,960 reads against 466 writes, a ratio of 28:1**. Because
+`?since=N` returns only the tail, those reads are almost empty. **Request count is the bill;
+bandwidth is a rounding error.**
+
+That single fact decides most of what follows.
+
+### Monthly cost, by scale
+
+| games / month | Cloudflare (Workers + DO) | Supabase Pro |
+| --- | --- | --- |
+| 10 — friends | **$0** (free tier) | **$0** (free tier) |
+| 500 — small community | **$5** | $25 |
+| 5,000 — busy | $32 | **$25** |
+| 50,000 — big | $309 | **$129** |
+
+Rates used: Workers $5/mo with 10M requests then $0.30/M; Durable Objects 1M requests then $0.15/M
+and 400k GB-s then $12.50/M (duration assumed at ~10 ms per request — **worth measuring rather than
+trusting**). Supabase Pro $25/mo with 5M Realtime messages then $2.50/M.
+
+### Free-tier headroom, and the ceiling that actually bites
+
+- **Cloudflare free**: 100k requests/day — about **7 games/day**, ~223/month.
+- **Supabase free**: 2M Realtime messages/month — about **2,145 games/month**, but only **200
+  concurrent connections, so 66 simultaneous games**.
+- **Supabase Pro**: 500 concurrent — **166 simultaneous games**, then $10 per 1000.
+
+The concurrency cap is a harder limit than any per-unit rate, because it is about *peak* rather than
+volume. A quiet month with one busy evening can hit it while every other number stays green.
+
+### The biggest lever is not the vendor
+
+**Swapping polling for push divides the request count by about ten**, at every scale — 6.7M requests
+a month becomes 0.70M at 500 games; 67M becomes 7M at 5,000. That is why section 4 lists it as step
+2 rather than a nicety: it moves the crossover between these two columns further out than choosing
+either vendor does.
+
+### Which to pick, and why price is the least of it
+
+At the scale this project is, **both are free**, so the decision should be made on fit and on what
+the next project needs.
+
+- **Cloudflare** — one Durable Object *per game* is exactly this problem's shape: single-threaded
+  per game, so the compare-and-set in section 4 is free rather than something to engineer. docs/16
+  already points at Cloudflare Pages for the static site, so the whole thing lands in one account
+  with no CORS. The bet is on edge compute and stateless APIs.
+- **Supabase** — Postgres plus auth, storage, Realtime and edge functions: a general-purpose
+  backend. If future projects need **accounts, user data or relational queries**, this is the
+  stronger foundation, and paying $25 buys something this project alone does not need.
+
+**Lock-in matters more than the money here.** Durable Objects are a proprietary primitive with no
+direct equivalent elsewhere — though the pattern in section 4 is roughly fifty lines and portable by
+hand. Supabase is Postgres underneath and self-hostable, so leaving is a migration rather than a
+rewrite; only Realtime is really Supabase-shaped.
+
 ## 5. Option 2 — server-authoritative *(if you don't trust the table)*
 
 The server runs the engine — it can, the engine is pure TypeScript with no I/O and the same
@@ -120,11 +190,13 @@ package runs in a Worker.
 - Randomness enters the journal as **outcomes appended by the server**, not values derived from a
   shared seed. This is the real engine change: `battle/roll` currently computes dice from
   `state.rng`, so it would have to carry its result instead.
-- Each client is sent `observe(state, myFaction)`, widened to include its own hand.
+- Each client is sent `observe(state, myFaction)`. **This part is already built** — `ObservedState`
+  carries `hand` and `handSizes` (see section 2), so the widening this entry once listed as work is
+  done, and what remains is the randomness change alone.
 
 The engine's determinism survives this — an action carrying its dice replays exactly as well as one
-that derives them. But it is a substantially bigger job than option 1, and it touches battle, the
-court shuffle and the draft.
+that derives them. Still a bigger job than option 1, and it touches battle, the court shuffle and
+the draft — but a smaller one than it was, now that the player view exists.
 
 **Do this only if you actually want competitive play with strangers.** For friends it is cost with
 no benefit.
@@ -163,5 +235,14 @@ Fully in **docs/03 section 9a**, written after this document. The short version:
 
 1. **Option 1 on Cloudflare Durable Objects**, per-player GUID links, 2-second polling, trusting
    the table — with a line in the UI saying the client can see everything, so nobody is misled.
-2. Swap polling for push if it feels slow.
-3. Revisit option 2 only if the game leaves the circle of people you know.
+   **Free at this scale** (section 4a): the free tier covers about 7 games a day, and the paid plan
+   is $5/month well beyond anything this project will see.
+2. **Swap polling for push** — and treat it as the real second step rather than a nicety. It divides
+   request count by about ten at every scale, which moves the cost crossover further than picking a
+   different vendor does.
+3. Revisit option 2 only if the game leaves the circle of people you know. Cheaper than it was: the
+   player view is built, so only the randomness change remains.
+
+**Reconsider the vendor, not the design, if a future project needs accounts or stored user data.**
+Nothing in sections 3-4 is Cloudflare-shaped — it is an append-only list with a compare-and-set, and
+Supabase does the same job in roughly the same amount of code. Section 4a has the comparison.
