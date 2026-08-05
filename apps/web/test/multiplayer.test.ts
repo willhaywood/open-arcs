@@ -10,7 +10,7 @@
 import { MemoryStore, handle } from '@arcs/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { linkFor, parseLink } from '../src/multiplayer/link.js'
+import { hashFor, linkFor, parseLink } from '../src/multiplayer/link.js'
 import { Session } from '../src/multiplayer/session.js'
 import type { SessionHost } from '../src/multiplayer/session.js'
 import { applyExternal, encodeAction, startGame, defaultRegistry } from '@arcs/engine'
@@ -67,6 +67,17 @@ describe('the link is the credential', () => {
   it('round-trips ids that need escaping', () => {
     const link = linkFor('https://arcs.test', 'a/b', 'c d')
     expect(parseLink(new URL(link).hash)).toEqual({ gameId: 'a/b', seatToken: 'c d' })
+  })
+
+  /*
+   * The creator never follows a link — they click through from the share screen — so their seat
+   * reaches the address bar via `hashFor` instead. If it drifted from what `parseLink` accepts,
+   * the one player who cannot recover a reload would be the one who started the game.
+   */
+  it('puts the creator on the same route a player link would', () => {
+    expect(parseLink(hashFor('a/b', 'c d'))).toEqual({ gameId: 'a/b', seatToken: 'c d' })
+    expect(hashFor('g1', 's1')).toBe(new URL(linkFor('https://arcs.test', 'g1', 's1')).hash)
+    expect(hashFor('g1')).toBe(new URL(linkFor('https://arcs.test', 'g1')).hash)
   })
 })
 

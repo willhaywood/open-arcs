@@ -7,8 +7,9 @@
  *   https://arcs.example/#/g/3f2a…/s/9c81…      <- red's link
  *   https://arcs.example/#/g/3f2a…              <- a spectator: game, no seat
  *
- * Everything lives in the hash so this works on a static host with no server-side routing, which is
- * what GitHub Pages and Cloudflare Pages both are.
+ * Everything lives in the hash, so the route never reaches the server and no host has to be taught
+ * about it. The Worker's asset routing sees a bare `/` and serves `index.html`; GitHub Pages, which
+ * has no server-side routing at all, does the same. One format works on both.
  *
  * **Losing the link is the failure mode**, so `remember` stashes it under the game id on first
  * visit. Keyed by game rather than a single "current" slot, because a player may reasonably have
@@ -34,9 +35,20 @@ export function parseLink(hash: string): GameLink | undefined {
   return undefined
 }
 
-export function linkFor(origin: string, gameId: string, seatToken?: string): string {
+/**
+ * Just the hash, for when the origin is already where you are — setting `window.location.hash`
+ * after creating a game, rather than handing someone a URL.
+ *
+ * Separate from `linkFor` only so the route format has one definition. It is parsed by `parseLink`
+ * above, and a copy of it that drifted would fail as a link nobody can join.
+ */
+export function hashFor(gameId: string, seatToken?: string): string {
   const seat = seatToken === undefined ? '' : `/s/${encodeURIComponent(seatToken)}`
-  return `${origin}/#/g/${encodeURIComponent(gameId)}${seat}`
+  return `#/g/${encodeURIComponent(gameId)}${seat}`
+}
+
+export function linkFor(origin: string, gameId: string, seatToken?: string): string {
+  return `${origin}/${hashFor(gameId, seatToken)}`
 }
 
 /**

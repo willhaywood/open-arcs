@@ -29,6 +29,7 @@ import { ShareGame } from './ShareGame.js'
 import { MultiplayerClient } from '../multiplayer/client.js'
 import type { CreatedGame } from '../multiplayer/client.js'
 import { MULTIPLAYER_URL, multiplayerEnabled } from '../multiplayer/config.js'
+import { hashFor } from '../multiplayer/link.js'
 import { colorOf } from '../theme.js'
 import { asset } from '../assets.js'
 
@@ -171,6 +172,17 @@ export function NewGame(): JSX.Element {
         <ShareGame
           game={created}
           onEnter={(seatToken) => {
+            /*
+             * Put the creator's own link in the address bar before joining. `joinSession` stashes
+             * the seat token under the game id, but a stash is only reachable if something still
+             * knows the game id — and without this the creator is the one player whose URL never
+             * carries it. They would be the only seat at the table that a reload cannot recover,
+             * which is the exact failure `ShareGame` exists to prevent.
+             *
+             * Nothing listens for `hashchange`, so this does not re-enter the game; it is read on
+             * the next load, by `main.tsx`.
+             */
+            window.location.hash = hashFor(created.gameId, seatToken)
             void store.joinSession(MULTIPLAYER_URL!, { gameId: created.gameId, seatToken })
           }}
         />
