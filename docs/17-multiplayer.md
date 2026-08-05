@@ -1,6 +1,11 @@
 # Arcs Digital — Multiplayer options
 
-A brainstorm, not a decision. Ordered by effort, with the honest problem stated up front.
+Ordered by effort, with the honest problem stated up front.
+
+**Decided so far:** option 1 (shared journal, dumb server) on Cloudflare Durable Objects, written
+behind a four-method store interface so a move to a small Node + Postgres box stays a swap rather
+than a rewrite. Section 4b is the contract that keeps that true; sections 1-3 and 5-7 are still a
+brainstorm.
 
 ## 1. Why this is easier than it looks
 
@@ -181,6 +186,58 @@ direct equivalent elsewhere — though the pattern in section 4 is roughly fifty
 hand. Supabase is Postgres underneath and self-hostable, so leaving is a migration rather than a
 rewrite; only Realtime is really Supabase-shaped.
 
+## 4b. Decision, and the portability contract
+
+**Cloudflare Durable Objects for v1** (section 4a has the reasoning: it is free at this scale, one
+object per game is exactly the shape, and docs/16 already points at Cloudflare Pages).
+
+**And it must stay possible to move to a small Node + Postgres box without a redesign.** That is a
+constraint on how the server is written, not a promise to write it twice — so this section states
+what has to hold. If a future change breaks one of these rules, the pivot stops being a swap and
+becomes a rewrite.
+
+### What actually creates lock-in — and what does not
+
+Durable Objects give exactly **one** thing that is hard to reproduce: they are single-threaded per
+object, so the compare-and-set in section 4 is free. Everything else — routing, storage, even push —
+has a plain equivalent.
+
+| Concern | Cloudflare | Node + Postgres |
+| --- | --- | --- |
+| Compare-and-set on append | Free: the object is single-threaded | `UPDATE … WHERE array_length(journal,1) = $expected`, then check the row count |
+| Push to other players | WebSocket or SSE from the object | `LISTEN`/`NOTIFY`, payload "game X is at length N" |
+| Storage | DO storage | a `games` table |
+| Fan-out | The object holds its own subscribers | Postgres delivers to every listening session |
+
+Postgres's `NOTIFY` is worth knowing precisely because it is *better* than the in-memory version:
+it fires **only on commit**, so a rolled-back append can never notify anyone. Payloads cap at 8000
+bytes, which is irrelevant here — the notification carries a length, and the client fetches the tail.
+
+### The five rules
+
+1. **The journal is the only thing persisted.** A list of strings plus `options`. The moment the
+   server stores derived state — a cached board, a materialised score — portability is gone, because
+   that state has to be rebuilt identically on the other side. It also is not needed: replay is the
+   design (docs/11).
+2. **The HTTP surface in section 4 is the contract.** Three endpoints. Both platforms serve exactly
+   those routes with exactly those semantics, so **the client cannot tell which is behind it** and
+   is never part of the migration.
+3. **`expectedLength` is passed explicitly and checked explicitly** — never left implicit in "the
+   object is single-threaded". Free on Durable Objects and a `WHERE` clause on Postgres, but only if
+   the check is written down rather than assumed.
+4. **No Cloudflare types outside the adapter.** The store is an interface — roughly `create`,
+   `readSince`, `append`, `subscribe` — and the Durable Object is one implementation of it. Nothing
+   above that layer imports a Workers type.
+5. **No DO-only primitives.** Alarms, WebSocket hibernation and the transactional storage API have
+   no plain equivalent. If one of them ever looks necessary, that is the moment to decide
+   deliberately rather than discover it during a migration.
+
+### What the pivot then costs
+
+A second implementation of a four-method interface, and a DNS change. The engine is untouched — it
+is pure TypeScript with no I/O and already runs in both places. The client is untouched, because of
+rule 2. That is the whole point of writing the rules down before the code exists rather than after.
+
 ## 5. Option 2 — server-authoritative *(if you don't trust the table)*
 
 The server runs the engine — it can, the engine is pure TypeScript with no I/O and the same
@@ -233,10 +290,12 @@ Fully in **docs/03 section 9a**, written after this document. The short version:
 
 ## 8. Suggested path
 
-1. **Option 1 on Cloudflare Durable Objects**, per-player GUID links, 2-second polling, trusting
-   the table — with a line in the UI saying the client can see everything, so nobody is misled.
-   **Free at this scale** (section 4a): the free tier covers about 7 games a day, and the paid plan
-   is $5/month well beyond anything this project will see.
+1. **Option 1 on Cloudflare Durable Objects** — decided, see section 4b — with per-player GUID
+   links, 2-second polling, and trusting the table, plus a line in the UI saying the client can see
+   everything so nobody is misled. **Free at this scale** (section 4a): the free tier covers about 7
+   games a day, and the paid plan is $5/month well beyond anything this project will see.
+   Written behind the four-method store interface of section 4b from the first commit, because that
+   is cheap now and a rewrite later.
 2. **Swap polling for push** — and treat it as the real second step rather than a nicety. It divides
    request count by about ten at every scale, which moves the cost crossover further than picking a
    different vendor does.

@@ -228,9 +228,16 @@ one invariant still worth adding.
   counts resource *tokens* only and ignores Guild-card icons, while `courtSecured` counts the cards
   separately. The `standing` feature already goes through `metric` and so does see them. Aligning
   the token term is bot tuning that needs an arena run to justify, not a correctness fix.
-- **Multiplayer.** Options brainstormed in docs/17 — the journal design makes it small (a server
-  that appends strings to a list), but note the hidden-information catch: every client can
-  currently derive all hands and all future rolls from `options.seed`.
+- **Multiplayer — transport decided, nothing built.** docs/17 section 4b: option 1 (shared journal,
+  dumb server) on Cloudflare Durable Objects, behind a four-method store interface so a move to Node
+  + Postgres stays a swap. The journal design makes the server small — it appends strings to a list
+  and knows one rule, `expectedLength === journal.length`. Costed in docs/17 section 4a: free at this
+  scale on either vendor.
+
+  Two things to carry in rather than discover. **Hidden information**: every client can derive all
+  hands and all future rolls from `options.seed`, so "trust the table" is a deliberate choice and
+  should be said in the UI. **Polling is the bill** — request count, not bandwidth — and swapping it
+  for push divides that by about ten, which is why it is step 2 rather than a nicety.
 - **2-player.** Deferred; HRF excludes it entirely, so the rules need sourcing elsewhere.
 - **Campaign / Blighted Reach.** Out of scope by docs/04.
 - **Trophy return at cleanup — done.** Rulebook 6.2.2 step 1: scoring Warlord returns all trophies,
