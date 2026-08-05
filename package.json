@@ -12,6 +12,7 @@
     "typecheck": "tsc --build --force && tsc -p apps/web --noEmit",
     "saves:build": "vite-node scripts/build-test-saves.ts",
     "arena": "vite-node scripts/arena.ts",
+    "audit": "vite-node scripts/ambition-audit.ts",
     "fit": "vite-node scripts/fit-weights.ts"
   },
   "devDependencies": {
