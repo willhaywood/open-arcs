@@ -1,0 +1,20 @@
+{
+  "name": "@arcs/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "comment": "Zero runtime dependencies, and no dependency on @arcs/engine \u2014 the server never runs the rules. See docs/17 section 4b.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.118.0"
+  }
+}

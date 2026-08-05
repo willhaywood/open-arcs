@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // `DOM` is here for `Request`/`Response`/`URL`/`crypto` — the web-standard types the handler is
+    // written against, which exist in Workers and in Node 18+ alike. It is *not* here to permit
+    // browser APIs: there is no document and no window on a server, and reaching for one would be a
+    // bug this project cannot catch by types alone.
+    //
+    // No "types" entry, so no Node and no Cloudflare globals leak in. That is docs/17 rule 4 made
+    // mechanical: a Workers-only API in `src` outside the adapter is a compile error.
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "outDir": "dist",
+    "rootDir": ".",
+    "composite": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

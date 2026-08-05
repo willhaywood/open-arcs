@@ -1,0 +1,20 @@
+# Cloudflare deployment for the multiplayer server. docs/17 section 4b is the decision.
+#
+# `wrangler dev` runs this locally on workerd — the same runtime as production — so no Cloudflare
+# account is needed to develop against it, and no cloud dev environment exists to keep in sync.
+# Only the adapter needs this: `handle()` and `MemoryStore` are plain vitest, which is what keeps
+# the everyday loop free of platform tooling.
+
+name = "arcs-multiplayer"
+main = "src/cloudflare/worker.ts"
+compatibility_date = "2026-08-05"
+
+[[durable_objects.bindings]]
+name = "GAMES"
+class_name = "GameObject"
+
+# SQLite-backed, which is the recommended default for new classes and is the variant available on
+# the free plan. One object per game — see `game-object.ts`.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameObject"]

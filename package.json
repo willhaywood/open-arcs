@@ -13,7 +13,8 @@
     "saves:build": "vite-node scripts/build-test-saves.ts",
     "arena": "vite-node scripts/arena.ts",
     "audit": "vite-node scripts/ambition-audit.ts",
-    "fit": "vite-node scripts/fit-weights.ts"
+    "fit": "vite-node scripts/fit-weights.ts",
+    "serve": "npm run dev --workspace @arcs/server"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

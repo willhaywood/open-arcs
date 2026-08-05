@@ -14,3 +14,7 @@ dist/
 # reproducible experiment.
 packages/engine/src/ai/fitted-weights*.json
 .DS_Store
+
+# Wrangler's local state — the emulated Durable Object storage `wrangler dev` writes to. It
+# persists between runs, which is convenient locally and meaningless to anyone else.
+.wrangler/
