@@ -73,7 +73,13 @@ export async function handle(request: Request, store: GameStore): Promise<Respon
       headers: {
         'access-control-allow-origin': '*',
         'access-control-allow-methods': 'GET, POST, OPTIONS',
-        'access-control-allow-headers': 'content-type',
+        /*
+         * `x-seat-token` is why a *GET* preflights at all — a custom header takes it out of the
+         * simple-request set. Same origin never sees this, but the two-terminal dev loop does, and
+         * omitting it here fails as "you are a spectator" rather than as a CORS error, which is a
+         * miserable thing to debug.
+         */
+        'access-control-allow-headers': 'content-type, x-seat-token',
       },
     })
   }
@@ -102,7 +108,13 @@ export async function handle(request: Request, store: GameStore): Promise<Respon
     const sinceRaw = url.searchParams.get('since')
     const since = sinceRaw === null ? 0 : Number(sinceRaw)
     if (!Number.isInteger(since) || since < 0) return bad(400, 'since must be a non-negative integer')
-    const tail = await store.read(decodeURIComponent(game[1]!), since)
+    /*
+     * The seat token comes in a header, never a query parameter. It is the credential, and query
+     * strings are the part of a URL that reliably ends up in access logs, proxy logs and referrer
+     * headers. Optional: without it this is a spectator read, which is a real and supported case.
+     */
+    const presented = request.headers.get('x-seat-token') ?? undefined
+    const tail = await store.read(decodeURIComponent(game[1]!), since, presented)
     if (tail === undefined) return bad(404, 'no such game')
     return json(tail)
   }
@@ -131,6 +143,7 @@ export async function handle(request: Request, store: GameStore): Promise<Respon
     if (result.ok) return json(result)
     if (result.reason === 'no-such-game') return bad(404, 'no such game')
     if (result.reason === 'bad-seat') return bad(403, 'seat token does not belong to this game')
+    if (result.reason === 'wrong-faction') return bad(403, 'that action belongs to another faction')
     /*
      * 409 rather than an error, and the current length comes back with it. A conflict is the
      * ordinary outcome of two clients racing or a stale tab retrying — the caller re-reads from

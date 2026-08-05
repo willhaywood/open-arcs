@@ -402,6 +402,43 @@ button {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* Which seat you are, in a joined game. Absent entirely in hotseat — see SeatBadge.tsx. */
+.seat-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.seat-label,
+.seat-wait {
+  color: var(--muted);
+}
+/* The faction's own colour identifies the seat, the way it does on the player boards and the
+   court rail — boxed so it reads as a token rather than as another caption in the row. */
+.seat-who {
+  padding: 2px 7px 1px;
+  border: 1px solid;
+  border-radius: 3px;
+  /* Fixed so the badge does not shuffle the toolbar sideways between "red" and "yellow". */
+  min-width: 62px;
+  text-align: center;
+}
+/* The one live cue in the row. Gold rather than --accent: docs/10 reserves the blue for what is
+   clickable, and this is telling you to look at the board, not offering a control. */
+.seat-turn {
+  color: var(--gold);
+}
+.seat-active .seat-who {
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 9px -1px currentColor;
+}
+.seat-watching .seat-label {
+  color: var(--gold-dim);
+}
+
 .toolbar {
   margin-left: auto;
   display: flex;

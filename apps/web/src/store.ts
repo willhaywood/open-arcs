@@ -31,6 +31,7 @@ import type {
 import { useSyncExternalStore } from 'react'
 
 import { Session } from './multiplayer/session.js'
+import type { SeatView } from './multiplayer/seat.js'
 import { remember } from './multiplayer/link.js'
 import type { GameLink } from './multiplayer/link.js'
 
@@ -250,6 +251,47 @@ class GameStore {
     return this.session?.isSpectator ?? false
   }
 
+  /**
+   * What this client is: playing every seat, holding one, or watching.
+   *
+   * The one question the whole seat boundary is built on, and it is three-valued on purpose —
+   * "hotseat" and "spectator" both mean "no single faction" and want opposite behaviour. Which
+   * faction a token belongs to is answered by the server, because the token is opaque and the
+   * client cannot decode it (`session.ts`).
+   */
+  seatView(): SeatView {
+    if (this.session === null) return { kind: 'hotseat' }
+    const faction = this.session.faction
+    // Before the join read lands there is no seat to name; watching is the safe reading of that.
+    /*
+     * The one cast in the seat boundary, and the right place for it: the server answers with a
+     * plain string because it must not import the engine's `FactionId` (docs/17 rule 4), so this is
+     * where an untyped wire value becomes a domain type.
+     */
+    return faction === null ? { kind: 'spectator' } : { kind: 'seat', faction: faction as FactionId }
+  }
+
+  /**
+   * Whether this client may take `action` itself.
+   *
+   * Always true in a hotseat game — playing every seat is the point of hotseat, and the rules are
+   * tested through it. In a joined game it is true only for your own faction: a spectator may take
+   * nothing, and neither may you on someone else's behalf.
+   *
+   * The check is here rather than only in the components because of *optimism*. A move is applied
+   * locally before it is published (`session.ts`), so an action that the server would reject must
+   * never be applied either — otherwise the board shows a move that no other client will ever see,
+   * and it survives until the next resync. Refusing at the door keeps local and remote in step.
+   */
+  mayAct(action: Action): boolean {
+    const view = this.seatView()
+    if (view.kind === 'hotseat') return true
+    if (view.kind === 'spectator') return false
+    const actor = action['faction']
+    // An action with no actor is engine-internal, not a player's move, so the seat says nothing.
+    return typeof actor !== 'string' || actor === view.faction
+  }
+
   start(options: NewGameOptions): void {
     // Starting a local game abandons any joined one; they are different games by definition.
     this.leaveSession()
@@ -266,6 +308,7 @@ class GameStore {
 
   apply(action: Action): void {
     if (this.result === null) return
+    if (!this.mayAct(action)) return
     /*
      * A human answering an Ask addressed to a bot seat is a *take-over*, and it is counted. The
      * journal records the action either way, so nothing downstream can tell — which is precisely

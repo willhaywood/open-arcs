@@ -93,6 +93,43 @@ describe(label, () => {
       expect(body.length).toBe(3)
     })
 
+    it('tells a seat which faction it is, and tells a spectator nothing', async () => {
+      /*
+       * The client cannot answer this for itself — a seat token is opaque — so without it a player
+       * who follows their link has no way to know which of the four they are, which hand to show, or
+       * which actions are theirs. Carried on the tail rather than as a fourth endpoint so joining
+       * stays one round trip, and so Postgres can answer it in the same query.
+       */
+      const { store, game } = await seeded()
+      const yellow = game.seats[1]!
+      expect(yellow.faction).toBe('yellow')
+
+      const seated = await handle(
+        new Request(`${BASE}/games/${game.gameId}?since=0`, {
+          headers: { 'x-seat-token': yellow.seatToken },
+        }),
+        store,
+      )
+      expect(((await seated.json()) as { yourFaction?: string }).yourFaction).toBe('yellow')
+
+      // No token: a spectator read, which is a supported case rather than a failure.
+      const watching = await handle(get(`/games/${game.gameId}`), store)
+      expect(((await watching.json()) as { yourFaction?: string }).yourFaction).toBeUndefined()
+
+      /*
+       * A wrong token reads as a spectator rather than 403. A 403 would confirm to a guesser that
+       * the game exists, and there is nothing to protect: the journal is the same for everyone.
+       */
+      const wrong = await handle(
+        new Request(`${BASE}/games/${game.gameId}?since=0`, {
+          headers: { 'x-seat-token': 'not-a-real-token' },
+        }),
+        store,
+      )
+      expect(wrong.status).toBe(200)
+      expect(((await wrong.json()) as { yourFaction?: string }).yourFaction).toBeUndefined()
+    })
+
     it('404s an unknown game rather than inventing an empty one', async () => {
       const store = makeStore()
       expect((await handle(get('/games/nope'), store)).status).toBe(404)
@@ -175,12 +212,70 @@ describe(label, () => {
       expect(res.status).toBe(403)
     })
 
+    it('refuses an action that says it was taken by a different faction', async () => {
+      /*
+       * The identity check, and the distinction from the test below is the whole design: reading
+       * `faction=` off an encoded action says *who*, which needs no rules; deciding whether it is
+       * their turn says *when*, which needs the engine. Only the first is done here.
+       */
+      const { store, game } = await seeded()
+      const red = game.seats[0]!
+      expect(red.faction).toBe('red')
+
+      const forged = await handle(
+        post(`/games/${game.gameId}/actions`, {
+          seatToken: red.seatToken,
+          expectedLength: 0,
+          action: 'turn/lead(card="Aggression-4",faction="blue",suit="Aggression")',
+        }),
+        store,
+      )
+      expect(forged.status).toBe(403)
+
+      // Nothing landed, so a rejected forgery cannot desync anyone by consuming a length.
+      const tail = await handle(get(`/games/${game.gameId}`), store)
+      expect(((await tail.json()) as { length: number }).length).toBe(0)
+
+      // The same action from the seat it actually belongs to goes through.
+      const honest = await handle(
+        post(`/games/${game.gameId}/actions`, {
+          seatToken: game.seats[2]!.seatToken, // blue
+          expectedLength: 0,
+          action: 'turn/lead(card="Aggression-4",faction="blue",suit="Aggression")',
+        }),
+        store,
+      )
+      expect(honest.status).toBe(200)
+    })
+
+    it('stores an action with no readable faction, because it holds opaque strings', async () => {
+      /*
+       * The identity check is silent rather than strict when it cannot tell. Refusing here would
+       * couple the server to the engine's encoding — rule 4 in reverse — and buys nothing: the
+       * engine routes on `faction`, so an action without one does not replay as a legal move for
+       * anybody.
+       */
+      const { store, game } = await seeded()
+      const res = await handle(
+        post(`/games/${game.gameId}/actions`, {
+          seatToken: game.seats[0]!.seatToken,
+          expectedLength: 0,
+          action: 'an opaque string',
+        }),
+        store,
+      )
+      expect(res.status).toBe(200)
+    })
+
     it('does NOT check whose turn it is — that would mean running the engine', async () => {
       /*
        * Deliberate, and stated here so nobody "fixes" it. The server stores strings; turns are
        * strictly sequential, so a client cannot produce a legal action out of turn, and an illegal one
        * fails on every client's replay rather than corrupting the journal. Checking turn order here
        * would put a second copy of the rules in the server and end its portability.
+       *
+       * Note the action below carries no faction, so the identity check above stays out of it. The
+       * two are independent: this one is about *when*, that one about *who*.
        */
       const { store, game } = await seeded()
       const outOfTurn = await handle(

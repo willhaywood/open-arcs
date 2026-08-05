@@ -41,9 +41,13 @@ export class DurableObjectStore implements GameStore {
     return { gameId, seats }
   }
 
-  async read(gameId: GameId, since: number): Promise<GameTail | undefined> {
+  async read(gameId: GameId, since: number, seatToken?: SeatToken): Promise<GameTail | undefined> {
     const res = await this.object(gameId).fetch(
-      new Request(`${DurableObjectStore.BASE}/read?since=${since}`),
+      new Request(`${DurableObjectStore.BASE}/read?since=${since}`, {
+        // Header rather than query string: the token is the credential, and query strings are what
+        // ends up in logs. This hop is internal, but the habit is the point.
+        ...(seatToken === undefined ? {} : { headers: { 'x-seat-token': seatToken } }),
+      }),
     )
     if (res.status === 404) return undefined
     return (await res.json()) as GameTail

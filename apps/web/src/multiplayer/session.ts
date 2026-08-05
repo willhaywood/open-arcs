@@ -51,6 +51,14 @@ export class Session {
   private options: NewGameOptions | null = null
   /** Guards against a poll overlapping itself on a slow connection. */
   private busy = false
+  /**
+   * Which faction this client's seat token belongs to, as told by the server on join.
+   *
+   * `null` until the first read completes, and for a spectator. Only the server can answer this —
+   * a seat token is opaque — and it is what lets the UI say who you are, hide rivals' hands and
+   * refuse to act for anyone else.
+   */
+  private seatFaction: string | null = null
 
   constructor(
     baseUrl: string,
@@ -62,6 +70,11 @@ export class Session {
 
   get isSpectator(): boolean {
     return this.link.seatToken === undefined
+  }
+
+  /** Which faction you are, or `null` if you are watching (or have not loaded yet). */
+  get faction(): string | null {
+    return this.seatFaction
   }
 
   /** Load the game from the server and start polling. */
@@ -84,9 +97,10 @@ export class Session {
    * publish conflicts — replay is exact, so there is no partial state to reconcile.
    */
   async resync(): Promise<void> {
-    const tail = await this.client.read(this.link.gameId, 0)
+    const tail = await this.client.read(this.link.gameId, 0, this.link.seatToken)
     const options = tail.options as NewGameOptions
     this.options = options
+    this.seatFaction = tail.yourFaction ?? null
     this.host.adopt(options, replayGame(options, [...tail.entries]))
   }
 

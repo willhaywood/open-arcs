@@ -18,6 +18,8 @@ import { LogPanel } from './components/LogPanel.js'
 import { NewGame } from './components/NewGame.js'
 import { PlayedCards } from './components/PlayedCards.js'
 import { PlayerBoards } from './components/PlayerBoards.js'
+import { SeatBadge } from './components/SeatBadge.js'
+import { viewFor } from './multiplayer/seat.js'
 import { setupLabel } from './setups.js'
 import { store, useGame } from './store.js'
 
@@ -72,9 +74,20 @@ export function App(): JSX.Element {
     )
   }
 
-  const { state, continue: cont } = result
+  const { state, continue: engineCont } = result
+  /*
+   * `current` is read from the engine's own answer, before the seat filter — it drives the board
+   * highlight and the "waiting for" badge, both of which have to keep naming whoever is genuinely
+   * acting. Whose turn it is has never been secret; only their cards are.
+   */
   const current =
-    cont.kind === 'ask' ? cont.faction : isWaiting(cont) ? undefined : state.current
+    engineCont.kind === 'ask'
+      ? engineCont.faction
+      : isWaiting(engineCont)
+        ? undefined
+        : state.current
+  const seatView = store.seatView()
+  const cont = viewFor(engineCont, seatView)
 
   return (
     <div className="app">
@@ -86,6 +99,7 @@ export function App(): JSX.Element {
         <span className="turn-meta">
           Act {state.act} · Chapter {state.chapter} · Round {state.round}
         </span>
+        <SeatBadge view={seatView} current={current} />
         <div className="toolbar">
           <button className="ghost" onClick={() => store.undo()} disabled={!store.canUndo()}>
             Undo

@@ -58,6 +58,36 @@ about it are no longer true**:
 
 Pick deliberately. Everything in sections 3–4 assumes the first.
 
+### 2a. What the seat boundary actually enforces
+
+"Trust the table" was chosen, and then implemented — but the two halves of it are enforced very
+differently, and conflating them would be the way to believe something false about this system.
+
+| | Holds against | Where |
+| --- | --- | --- |
+| **Acting as another faction** | a tampered client | server: `actorOf` reads the `faction` off the encoded action and refuses a seat that does not match |
+| **Seeing another hand** | a mis-click, a shoulder | client: `Hand` renders your own seat's cards, never the current player's |
+| **Seeing future dice** | nothing | not addressed — every client holds the seed |
+
+**Only the first row is a guarantee.** The server check needs no engine: an encoded action carries
+`faction="…"`, so refusing a forgery is an identity check on a string, not a rules check. Whose turn
+it is is still not checked, and still would need the engine — the distinction is drawn in `store.ts`.
+
+The second row is hygiene, not security. It closes the leak that mattered in practice — every client
+was rendering *whoever was currently being asked*, so on blue's turn red's browser showed blue's
+hand — but a player who opens devtools can still replay the journal and read everything, because
+`options.seed` has to be in every client for replay to work at all. That is the boundary above, and
+it is unchanged.
+
+The third row is the one that would need section 5. Nothing about it got better.
+
+**A note on the check being silent rather than strict.** The server stores an action whose faction it
+cannot read, rather than refusing it. Refusing would couple the server to the engine's encoding —
+rule 4 in the other direction — and buys nothing, because the engine routes on `faction` and an
+action without one does not replay as a legal move for anybody. The duplication of the encoding rule
+in `actorOf` is real, and is pinned by a test that runs it over thousands of actions from the actual
+encoder rather than over hand-written strings.
+
 ## 3. The GUID link, concretely
 
 Two ids, and they do different jobs:

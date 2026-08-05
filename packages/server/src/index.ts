@@ -6,6 +6,7 @@
  */
 
 export { handle } from './api.js'
+export { actorOf } from './actor.js'
 export { MemoryStore } from './memory.js'
 export { randomId } from './ids.js'
 export type {

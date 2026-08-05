@@ -120,13 +120,20 @@ describe('a joined session, against the real server', () => {
     serve(store)
     const created = await store.create(OPTIONS, ['red', 'yellow', 'blue'])
 
-    // Another player acts first, straight into the store.
+    /*
+     * Another player acts first, straight into the store — published from *their own* seat, because
+     * the server now checks that the action's faction matches the token. It used to be appended with
+     * an arbitrary seat, which passed only because nothing looked.
+     */
     const fresh = startGame(OPTIONS, registry)
     const theirs = (fresh.continue as { actions: Action[] }).actions[0]!
-    await store.append(created.gameId, created.seats[1]!.seatToken, 0, encodeAction(theirs))
+    const actor = created.seats.find((s) => s.faction === theirs['faction'])!
+    await store.append(created.gameId, actor.seatToken, 0, encodeAction(theirs))
 
+    // ...and a *different* seat joins, which is what makes this "someone else did it".
+    const other = created.seats.find((s) => s.faction !== theirs['faction'])!
     const h = host()
-    const session = new Session(API, { gameId: created.gameId, seatToken: created.seats[0]!.seatToken }, h)
+    const session = new Session(API, { gameId: created.gameId, seatToken: other.seatToken }, h)
     await session.join()
     session.leave()
 
@@ -145,10 +152,16 @@ describe('a joined session, against the real server', () => {
     const created = await store.create(OPTIONS, ['red', 'yellow', 'blue'])
     const fresh = startGame(OPTIONS, registry)
     const theirs = (fresh.continue as { actions: Action[] }).actions[0]!
-    await store.append(created.gameId, created.seats[1]!.seatToken, 0, encodeAction(theirs))
+    /*
+     * The same seat, from another tab — which is the scenario named above. It has to be that seat's
+     * own action or the server refuses it as a forgery and there is no conflict left to recover
+     * from, which is exactly how this test failed when the identity check landed.
+     */
+    const mine = created.seats.find((s) => s.faction === theirs['faction'])!
+    await store.append(created.gameId, mine.seatToken, 0, encodeAction(theirs))
 
     const h = host()
-    const session = new Session(API, { gameId: created.gameId, seatToken: created.seats[0]!.seatToken }, h)
+    const session = new Session(API, { gameId: created.gameId, seatToken: mine.seatToken }, h)
     await session.join()
     const adoptedAfterJoin = h.adopted
 

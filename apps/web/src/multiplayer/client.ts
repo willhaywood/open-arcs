@@ -20,6 +20,13 @@ export interface GameTail {
   readonly options: unknown
   readonly entries: readonly string[]
   readonly length: number
+  /**
+   * Which faction the seat token belongs to. Absent for a spectator.
+   *
+   * The client cannot work this out for itself — a token is opaque — so it is the server's answer
+   * to "who am I", and everything that depends on knowing your own seat hangs off it.
+   */
+  readonly yourFaction?: string
 }
 
 /**
@@ -64,9 +71,17 @@ export class MultiplayerClient {
     })
   }
 
-  /** The tail from `since`. The usual poll returns no entries at all — see docs/17 section 4a. */
-  async read(gameId: string, since: number): Promise<GameTail> {
-    return this.json<GameTail>(`/games/${encodeURIComponent(gameId)}?since=${since}`)
+  /**
+   * The tail from `since`. The usual poll returns no entries at all — see docs/17 section 4a.
+   *
+   * `seatToken` only adds `yourFaction` to the answer; the journal is identical with or without it.
+   * It travels as a header rather than a query parameter because it is the credential, and query
+   * strings are the part of a URL that ends up in access logs and referrers.
+   */
+  async read(gameId: string, since: number, seatToken?: string): Promise<GameTail> {
+    return this.json<GameTail>(`/games/${encodeURIComponent(gameId)}?since=${since}`, {
+      ...(seatToken === undefined ? {} : { headers: { 'x-seat-token': seatToken } }),
+    })
   }
 
   /**

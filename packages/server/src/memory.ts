@@ -10,6 +10,7 @@
  * during a migration.
  */
 
+import { actorOf } from './actor.js'
 import { randomId } from './ids.js'
 import type {
   AppendResult,
@@ -40,12 +41,20 @@ export class MemoryStore implements GameStore {
     return { gameId, seats }
   }
 
-  async read(gameId: GameId, since: number): Promise<GameTail | undefined> {
+  async read(gameId: GameId, since: number, seatToken?: SeatToken): Promise<GameTail | undefined> {
     const game = this.games.get(gameId)
     if (game === undefined) return undefined
     // A negative or oversized `since` is a caller bug, not a reason to fail: clamp and answer.
     const from = Math.max(0, Math.min(since, game.journal.length))
-    return { options: game.options, entries: game.journal.slice(from), length: game.journal.length }
+    const seat = game.seats.find((s) => s.seatToken === seatToken)
+    return {
+      options: game.options,
+      entries: game.journal.slice(from),
+      length: game.journal.length,
+      // Spread rather than assign: `exactOptionalPropertyTypes` makes an explicit `undefined`
+      // different from an absent key, and the wire form should simply not carry it.
+      ...(seat === undefined ? {} : { yourFaction: seat.faction }),
+    }
   }
 
   async append(
@@ -56,8 +65,12 @@ export class MemoryStore implements GameStore {
   ): Promise<AppendResult> {
     const game = this.games.get(gameId)
     if (game === undefined) return { ok: false, reason: 'no-such-game' }
-    if (!game.seats.some((s) => s.seatToken === seatToken)) {
-      return { ok: false, reason: 'bad-seat' }
+    const seat = game.seats.find((s) => s.seatToken === seatToken)
+    if (seat === undefined) return { ok: false, reason: 'bad-seat' }
+    // An identity check, not a rules check — see `actorOf`. Silent on actions with no actor.
+    const actor = actorOf(action)
+    if (actor !== undefined && actor !== seat.faction) {
+      return { ok: false, reason: 'wrong-faction' }
     }
     /*
      * The compare-and-set. Free here because JavaScript is single-threaded, exactly as it is free on

@@ -60,6 +60,17 @@ export interface GameTail {
   readonly entries: readonly string[]
   /** Total entries in the game, so the caller knows what to pass as `expectedLength` next. */
   readonly length: number
+  /**
+   * Which faction the presented seat token belongs to, when one was presented and matched.
+   *
+   * A player who follows their link holds an opaque token and nothing else — only the store knows
+   * which seat it is. Without this the client cannot say "you are red", cannot hide rivals' hands,
+   * and cannot stop you acting for someone else, because it does not know who you are.
+   *
+   * Absent for a spectator, for an unrecognised token, and for a plain read. Answering the tail and
+   * the identity together keeps this to one round trip, and on Postgres it stays one query.
+   */
+  readonly yourFaction?: string
 }
 
 /**
@@ -73,6 +84,8 @@ export type AppendResult =
   | { readonly ok: false; readonly reason: 'conflict'; readonly length: number }
   | { readonly ok: false; readonly reason: 'no-such-game' }
   | { readonly ok: false; readonly reason: 'bad-seat' }
+  /** A real seat, but the action says it was taken by a different faction. */
+  | { readonly ok: false; readonly reason: 'wrong-faction' }
 
 /** Called when a game gains entries. The payload is deliberately tiny — see `subscribe`. */
 export type OnAppend = (length: number) => void
@@ -90,17 +103,30 @@ export interface GameStore {
    *
    * Polling calls this with the length it already has, so the usual response is empty. That is what
    * makes polling cheap in bandwidth even though it is expensive in requests (docs/17 section 4a).
+   *
+   * `seatToken` is optional and only ever *adds* `yourFaction` to the answer — the journal is the
+   * same for everyone, including spectators. An unrecognised token is not an error: it reads as a
+   * spectator, because a wrong token proves nothing and a 403 here would only tell a guesser that
+   * the game exists.
    */
-  read(gameId: GameId, since: number): Promise<GameTail | undefined>
+  read(gameId: GameId, since: number, seatToken?: SeatToken): Promise<GameTail | undefined>
 
   /**
    * Append one action, if `expectedLength` still matches. See the note above on why it is a
    * parameter.
    *
-   * The seat is checked to belong to this game; **whose turn it is, is not checked**, because that
-   * would require running the engine. docs/17 section 4 makes the case: turns are strictly
-   * sequential, so a client cannot produce a legal action out of turn, and an illegal one fails on
-   * every client's replay rather than corrupting the journal.
+   * Two things are checked, and the difference between them is the whole design:
+   *
+   *   - **The seat belongs to this game**, and **the action does not claim to be by someone else**.
+   *     The second is `actorOf` reading the `faction` field off the encoded string — an identity
+   *     check, not a rules check, which is why it needs no engine.
+   *   - **Whose turn it is, is still not checked.** That would require running the engine. docs/17
+   *     section 4 makes the case: turns are strictly sequential, so a client cannot produce a legal
+   *     action out of turn, and an illegal one fails on every client's replay rather than corrupting
+   *     the journal.
+   *
+   * An action carrying no readable faction is stored, not refused. The server holds opaque strings
+   * by design, and one with no actor does not replay as a legal move for anybody — see `actor.ts`.
    */
   append(
     gameId: GameId,

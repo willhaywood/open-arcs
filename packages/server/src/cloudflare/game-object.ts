@@ -25,6 +25,7 @@
  * with no plain equivalent, and none of them is needed to append a string to a list.
  */
 
+import { actorOf } from '../actor.js'
 import type { AppendResult, GameTail, Seat } from '../store.js'
 import type { DurableObjectState } from './types.js'
 
@@ -79,10 +80,18 @@ export class GameObject {
         if (this.meta === undefined) return json(undefined, 404)
         const since = Math.max(0, Math.min(Number(url.searchParams.get('since') ?? 0), this.length))
         const found = await this.state.storage.list<string>({ prefix: 'j:', start: key(since) })
+        /*
+         * The token rides in a header rather than the query string. It is the credential, and a
+         * query string is the one part of a URL that ends up in access logs and referrers by
+         * default. Same reason the client sends it that way — see `client.ts`.
+         */
+        const presented = request.headers.get('x-seat-token')
+        const seat = this.meta.seats.find((s) => s.seatToken === presented)
         const tail: GameTail = {
           options: this.meta.options,
           entries: [...found.values()],
           length: this.length,
+          ...(seat === undefined ? {} : { yourFaction: seat.faction }),
         }
         return json(tail)
       }
@@ -94,8 +103,12 @@ export class GameObject {
           expectedLength: number
           action: string
         }
-        if (!this.meta.seats.some((s) => s.seatToken === body.seatToken)) {
-          return json({ ok: false, reason: 'bad-seat' }, 403)
+        const seat = this.meta.seats.find((s) => s.seatToken === body.seatToken)
+        if (seat === undefined) return json({ ok: false, reason: 'bad-seat' }, 403)
+        // An identity check, not a rules check — see `actorOf`. Silent on actions with no actor.
+        const actor = actorOf(body.action)
+        if (actor !== undefined && actor !== seat.faction) {
+          return json({ ok: false, reason: 'wrong-faction' }, 403)
         }
         // The compare-and-set. See the note at the top on why it is written out.
         if (body.expectedLength !== this.length) {
