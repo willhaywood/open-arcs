@@ -70,8 +70,24 @@ export function viewFor(cont: Continue, view: SeatView): Continue {
   if (view.kind === 'hotseat' || canAct(cont, view)) return cont
 
   if (cont.kind === 'ask') {
+    /*
+     * An ask nobody claims is **shown**, not hidden, and that default is load-bearing.
+     *
+     * The first cut treated `undefined` as private and blanked it, which reintroduced the very
+     * regression this file was rewritten to fix — just narrowed to whatever `surfaces.ts` had not
+     * got round to claiming. The two-player mulligan was exactly that: unclaimed, so a watcher sat
+     * on an empty prompt for it while the actor, whose `ActionPanel` draws unclaimed asks on
+     * purpose, played on.
+     *
+     * The two failure modes are not symmetric. Defaulting to hidden costs a dead-looking screen on
+     * every new action type until someone notices; defaulting to shown costs a leak only if a
+     * *private* surface is added and left out of `PRIVATE` — and privacy is an explicit list that
+     * has to be edited to add one. `surfaces.test.ts` forbids unclaimed asks outright, so this is
+     * the behaviour when that test has already failed, not a substitute for it.
+     */
     const surface = surfaceFor(cont)
-    return surface !== undefined && isPublicSurface(surface) ? cont : { ...cont, actions: [] }
+    if (surface === undefined) return cont
+    return isPublicSurface(surface) ? cont : { ...cont, actions: [] }
   }
   /*
    * `multiAsk` is simultaneous decisions — summits, phase 2. Nothing emits it yet, so this is not
