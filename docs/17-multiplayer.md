@@ -137,9 +137,11 @@ The one piece of logic that matters is the append:
 Step 3 is the only rule the server needs to know, and even that is optional in v1 — with sequential
 turns, a client simply cannot produce a legal action out of turn.
 
-**Sync:** poll `GET ?since=N` every 2–3 seconds and replay the tail. For a game where a turn takes
-a minute, polling is completely adequate and is a fraction of the code of a socket. Upgrade to
-SSE or WebSockets later if it feels sluggish.
+**Sync:** a WebSocket at `/games/:id/live` that the server pushes journal entries down, with
+`GET ?since=N` polling as the fallback when a socket will not open or drops. This used to say
+polling was "completely adequate" and to upgrade "later if it feels sluggish", which had the
+reason wrong. Polling is perfectly responsive; it is the *cost* that bites, at roughly thirty
+times the requests. Section 4d has the arithmetic and the one line that decides it.
 
 **Where to run it**
 
@@ -193,10 +195,10 @@ volume. A quiet month with one busy evening can hit it while every other number 
 
 ### The biggest lever is not the vendor
 
-**Swapping polling for push divides the request count by about ten**, at every scale — 6.7M requests
-a month becomes 0.70M at 500 games; 67M becomes 7M at 5,000. That is why section 4 lists it as step
-2 rather than a nicety: it moves the crossover between these two columns further out than choosing
-either vendor does.
+**Swapping polling for push divides the request count by about thirty**, at every scale. That was
+written as "about ten" and was too kind; section 4d has the measured arithmetic. It moves the
+crossover between these two columns further out than choosing either vendor does — and it is now
+done, so the free-tier line above ("about 7 games/day") is the *old* number.
 
 ### Which to pick, and why price is the least of it
 
@@ -309,6 +311,45 @@ without an opinion about who answers.
 Vite folds this to a literal, so the check is on `typeof`, not on truthiness — the two off-looking
 values mean opposite things. GitHub Pages is kept as a hotseat-only fallback rather than retired: it
 has no server behind it and never will, but that is the entire game minus the links.
+
+## 4d. Push, and the one line that decides the bill
+
+Polling every 2.5 seconds costs a 466-action, 3-player, 3-hour game **13,426 requests** — about
+**7 games a day** on a 100k/day free tier. The clients are paying to ask a question whose answer is
+almost always "nothing". Replacing it with a socket the server pushes to costs **469**, or about
+**213 games a day**, because Cloudflare bills incoming messages and not outgoing ones — and this
+workload is almost entirely outgoing. One player acts; three clients need telling.
+
+| | requests/game | games/day |
+| --- | ---: | ---: |
+| Polling every 2.5s | 13,426 | 7 |
+| **Push, writes still HTTP** | **469** | **213** |
+| Push both ways (20:1 on incoming) | 26 | 3,802 |
+| Push **without** hibernation | 469 | **9** ← duration-bound |
+
+**The last row is the trap.** `ctx.acceptWebSocket(ws)` lets the object be evicted while clients
+stay connected — "Billable Duration (GB-s) charges do not accrue during hibernation". The
+ordinary `ws.accept()` also works, and pins the object in memory for the length of the game: 1,382
+GB-s against a 13,000/day cap, which is *worse than the polling it replaces*. Nothing observable
+tells them apart — the sockets connect either way and every test passes — so `WebSocketLike` in
+`cloudflare/types.ts` deliberately omits `accept()`, making the expensive choice a compile error.
+
+**Rule 5 named WebSocket hibernation as a decision to take deliberately rather than discover.** This
+is that decision, and the reason it does not cost portability: what is Cloudflare-specific is the
+*hibernation optimisation*, not the protocol. A socket at `/games/:id/live` pushing journal entries
+is portable to anything; a Node box holds connections in memory for free and needs no hibernation at
+all. `GameStore.subscribe?` remains the seam for exactly that server, where one process holds the
+sockets and `LISTEN`/`NOTIFY` wakes it — which is what its comment predicted: "when push lands it
+belongs inside the Durable Object."
+
+**Writes stay on HTTP.** That is the 469 row rather than the 26 row, and it is deliberate: 213 games
+a day is far past what this needs, and moving writes onto the socket would trade the
+append contract — the thing rule 2 protects — for headroom nobody is short of.
+
+**The socket is an optimisation, never a dependency.** A client that cannot open one polls instead,
+which is slower and dearer but not broken; a socket that drops mid-game starts polling immediately
+and retries in the background. The three HTTP endpoints remain the contract, and a Node + Postgres
+server that served only those would still work.
 
 ## 5. Option 2 — server-authoritative *(if you don't trust the table)*
 

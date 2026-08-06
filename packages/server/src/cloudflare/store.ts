@@ -41,6 +41,24 @@ export class DurableObjectStore implements GameStore {
     return { gameId, seats }
   }
 
+  /**
+   * Hand a WebSocket upgrade to the object that owns the game.
+   *
+   * **Not on `GameStore`.** That interface is the portable contract and returns data; this returns a
+   * 101 carrying a Cloudflare `webSocket`, which is exactly the kind of platform shape rule 4 keeps
+   * out of `api.ts`. It lives on the adapter, and a Node server would grow its own equivalent —
+   * the client-facing URL is what stays the same, not this method.
+   *
+   * The upgrade has to reach the *object*: a Worker is stateless and per-request, so a socket it
+   * accepted itself would have nothing behind it. The object is where the appends are serialised
+   * and where the sockets can survive hibernation.
+   */
+  connect(gameId: GameId, request: Request): Promise<Response> {
+    return this.object(gameId).fetch(
+      new Request(`${DurableObjectStore.BASE}/connect`, { headers: request.headers }),
+    )
+  }
+
   async read(gameId: GameId, since: number, seatToken?: SeatToken): Promise<GameTail | undefined> {
     const res = await this.object(gameId).fetch(
       new Request(`${DurableObjectStore.BASE}/read?since=${since}`, {

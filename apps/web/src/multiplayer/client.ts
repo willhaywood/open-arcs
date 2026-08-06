@@ -54,6 +54,20 @@ export class MultiplayerClient {
   /** `baseUrl` has no trailing slash; the endpoints supply their own. */
   constructor(private readonly baseUrl: string) {}
 
+  /**
+   * Where this game's live socket is, as an absolute `ws://` or `wss://` URL.
+   *
+   * `WebSocket` will not take a relative URL the way `fetch` will, and the same-origin build has an
+   * empty base — so the page's own address is what resolves it. The scheme has to be swapped by
+   * hand: an `https` page needs `wss`, and getting that wrong fails as a mixed-content block rather
+   * than as anything that mentions protocols.
+   */
+  liveUrl(gameId: string, pageUrl: string): string {
+    const url = new URL(`${this.baseUrl}/games/${encodeURIComponent(gameId)}/live`, pageUrl)
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    return url.toString()
+  }
+
   private async json<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, init)
     if (!res.ok) {
