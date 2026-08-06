@@ -1504,7 +1504,7 @@ function offerRuthlessRansack(
   if (hasTrait(state, victim, 'Beloved')) {
     return C.log(`${victim} cannot be ransacked (their leader)`, C.then(then))
   }
-  const options: Action[] = courtSlots()
+  const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => cardInSlot(state, n) !== undefined)
     .filter((n) =>
       contentsOf(state.figures, Location.court(n)).some(
@@ -1602,7 +1602,7 @@ function offerInfluence(state: GameState, faction: FactionId, then: PipReturn): 
   if (reservePiece(state, faction, 'Agent') === undefined) {
     return C.ask(state.current ?? faction, [skip(faction, then)], `${faction} has no agents left`)
   }
-  const options: Action[] = courtSlots()
+  const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => cardInSlot(state, n) !== undefined)
     .map((n) => ({
       ...InfluenceSlot(faction, n, then),
@@ -1651,7 +1651,7 @@ function performInfluence(
 /** The Noble's second influence: the same menu, marked so it cannot buy a third. */
 function offerSecondInfluence(state: GameState, faction: FactionId, then: PipReturn): Continue {
   if (reservePiece(state, faction, 'Agent') === undefined) return C.then(then as Action)
-  const options: Action[] = courtSlots()
+  const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => cardInSlot(state, n) !== undefined)
     .map((n) => ({
       ...InfluenceSlot(faction, n, then),
@@ -1693,7 +1693,7 @@ function canSecure(state: GameState, faction: FactionId, n: number): boolean {
 }
 
 function offerSecure(state: GameState, faction: FactionId, then: PipReturn): Continue {
-  const options: Action[] = courtSlots()
+  const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => canSecure(state, faction, n))
     .map((n) => ({
       ...SecureSlot(faction, n, then),

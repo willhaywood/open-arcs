@@ -27,7 +27,7 @@
  * plan hold still.
  */
 
-import { metric } from '../rules/ambitions.js'
+import { metric, rivalHoldings } from '../rules/ambitions.js'
 import { AMBITIONS } from '../state.js'
 import { Location, contentsOf, parseFigureId } from '../index.js'
 import type { FactionId } from '../ids.js'
@@ -108,10 +108,8 @@ export const structuralFitness: Fitness = (observed, self, ambition) => {
  * distinction, and it is why this takes the field's best rather than a difference.
  */
 function contest(observed: ObservedState, self: FactionId, ambition: Ambition): number {
-  const best = Math.max(
-    0,
-    ...observed.factions.filter((f) => f !== self).map((f) => metric(observed, f, ambition)),
-  )
+  // Includes the two-player phantom: a fixed pile of resources is still something to contest.
+  const best = Math.max(0, ...rivalHoldings(observed, self, ambition))
   // Saturating rather than linear: the gap between 6 and 8 matters far less than 0 and 2.
   return best / (best + 4)
 }

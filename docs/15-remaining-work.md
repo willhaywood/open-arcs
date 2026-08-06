@@ -238,7 +238,12 @@ one invariant still worth adding.
   hands and all future rolls from `options.seed`, so "trust the table" is a deliberate choice and
   should be said in the UI. **Polling is the bill** — request count, not bandwidth — and swapping it
   for push divides that by about ten, which is why it is step 2 rather than a nicety.
-- **2-player.** Deferred; HRF excludes it entirely, so the rules need sourcing elsewhere.
+- **2-player — done.** The half of that entry which said "HRF excludes it entirely" was right; the
+  half that said the rules "need sourcing elsewhere" is now moot. They came from the publisher's own
+  base rulebook (pages 4, 5 and 19) and the boards from arcs_tts, which carries all four 2-player
+  setup cards as data. What is 2-player-specific: a court of 3, a mulligan for the player without
+  initiative, two fleet systems per seat instead of one, a 33-power threshold, and the six
+  out-of-play resources that score as a third player. See docs/05 and docs/08.
 - **Campaign / Blighted Reach.** Out of scope by docs/04.
 - **Trophy return at cleanup — done.** Rulebook 6.2.2 step 1: scoring Warlord returns all trophies,
   scoring Tyrant all captives, for *every* faction and not just the scorer. Omitting it let both

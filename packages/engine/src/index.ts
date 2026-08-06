@@ -56,6 +56,8 @@ export {
   chapterAmbitionable,
   ambitionsForStrength,
   metric,
+  phantomHolding,
+  rivalHoldings,
 } from './rules/ambitions.js'
 export { BattleModule, canBattle } from './rules/battle.js'
 export { LeadersModule } from './rules/leaders.js'

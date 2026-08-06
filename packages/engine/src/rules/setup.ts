@@ -43,7 +43,7 @@ function performStartSetup(state: GameState): RuleResult {
     figures = register(figures, Location.captives(faction))
   }
   // Agents stand on court slots, so the slots are figure locations too.
-  for (const n of courtSlots()) figures = register(figures, Location.court(n))
+  for (const n of courtSlots(state.factions.length)) figures = register(figures, Location.court(n))
   figures = register(figures, Location.scrap())
 
   // Everything starts in reserve; seat setup moves pieces onto the board.
@@ -65,14 +65,14 @@ function performStartSetup(state: GameState): RuleResult {
   // The court: a shuffled deck, four display slots, a secured pile per faction, a discard.
   let courtCards = register(state.courtCards, CourtPile.deck())
   courtCards = register(courtCards, CourtPile.discard())
-  for (const n of courtSlots()) courtCards = register(courtCards, CourtPile.slot(n))
+  for (const n of courtSlots(state.factions.length)) courtCards = register(courtCards, CourtPile.slot(n))
   for (const faction of state.factions) {
     courtCards = register(courtCards, CourtPile.secured(faction))
   }
   const [order, rng] = shuffle(state.rng, BASE_COURT.map((c) => c.id))
   courtCards = place(courtCards, order, CourtPile.deck())
   // Deal the opening display, as HRF does via ReplenishMarketAction at chapter 0.
-  for (const n of courtSlots()) {
+  for (const n of courtSlots(state.factions.length)) {
     const top = contentsOf(courtCards, CourtPile.deck())[0]
     if (top === undefined) break
     courtCards = move(courtCards, top, CourtPile.slot(n))

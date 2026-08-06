@@ -14,6 +14,8 @@
  */
 
 import type { Action } from '../action.js'
+import { allSystems } from '../board.js'
+import type { BoardVariant } from '../board.js'
 import type { Suit } from '../cards.js'
 import { Continue as C } from '../continue.js'
 import { citiesInReserve, slotsOf } from '../control.js'
@@ -119,6 +121,74 @@ export function metric(state: MetricView, faction: FactionId, ambition: Ambition
     case 'Warlord':
       return contentsOf(state.figures, Location.trophies(faction)).length
   }
+}
+
+/**
+ * Which ambition a resource on the ambition boxes feeds, at two players.
+ *
+ * Rulebook Setup K: *Material and Fuel go on Tycoon. Weapons go on Warlord. Relics go on Keeper.
+ * Psionics go on Empath.* Tyrant is absent from that list and so from this table — captives come
+ * from taxing and securing, and no resource stands in for them.
+ */
+const PHANTOM_AMBITION: Readonly<Partial<Record<Resource, Ambition>>> = {
+  Material: 'Tycoon',
+  Fuel: 'Tycoon',
+  Weapon: 'Warlord',
+  Relic: 'Keeper',
+  Psionic: 'Empath',
+}
+
+/** Enough of a game to work out the out-of-play resources: `GameState` and `ObservedState` both fit. */
+export interface PhantomView {
+  readonly board: BoardVariant
+  readonly factions: readonly FactionId[]
+}
+
+/**
+ * What the out-of-play resources hold for one ambition — the two-player rival.
+ *
+ * At two players, setup puts the six resources matching the six covered planets onto the ambition
+ * boxes (Setup K), and scoring counts them **as if a third player had them** (p19, "Two-Player
+ * Scoring"). They are a fixed benchmark that can take first or second place and deny a real player
+ * the power, but they never gain any. Weapons on Warlord count as Trophies, which falls out of the
+ * table above rather than needing a case.
+ *
+ * Derived rather than stored: the out-of-play clusters are the ones missing from `board.clusters`,
+ * every planet's resource is already in the topology, and none of it changes during a game. That
+ * keeps rule 1 of docs/17 intact — nothing new is persisted, and replay reproduces it for free.
+ *
+ * **Zero above two players**, which is what keeps the 3-4 player game and its bot baseline
+ * untouched. Three players also cover two clusters, so the count would otherwise be non-zero there
+ * and quietly change every ambition in the game.
+ */
+export function phantomHolding(state: PhantomView, ambition: Ambition): number {
+  if (state.factions.length !== 2) return 0
+  const inPlay = new Set(state.board.clusters)
+  return allSystems().filter(
+    (s) =>
+      !s.isGate &&
+      !s.fateOnly &&
+      !inPlay.has(s.cluster) &&
+      s.resource !== null &&
+      PHANTOM_AMBITION[s.resource as Resource] === ambition,
+  ).length
+}
+
+/**
+ * What every rival to `self` holds, including the two-player phantom.
+ *
+ * One helper because three places need the same list and getting it wrong in any of them is a
+ * different bug: scoring would misplace, and a bot would misjudge what it is up against.
+ */
+export function rivalHoldings(
+  state: MetricView & PhantomView,
+  self: FactionId,
+  ambition: Ambition,
+): readonly number[] {
+  return [
+    ...state.factions.filter((f) => f !== self).map((f) => metric(state, f, ambition)),
+    phantomHolding(state, ambition),
+  ]
 }
 
 // --- action constructors ---------------------------------------------------
@@ -354,9 +424,25 @@ function performScore(state: GameState): RuleResult {
     const high = markers.reduce((n, m) => n + m.high, 0)
     const low = markers.reduce((n, m) => n + m.low, 0)
 
-    const scores = state.factions
-      .map((f) => ({ faction: f, value: metric(state, f, ambition) }))
-      .filter((s) => s.value > 0)
+    /*
+     * The two-player phantom joins the comparison as a rival with no seat, spelled `null`.
+     *
+     * p19 "Two-Player Scoring": the six out-of-play resources count *as if a third player had
+     * them*. So it competes on exactly the terms everyone else does — it can take first or second
+     * and deny a real player the Power — and the only thing it cannot do is receive any. Every
+     * award below is therefore guarded on the seat existing, and nothing else about the procedure
+     * changes: qualifying, ties and the city bonus all read the same list.
+     *
+     * `phantomHolding` is 0 above two players, so this entry is filtered out and 3-4 player
+     * scoring is byte-for-byte what it was.
+     */
+    const scores: { faction: FactionId | null; value: number }[] = [
+      ...state.factions.map((f) => ({
+        faction: f as FactionId | null,
+        value: metric(state, f, ambition),
+      })),
+      { faction: null, value: phantomHolding(state, ambition) },
+    ].filter((s) => s.value > 0)
 
     if (scores.length === 0) {
       log.push(`No one scored ${ambition}`)
@@ -368,39 +454,53 @@ function performScore(state: GameState): RuleResult {
 
     if (leaders.length === 1) {
       const first = leaders[0]!
-      const bonus =
-        (citiesInReserve(state, first) < 2 ? 2 : 0) + (citiesInReserve(state, first) < 1 ? 3 : 0)
-      // Just (Elder, on Tyrant) and Violent (Warrior, on Empath) replace a first place outright
-      // with the second-place value — HRF reassigns `p` wholesale (game-common.scala:2397), which
-      // is what the card means by "don't get bonus city Power": the city bonus goes too.
-      const demoted = demotesFirst(state, first, ambition)
-      const won = demoted ? low : high + bonus
-      power[first] = (power[first] ?? 0) + won
-      winners.push(first)
-      log.push(
-        demoted
-          ? `${first} won ${ambition} but takes only ${won} power (their leader)`
-          : `${first} won ${ambition} for ${won} power`,
-      )
+      if (first === null) {
+        // The phantom outright. Nobody takes first, and second place is still contested below.
+        log.push(`the out-of-play resources lead ${ambition}; no one takes first`)
+      } else {
+        const bonus =
+          (citiesInReserve(state, first) < 2 ? 2 : 0) + (citiesInReserve(state, first) < 1 ? 3 : 0)
+        // Just (Elder, on Tyrant) and Violent (Warrior, on Empath) replace a first place outright
+        // with the second-place value — HRF reassigns `p` wholesale (game-common.scala:2397), which
+        // is what the card means by "don't get bonus city Power": the city bonus goes too.
+        const demoted = demotesFirst(state, first, ambition)
+        const won = demoted ? low : high + bonus
+        power[first] = (power[first] ?? 0) + won
+        winners.push(first)
+        log.push(
+          demoted
+            ? `${first} won ${ambition} but takes only ${won} power (their leader)`
+            : `${first} won ${ambition} for ${won} power`,
+        )
+      }
 
       const runnerValue = Math.max(...scores.filter((s) => s.value < max).map((s) => s.value), 0)
       const runners = scores.filter((s) => s.value === runnerValue && runnerValue > 0)
       if (runners.length === 1) {
         const second = runners[0]!.faction
-        // The same two traits zero a second place (game-common.scala:2483), and Proud zeroes
-        // anything that is not an outright win.
-        const zeroed = demotesFirst(state, second, ambition) || hasTrait(state, second, 'Proud')
-        const got = zeroed ? 0 : low
-        power[second] = (power[second] ?? 0) + got
-        log.push(
-          zeroed
-            ? `${second} placed second in ${ambition} but takes no power (their leader)`
-            : `${second} placed second in ${ambition} for ${got} power`,
-        )
+        if (second === null) {
+          log.push(`the out-of-play resources place second in ${ambition}`)
+        } else {
+          // The same two traits zero a second place (game-common.scala:2483), and Proud zeroes
+          // anything that is not an outright win.
+          const zeroed = demotesFirst(state, second, ambition) || hasTrait(state, second, 'Proud')
+          const got = zeroed ? 0 : low
+          power[second] = (power[second] ?? 0) + got
+          log.push(
+            zeroed
+              ? `${second} placed second in ${ambition} but takes no power (their leader)`
+              : `${second} placed second in ${ambition} for ${got} power`,
+          )
+        }
       }
     } else {
       // Tie for first: each tied leader takes the low value; no first place awarded.
       for (const f of leaders) {
+        if (f === null) {
+          // The phantom is one of the tied leaders. It occupies a place and takes nothing.
+          log.push(`the out-of-play resources tie ${ambition}`)
+          continue
+        }
         // Proud (Noble): "you only gain Power if you get first place (not tied)". A tie is
         // explicitly not first place, so a Proud faction takes nothing from one — the trait's
         // whole cost, since tying is the common outcome it now refuses.

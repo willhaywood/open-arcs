@@ -112,6 +112,35 @@ BOARDS = {
                                         [[1, "Arrow"], [3, "Arrow"], [[2, "Gate"]]],
                                         [[1, "Hex"], [4, "Hex"], [[3, "Gate"]]],
                                         [[4, "Arrow"], [2, "Crescent"], [[5, "Gate"]]]]),
+    # --- two players -------------------------------------------------------
+    #
+    # HRF excludes 2-player entirely (SetupCardOption.count = $(3, 4)), so all four come from
+    # arcs_tts, read the same way as the three above:
+    #
+    #   out-of-play clusters   src/BaseGame.lua, two_player_setup_cards
+    #   starting positions     src/Global.lua, starting_locations[<card>_2P_GUID][seat][A..D]
+    #
+    # **Two ships go in a gate AND a planet, not two gates.** Every 3-4 player seat has a single
+    # fleet system and it is always a gate, which makes "C is a gate" an easy and wrong thing to
+    # assume here — the mod is explicit that seat 1 of Frontiers is C = 3-gate, D = 3-c.
+    #
+    # Checked two ways. The parser that read these reproduces **27 of the 28** stored 3-4 player
+    # seats exactly; the one exception is the Board3MixUp seat 2 disagreement docs/05 already
+    # records. And each card's printed labels were converted to an angle about the map centre and
+    # matched against these systems — all 8 labels agree on every card checked, from art that is a
+    # wholly separate source to the Lua.
+    "Board2Frontiers":   dict(players=2, clusters=[2, 3, 4, 5],
+                              starting=[[[5, "Hex"], [4, "Hex"], [[3, "Gate"], [3, "Hex"]]],
+                                        [[3, "Arrow"], [5, "Arrow"], [[5, "Gate"], [4, "Arrow"]]]]),
+    "Board2Homelands":   dict(players=2, clusters=[2, 3, 5, 6],
+                              starting=[[[5, "Arrow"], [6, "Arrow"], [[5, "Gate"], [5, "Hex"]]],
+                                        [[3, "Hex"], [3, "Arrow"], [[3, "Gate"], [2, "Arrow"]]]]),
+    "Board2MixUp1":      dict(players=2, clusters=[1, 3, 4, 6],
+                              starting=[[[4, "Crescent"], [3, "Crescent"], [[1, "Gate"], [6, "Arrow"]]],
+                                        [[6, "Hex"], [3, "Hex"], [[4, "Gate"], [1, "Crescent"]]]]),
+    "Board2MixUp2":      dict(players=2, clusters=[2, 3, 5, 6],
+                              starting=[[[5, "Crescent"], [2, "Arrow"], [[3, "Gate"], [6, "Crescent"]]],
+                                        [[2, "Crescent"], [6, "Arrow"], [[5, "Gate"], [3, "Hex"]]]]),
     "BoardFull":         dict(players=0, clusters=[1, 2, 3, 4, 5, 6], starting=[], campaign_only=True),
 }
 

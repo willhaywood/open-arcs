@@ -15,7 +15,7 @@
  */
 
 import { LORE_AMBITION, hasLore, loreActive } from '../lore.js'
-import { metric } from '../rules/ambitions.js'
+import { metric, rivalHoldings } from '../rules/ambitions.js'
 import { declareReadiness } from './declare-ready.js'
 import { incomeFor } from './income.js'
 import { AMBITIONS } from '../state.js'
@@ -228,10 +228,9 @@ export function featuresOf(
    */
   for (const d of observed.declared) {
     const mine = metric(observed, self, d.ambition)
-    const best = Math.max(
-      0,
-      ...observed.factions.filter((f) => f !== self).map((f) => metric(observed, f, d.ambition)),
-    )
+    // `rivalHoldings` rather than a filter over factions: at two players the out-of-play
+    // resources are a rival too, and one this bot has to beat to score (docs/08).
+    const best = Math.max(0, ...rivalHoldings(observed, self, d.ambition))
     const share = mine === 0 && best === 0 ? 0 : mine > best ? 1 : mine === best ? 0.5 : 0.2
     x.standing += d.marker.high * share * bias(intent, d.ambition)
 
@@ -376,7 +375,7 @@ export function featuresOf(
   for (const id of contentsOf(observed.courtCards, CourtPile.secured(self))) {
     x.courtSecured += courtWorth(id, intent)
   }
-  for (const slot of courtSlots()) {
+  for (const slot of courtSlots(observed.factions.length)) {
     const id = contentsOf(observed.courtCards, CourtPile.slot(slot))[0]
     if (id === undefined) continue
     const on = (f: FactionId): number =>

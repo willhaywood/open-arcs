@@ -54,7 +54,15 @@ export const UNION_SUITS: Readonly<Record<string, string>> = {
   bc11: 'Aggression',
 }
 
+/**
+ * Cards face up in the court row: **3 at two players, 4 otherwise**.
+ *
+ * Rulebook Setup H: *Draw 3 cards (2 players) or 4 cards (3-4 players) from this deck to make a
+ * face-up Court row.* One fewer card is one fewer thing to contest, which at two players is the
+ * difference between a crowded court and a race.
+ */
 export const COURT_SLOTS = 4
+export const COURT_SLOTS_TWO_PLAYER = 3
 export const AGENTS_PER_FACTION = 10
 
 export type CourtCardKind = 'guild' | 'vox'
@@ -147,8 +155,21 @@ export const CourtPile = {
   discard: (): LocationId => 'court:discard',
 } as const
 
-export function courtSlots(): readonly number[] {
-  return Array.from({ length: COURT_SLOTS }, (_, i) => i + 1)
+/** How many court slots this many players use. */
+export function courtSize(players: number): number {
+  return players === 2 ? COURT_SLOTS_TWO_PLAYER : COURT_SLOTS
+}
+
+/**
+ * The court slot numbers, 1-based.
+ *
+ * Takes the player count rather than reading a constant, because the row is shorter at two
+ * players. Every caller has the count to hand — it is `state.factions.length`, or
+ * `observed.factions.length` for a bot — so the argument costs nothing and makes the one place
+ * the size varies impossible to forget.
+ */
+export function courtSlots(players: number): readonly number[] {
+  return Array.from({ length: courtSize(players) }, (_, i) => i + 1)
 }
 
 

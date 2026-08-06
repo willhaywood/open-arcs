@@ -52,7 +52,17 @@ const jobs = Math.max(1, Number(flag('jobs') ?? 1))
 
 const names = (flag('seats') ?? 'heuristic,trivial,trivial,trivial').split(',')
 const specs: BotSpec[] = names.map(parseSpec)
-const board = flag('board') ?? (specs.length === 3 ? 'Board3Frontiers' : 'Board4MixUp1')
+/*
+ * One default board per seat count. Written as a table rather than a ternary because the ternary
+ * read "3 seats, or else 4" and silently handed a 2-seat run a four-player board, which fails as
+ * "0 games finished" rather than as anything that names the cause.
+ */
+const DEFAULT_BOARD: Readonly<Record<number, string>> = {
+  2: 'Board2Frontiers',
+  3: 'Board3Frontiers',
+  4: 'Board4MixUp1',
+}
+const board = flag('board') ?? DEFAULT_BOARD[specs.length] ?? 'Board4MixUp1'
 
 /*
  * Leaders and lore, off by default.
@@ -66,9 +76,8 @@ const board = flag('board') ?? (specs.length === 3 ? 'Board3Frontiers' : 'Board4
 const lorePerPlayer = Number(flag('lore') ?? 0)
 const leadersAndLore =
   lorePerPlayer > 0 ? { expansion: true, lorePerPlayer } : undefined
-const factions = (
-  specs.length === 3 ? ['red', 'yellow', 'blue'] : ['red', 'yellow', 'blue', 'white']
-) as FactionId[]
+// One faction per seat, in seating order — so `--seats a,b` is a two-player run.
+const factions = (['red', 'yellow', 'blue', 'white'] as FactionId[]).slice(0, specs.length)
 
 /*
  * The twin takes the last seat rather than being appended, so the seat count still matches the

@@ -204,7 +204,7 @@ export function NewGame(): JSX.Element {
         <div className="ng-field">
           <span className="ng-label">Players</span>
           <div className="seg">
-            {[3, 4].map((n) => (
+            {[2, 3, 4].map((n) => (
               <button
                 key={n}
                 className={players === n ? 'on' : ''}

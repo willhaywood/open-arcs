@@ -118,7 +118,10 @@ To keep scope honest — these need no accommodation at all:
 - Blight mechanics, imperial trust, golems
 - The 24 fates themselves
 - Act transitions and campaign scoring
-- Two-player support (campaign-only)
+
+> **"Two-player support (campaign-only)" used to be on this list, and it was wrong.** The box says
+> 2-4 players and the base rulebook carries 2-player rules on pages 4, 5 and 19. It is implemented;
+> see docs/05 for the boards and docs/08 for the out-of-play resources that score as a third player.
 
 ## 5. Acceptance check
 

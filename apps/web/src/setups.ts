@@ -16,6 +16,14 @@ export interface SetupCard {
 }
 
 export const SETUP_CARDS: Record<string, SetupCard> = {
+  Board2Frontiers: {
+    label: 'Frontiers',
+    art: asset('game-assets/setup/setup-2p-01.webp'),
+    note: 'For experienced players',
+  },
+  Board2MixUp1: { label: 'Mix Up 1', art: asset('game-assets/setup/setup-2p-02.webp') },
+  Board2Homelands: { label: 'Homelands', art: asset('game-assets/setup/setup-2p-03.webp') },
+  Board2MixUp2: { label: 'Mix Up 2', art: asset('game-assets/setup/setup-2p-04.webp') },
   Board3MixUp: { label: 'Mix Up', art: asset('game-assets/setup/setup-3p-01.webp') },
   Board3Frontiers: { label: 'Frontiers', art: asset('game-assets/setup/setup-3p-02.webp') },
   Board3Homelands: { label: 'Homelands', art: asset('game-assets/setup/setup-3p-03.webp') },

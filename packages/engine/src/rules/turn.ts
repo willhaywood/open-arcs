@@ -85,6 +85,27 @@ import { copiedOrPivoted } from '../observe.js'
 
 export const StartChapter = (): Action => ({ type: 'chapter/start' })
 const StartRound = (): Action => ({ type: 'round/start' })
+
+/**
+ * The two-player mulligan.
+ *
+ * Rulebook p19 "Two-Player Mulligans": *In games with 2 players, after drawing, the player without
+ * initiative may discard their hand of 6 action cards to draw a new hand of 6 action cards. They
+ * must accept this new hand.* Setup P is the same offer at chapter 1, and because setup reaches
+ * chapter 1 through `StartChapter` like every other chapter, one implementation covers both.
+ *
+ * The compensation for going second, and the reason it is *without initiative* specifically.
+ */
+const Mulligan = (faction: FactionId): Action => ({
+  type: 'turn/mulligan',
+  faction,
+  label: 'Discard and draw 6 new',
+})
+const KeepHand = (faction: FactionId): Action => ({
+  type: 'turn/keep-hand',
+  faction,
+  label: 'Keep this hand',
+})
 const LeadMain = (faction: FactionId): Action => ({ type: 'turn/lead-main', faction })
 
 const Lead = (faction: FactionId, card: string, suit: Suit): Action => ({
@@ -253,7 +274,47 @@ function performStartChapter(state: GameState): RuleResult {
     declared: [],
     log: [...state.log, `Chapter ${chapter}: dealt ${CHAPTER_HAND_SIZE} cards each`],
   }
-  return { state: next, continue: C.then(StartRound()) }
+  return { state: next, continue: offerMulligan(next) ?? C.then(StartRound()) }
+}
+
+/**
+ * Offer the mulligan, or `undefined` when there is none to offer.
+ *
+ * Two players only, and only to the one **without** initiative — at three or four this returns
+ * nothing and the chapter starts exactly as it always did.
+ */
+function offerMulligan(state: GameState): Continue | undefined {
+  if (state.factions.length !== 2) return undefined
+  const withInitiative = state.initiativeOrder[0] ?? state.factions[0]!
+  const other = state.factions.find((f) => f !== withInitiative)
+  if (other === undefined) return undefined
+  return C.ask(other, [Mulligan(other), KeepHand(other)], 'Keep this hand, or draw a new six?')
+}
+
+/**
+ * Take the mulligan: the six go away and six fresh ones come back.
+ *
+ * The old hand goes to the **discard**, not back to the deck, so it cannot be dealt straight back —
+ * "draw a new hand" has to mean a different one. The remaining deck is then shuffled rather than
+ * dealt off the top, because after the chapter reset the deck's order is whatever returning the
+ * hands left it in, which is deterministic but not random. Shuffling with the state's own RNG keeps
+ * the draw both fair and exactly reproducible under replay.
+ */
+function performMulligan(state: GameState, faction: FactionId): RuleResult {
+  const hand = CardLocation.hand(faction)
+  const deck = CardLocation.deck()
+  let cards = moveAll(state.cards, [...contentsOf(state.cards, hand)], CardLocation.discard())
+  const [order, rng] = shuffle(state.rng, contentsOf(cards, deck))
+  cards = moveAll(cards, order.slice(0, CHAPTER_HAND_SIZE), hand)
+  return {
+    state: {
+      ...state,
+      cards,
+      rng,
+      log: [...state.log, `${faction} took a new hand of ${CHAPTER_HAND_SIZE}`],
+    },
+    continue: C.then(StartRound()),
+  }
 }
 
 /** Register the deck's cards as tracker entities. Called once, lazily, on first chapter. */
@@ -1310,6 +1371,10 @@ export const TurnModule: RuleModule = {
         return performStartChapter(state)
       case 'round/start':
         return performStartRound(state)
+      case 'turn/mulligan':
+        return performMulligan(state, action['faction'] as FactionId)
+      case 'turn/keep-hand':
+        return { state, continue: C.then(StartRound()) }
       case 'turn/lead-main':
         return performLeadMain(state, action['faction'] as FactionId)
       case 'turn/lead':

@@ -5,12 +5,16 @@
  * live state at percentage positions measured from that image: available markers on the
  * three hex slots at the top, and declared markers inside the matching ambition box. Below
  * it sits the chapter strip (`chapter-N.webp`) and the power goal token for this player
- * count (`goal-27` at four players, `goal-30` at three — the 39 - 3n threshold).
+ * count (`goal-27` at four players, `goal-30` at three, `goal-33` at two — the 39 - 3n threshold).
+ *
+ * At two players the boxes also carry the **out-of-play resources**, which score as a third player
+ * (rulebook p19). They are shown as a count against the ambition they feed, because a player who
+ * cannot see what the phantom holds cannot tell whether declaring is worth anything.
  *
  * If the artwork is missing the panel falls back to a plain readable list.
  */
 
-import { AMBITIONS, RESOURCES, ResourceSlot, contentsOf } from '@arcs/engine'
+import { AMBITIONS, RESOURCES, ResourceSlot, contentsOf, phantomHolding } from '@arcs/engine'
 import type { Action, Ambition, AmbitionMarker, Continue, GameState } from '@arcs/engine'
 import { useState } from 'react'
 
@@ -122,6 +126,29 @@ export function AmbitionTrack({
 
         {/* Populist Demands — click the ambition's row to declare it. */}
         {claims}
+
+        {/*
+          * The two-player rival: the six out-of-play resources, sitting in the boxes they were
+          * dealt to. Zero at 3-4 players, so nothing renders there.
+          */}
+        {AMBITIONS.map((a) => {
+          const held = phantomHolding(state, a)
+          if (held === 0) return null
+          return (
+            <span
+              key={`phantom-${a}`}
+              className="amb-phantom"
+              style={{ top: ROW_Y[a] }}
+              title={
+                held === 1
+                  ? `1 out-of-play resource counts toward ${a}`
+                  : `${held} out-of-play resources count toward ${a}`
+              }
+            >
+              {held}
+            </span>
+          )
+        })}
 
         {/* Declared markers sit in their ambition's box. */}
         {AMBITIONS.map((a) => {

@@ -21,7 +21,7 @@ import { CardZoom } from './CardZoom.js'
 import { asset } from '../assets.js'
 
 export function CourtPanel({ state }: { state: GameState }): JSX.Element {
-  const slots = courtSlots().map((n) => readSlot(state, n))
+  const slots = courtSlots(state.factions.length).map((n) => readSlot(state, n))
   const deckLeft = contentsOf(state.courtCards, CourtPile.deck()).length
   const [open, setOpen] = useState<number | null>(null)
 

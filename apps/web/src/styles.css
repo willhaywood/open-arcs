@@ -3462,6 +3462,14 @@ button {
  * Below the threshold the rivals keep the wash, which costs no width at all. The two counts need
  * separate thresholds because a fourth player adds a whole board, not just a panel.
  */
+@container boards (min-width: 780px) {
+  .player-boards.p2 .pb-portrait.mini {
+    display: block;
+  }
+  .player-boards.p2 .pboard.mini.has-leader {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0));
+  }
+}
 @container boards (min-width: 1040px) {
   .player-boards.p3 .pb-portrait.mini {
     display: block;
@@ -3480,6 +3488,31 @@ button {
   }
 }
 
+
+/*
+ * The two-player rival, in the ambition boxes it was dealt to.
+ *
+ * Right of the declared markers, which sit left of centre — so the two never collide, and the
+ * count reads as something already in the box rather than as another marker. Gold-on-dark like
+ * the printed values it sits beside; not `--accent`, which is reserved for what is clickable.
+ */
+.amb-phantom {
+  position: absolute;
+  left: 76%;
+  transform: translate(-50%, -50%);
+  min-width: 17px;
+  padding: 1px 4px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 3px;
+  background: rgba(8, 10, 16, 0.86);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: center;
+  pointer-events: none;
+}
 
 /* --- the variant boxes, as the plaques printed on them --------------------- */
 /*

@@ -1097,7 +1097,7 @@ function offerRansack(state: GameState, ctx: Resolve, then: Action): Continue {
     return C.log(`${victim} cannot be ransacked (their leader)`, C.then(then))
   }
 
-  const options: Action[] = courtSlots()
+  const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => contentsOf(state.courtCards, CourtPile.slot(n))[0] !== undefined)
     .filter((n) =>
       contentsOf(state.figures, Location.court(n)).some(

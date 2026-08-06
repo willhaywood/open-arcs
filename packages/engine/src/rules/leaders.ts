@@ -430,7 +430,7 @@ function offerBold(
   const exit: Action = { ...back, label: started ? 'Done' : 'Cancel' }
   if (!hasAgent(state, faction)) return C.then(back)
 
-  const options: Action[] = courtSlots()
+  const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => cardIn(state, n) !== undefined && !influenced.includes(n))
     .map((n) => ({
       type: 'action/influence',
@@ -578,7 +578,7 @@ function offerFollow(
  */
 function offerBeloved(state: GameState, faction: FactionId, then: Action): Continue {
   if (!hasAgent(state, faction)) return C.then(then)
-  const options: Action[] = courtSlots()
+  const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => cardIn(state, n) !== undefined)
     .map((n) => ({
       type: 'action/influence',

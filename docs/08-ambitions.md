@@ -107,6 +107,31 @@ A scripted three-player game confirms the shape: a faction reached exactly 30 po
 chapter 4 and won, with stacked Keeper markers scoring 8 (5+3) and second place taking the
 low values — all as expected.
 
+## 4a. The two-player rival
+
+At two players the six planets covered by the out-of-play markers put their resources on the
+ambition boxes (rulebook Setup K), and scoring counts them **as if a third player held them**
+(p19, "Two-Player Scoring"). Material and Fuel feed Tycoon, Weapons Warlord, Relics Keeper,
+Psionics Empath. **Tyrant gets nothing** — no resource stands in for captives — so it stays the
+one ambition that is a straight two-way race.
+
+Weapons on the Warlord box "count as Trophies", which needs no special case here: Warlord's metric
+is a count, and the phantom contributes to that count like anything else.
+
+**It can place, and it never scores.** `performScore` puts it in the comparison as a rival with no
+seat, so it can take first outright or tie — denying a real player the high value — while every
+award is guarded on the seat existing. A single Weapon on Frontiers is enough to turn a lone trophy
+from a 4-power win into a 2-power tie, which is the whole design: it is a benchmark you have to
+clear rather than an opponent who acts.
+
+**Derived, never stored.** The out-of-play clusters are the ones missing from `board.clusters` and
+every planet's resource is already in the topology, so `phantomHolding` recomputes it and nothing
+new is persisted. It returns 0 above two players — deliberately keyed on the player count and not
+on the board, since three players also cover two clusters and would otherwise inherit a phantom.
+
+The bots see it too: `rivalHoldings` is what `value.ts` and `intent.ts` compare against, so a bot
+weighs the phantom exactly as it weighs a human holding the same pile.
+
 ## 5. Scope and simplifications
 
 - **Declaration is lead-only — and that is the rule, not a simplification.** This entry

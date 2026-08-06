@@ -45,13 +45,13 @@ describe('the deck', () => {
 describe('setup', () => {
   it('deals four face-up cards and keeps the rest as deck', () => {
     const state = fresh()
-    const filled = courtSlots().filter((n) => contentsOf(state.courtCards, CourtPile.slot(n)).length)
+    const filled = courtSlots(state.factions.length).filter((n) => contentsOf(state.courtCards, CourtPile.slot(n)).length)
     expect(filled).toHaveLength(COURT_SLOTS)
     expect(contentsOf(state.courtCards, CourtPile.deck())).toHaveLength(31 - COURT_SLOTS)
   })
 
   it('shuffles — two seeds do not deal the same court', () => {
-    const open = (s: GameState) => courtSlots().map((n) => contentsOf(s.courtCards, CourtPile.slot(n))[0])
+    const open = (s: GameState) => courtSlots(s.factions.length).map((n) => contentsOf(s.courtCards, CourtPile.slot(n))[0])
     expect(open(fresh(1))).not.toEqual(open(fresh(2)))
   })
 
@@ -178,7 +178,7 @@ function drive(seeds: number) {
         const inReserve = contentsOf(step.state.figures, Location.reserve(f)).filter((id) =>
           id.startsWith(`${f}/Agent/`),
         ).length
-        const onCards = courtSlots().reduce((n, s) => n + agentsOn(step.state, s, f), 0)
+        const onCards = courtSlots(step.state.factions.length).reduce((n, k) => n + agentsOn(step.state, k, f), 0)
         const held = FOUR.reduce(
           (n, g) =>
             n +
@@ -191,7 +191,7 @@ function drive(seeds: number) {
       }
 
       const deckLeft = contentsOf(step.state.courtCards, CourtPile.deck()).length
-      const filled = courtSlots().filter(
+      const filled = courtSlots(step.state.factions.length).filter(
         (n) => contentsOf(step.state.courtCards, CourtPile.slot(n)).length > 0,
       ).length
       if (deckLeft > 0 && filled < COURT_SLOTS) slotsAlwaysFull = false
@@ -201,7 +201,7 @@ function drive(seeds: number) {
     const s = step.state
     const seen =
       contentsOf(s.courtCards, CourtPile.deck()).length +
-      courtSlots().reduce((n, k) => n + contentsOf(s.courtCards, CourtPile.slot(k)).length, 0) +
+      courtSlots(s.factions.length).reduce((n, k) => n + contentsOf(s.courtCards, CourtPile.slot(k)).length, 0) +
       FOUR.reduce((n, f) => n + contentsOf(s.courtCards, CourtPile.secured(f)).length, 0) +
       contentsOf(s.courtCards, CourtPile.discard()).length
     if (seen !== 31) strayCards++

@@ -344,7 +344,7 @@ describe('Paranoid (Demagogue) — no securing a Guild card held by one agent', 
 
   /** The first court slot holding a card of this kind. Slots are numbered from 1. */
   function slotOfKind(state: GameState, kind: 'guild' | 'vox'): number {
-    for (const n of courtSlots()) {
+    for (const n of courtSlots(state.factions.length)) {
       const card = contentsOf(state.courtCards, CourtPile.slot(n))[0]
       if (card !== undefined && courtCard(card).kind === kind) return n
     }
@@ -378,7 +378,7 @@ describe('Paranoid (Demagogue) — no securing a Guild card held by one agent', 
     let slot = 0
     for (let seed = 1; seed < 60 && base === undefined; seed++) {
       const candidate = withLeader(fresh(seed), 'red', 'leader08')
-      for (const n of courtSlots()) {
+      for (const n of courtSlots(candidate.factions.length)) {
         const card = contentsOf(candidate.courtCards, CourtPile.slot(n))[0]
         if (card !== undefined && courtCard(card).kind === 'vox') {
           base = candidate
@@ -663,7 +663,7 @@ describe('Tactical (Warrior) and Charismatic (Feastbringer) — a second action 
     function withSecurable(state: GameState): GameState {
       const contents = new Map(state.figures.contents)
       const at = new Map(state.figures.at)
-      const court = Location.court(courtSlots()[0]!)
+      const court = Location.court(courtSlots(state.factions.length)[0]!)
       const picked = (contents.get('reserve:red') ?? []).filter((id) => id.startsWith('red/Agent/')).slice(0, 2)
       contents.set('reserve:red', (contents.get('reserve:red') ?? []).filter((id) => !picked.includes(id)))
       contents.set(court, [...(contents.get(court) ?? []), ...picked])
@@ -793,7 +793,7 @@ describe('Bold (Demagogue) and Generous (Feastbringer) — the declare-time trai
   }
 
   function aGuildCard(state: GameState): string {
-    for (const n of courtSlots()) {
+    for (const n of courtSlots(state.factions.length)) {
       const card = contentsOf(state.courtCards, CourtPile.slot(n))[0]
       if (card !== undefined && courtCard(card).kind === 'guild') return card
     }
@@ -1004,7 +1004,7 @@ describe('Ransack the Court, and Beloved (Elder)', () => {
     s = { ...s, damaged: [...s.damaged, city] }
 
     // a yellow agent on the first court slot, so there is something to ransack
-    const slot = courtSlots().find((n) => contentsOf(s.courtCards, CourtPile.slot(n))[0] !== undefined)!
+    const slot = courtSlots(s.factions.length).find((n) => contentsOf(s.courtCards, CourtPile.slot(n))[0] !== undefined)!
     const contents = new Map(s.figures.contents)
     const at = new Map(s.figures.at)
     const agent = (contents.get('reserve:yellow') ?? []).find((id) => id.includes('/Agent/'))!
@@ -1058,7 +1058,7 @@ describe('Ransack the Court, and Beloved (Elder)', () => {
     const { state, system, agent } = siege()
     const contents = new Map(state.figures.contents)
     const at = new Map(state.figures.at)
-    for (const n of courtSlots()) {
+    for (const n of courtSlots(state.factions.length)) {
       contents.set(Location.court(n), (contents.get(Location.court(n)) ?? []).filter((i) => i !== agent))
     }
     contents.set('reserve:yellow', [...(contents.get('reserve:yellow') ?? []), agent])
@@ -1185,7 +1185,7 @@ describe('Paranoid’s ransack exception — "Ignore this if you Ransack the Cou
   }
 
   function guildSlot(state: GameState): number {
-    for (const n of courtSlots()) {
+    for (const n of courtSlots(state.factions.length)) {
       const card = contentsOf(state.courtCards, CourtPile.slot(n))[0]
       if (card !== undefined && courtCard(card).kind === 'guild') return n
     }

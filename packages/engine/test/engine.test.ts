@@ -57,6 +57,10 @@ describe('ids: Color and Faction are distinct', () => {
 describe('board topology', () => {
   it('exposes every board variant', () => {
     expect([...boardNames()].sort()).toEqual([
+      'Board2Frontiers',
+      'Board2Homelands',
+      'Board2MixUp1',
+      'Board2MixUp2',
       'Board3CoreConflict',
       'Board3Frontiers',
       'Board3Homelands',
@@ -69,12 +73,15 @@ describe('board topology', () => {
     ])
   })
 
-  it('offers all four printed setups at each of 3 and 4 players', () => {
+  it('offers all four printed setups at each of 2, 3 and 4 players', () => {
+    expect(boardsFor(2)).toHaveLength(4)
     expect(boardsFor(3)).toHaveLength(4)
     expect(boardsFor(4)).toHaveLength(4)
   })
 
-  it('3p boards use 4 clusters, 4p boards use 5, campaign uses 6', () => {
+  it('2p and 3p boards use 4 clusters, 4p boards use 5, campaign uses 6', () => {
+    // Setup J: two clusters go out of play at 2-3 players, one at 4.
+    for (const b of boardsFor(2)) expect(b.clusters).toHaveLength(4)
     for (const b of boardsFor(3)) expect(b.clusters).toHaveLength(4)
     for (const b of boardsFor(4)) expect(b.clusters).toHaveLength(5)
     expect(board('BoardFull').clusters).toHaveLength(6)
@@ -101,9 +108,22 @@ describe('board topology', () => {
           expect(claimed.has(home), `${name}: ${home} claimed twice`).toBe(false)
           claimed.add(home)
         }
-        for (const gate of fleets) {
-          expect(b.systems, `${name}: ${gate} is on the board`).toContain(gate)
-          expect(gate.endsWith('-Gate'), `${name}: fleets start at a gate`).toBe(true)
+        for (const fleet of fleets) {
+          expect(b.systems, `${name}: ${fleet} is on the board`).toContain(fleet)
+        }
+        /*
+         * Setup N: 2 ships go in *one* system at 3-4 players and *two* at 2 players — and the
+         * second of the pair is a planet, not another gate. "Every fleet starts at a gate" held
+         * for every 3-4 player seat and is exactly the wrong generalisation to carry into 2p, so
+         * the shape is asserted per player count instead.
+         */
+        const gates = fleets.filter((f) => f.endsWith('-Gate'))
+        if (b.players === 2) {
+          expect(fleets, `${name}: 2p seats hold two fleet systems`).toHaveLength(2)
+          expect(gates, `${name}: exactly one of the two is a gate`).toHaveLength(1)
+        } else {
+          expect(fleets, `${name}: 3-4p seats hold one fleet system`).toHaveLength(1)
+          expect(gates, `${name}: which is a gate`).toHaveLength(1)
         }
       }
     }

@@ -67,6 +67,10 @@ Resource, with building slots in parentheses. Gates have no resource and no slot
 
 | Board | Players | Clusters | Systems | Source |
 | --- | ---: | --- | ---: | --- |
+| Board2Frontiers | 2 | 2,3,4,5 | 16 | arcs_tts |
+| Board2Homelands | 2 | 2,3,5,6 | 16 | arcs_tts |
+| Board2MixUp1 | 2 | 1,3,4,6 | 16 | arcs_tts |
+| Board2MixUp2 | 2 | 2,3,5,6 | 16 | arcs_tts |
 | Board3MixUp | 3 | 2,3,5,6 | 16 | HRF |
 | Board3Frontiers | 3 | 1,4,5,6 | 16 | HRF |
 | Board3Homelands | 3 | 1,2,3,4 | 16 | arcs_tts |
@@ -77,10 +81,26 @@ Resource, with building slots in parentheses. Gates have no resource and no slot
 | Board4MixUp3 | 4 | 1,2,3,4,5 | 20 | arcs_tts |
 | BoardFull | — | 1–6 | 24 | HRF |
 
-**The full 6-cluster board is campaign-only.** Three players use four clusters, four players use
-five. There is no "standard" layout — every base-game layout is a named setup, and the board
-selector in `arcs/game.scala:1373` has **no default case**, so a game started without a setup
-option selected would throw a `MatchError`. Our implementation makes the layout a required
+**The four 2-player boards come from arcs_tts as well**, since HRF's `SetupCardOption` is limited
+to 3-4 players. Two things about them that the 3-4 player data would lead you to assume wrongly:
+
+- **A seat's "2 ships" position is two systems, not one** (Setup N), and **the second is a planet,
+  not a second gate.** Every 3-4 player seat has exactly one fleet system and it is always a gate,
+  which makes "C is a gate" an easy and incorrect generalisation. The mod is explicit —
+  `frontiers_2P` seat 1 is `C = 3-gate, D = 3-c`.
+- **Two cards share the same out-of-play clusters.** Homelands and Mix Up 2 are both `{1, 4}`; they
+  differ only in where the two players start.
+
+The reading was validated by re-parsing the mod for the 3-4 player boards and comparing to the
+data already stored here: **27 of 28 seats match exactly**, the one exception being the
+Board3MixUp seat 2 disagreement recorded below. Independently, each 2-player card's printed labels
+were converted to an angle about the map centre and matched against the mod's systems — all 8
+labels agree on every card checked, from art that shares no lineage with the Lua.
+
+**The full 6-cluster board is campaign-only.** Two and three players use four clusters, four
+players use five. There is no "standard" layout — every base-game layout is a named setup, and the
+board selector in `arcs/game.scala:1373` has **no default case**, so a game started without a
+setup option selected would throw a `MatchError`. Our implementation makes the layout a required
 parameter rather than reproducing that.
 
 ### The three ported from the TTS mod

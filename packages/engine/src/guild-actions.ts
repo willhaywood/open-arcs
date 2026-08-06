@@ -75,7 +75,7 @@ export function rivalAgentsOn(
  */
 export function abductableSlots(state: GameState, faction: FactionId): readonly number[] {
   const reach = weaponReach(state, faction)
-  return courtSlots().filter((n) => {
+  return courtSlots(state.factions.length).filter((n) => {
     const rivals = rivalAgentsOn(state, faction, n).length
     return rivals > 0 && rivals < reach
   })
