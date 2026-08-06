@@ -178,6 +178,15 @@ const PANEL = [
   'ambition/skip-declare',
   'turn/seize',
   'turn/skip-seize',
+  /*
+   * The two-player mulligan (rulebook p19), a genuine yes/no — docs/15 S6.
+   *
+   * Unclaimed until a real 2-player game reached it, because every config in `surfaces.test.ts` was
+   * three or four players and this offer exists only at two. The invariant is only as wide as the
+   * games the sweep plays, so a 2-player config is added there alongside this.
+   */
+  'turn/mulligan',
+  'turn/keep-hand',
   'turn/bards-declare',
   'turn/prelude',
   'turn/pips',

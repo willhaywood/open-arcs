@@ -84,6 +84,33 @@ describe('every Ask has a surface that draws it', () => {
         leadersAndLore: { expansion: true, lorePerPlayer: 3 },
       }),
     },
+    /*
+     * Two players, which nothing above covered.
+     *
+     * The 2-player rules are not a subset: the mulligan (rulebook p19) is offered *only* at two, so
+     * `turn/mulligan` and `turn/keep-hand` were unclaimed and this sweep could never say so. A
+     * reported dead game found it instead — the cost this test exists to avoid paying.
+     *
+     * With leaders and lore on, because that is the reported configuration and because the draft is
+     * where the 2-player setup differs most.
+     */
+    {
+      name: 'leaders and lore, 2 players',
+      options: (seed) => ({
+        board: 'Board2MixUp2',
+        factions: ['red', 'yellow'],
+        seed,
+        leadersAndLore: { expansion: true, lorePerPlayer: 1 },
+      }),
+    },
+    {
+      name: 'base game, 2 players',
+      options: (seed) => ({
+        board: 'Board2Frontiers',
+        factions: ['red', 'yellow'],
+        seed,
+      }),
+    },
   ]
 
   for (const { name, options } of configs) {

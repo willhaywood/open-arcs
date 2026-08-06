@@ -66,6 +66,17 @@ const CONFIGS: NewGameOptions[] = [
     seed: 5,
     leadersAndLore: { expansion: true, lorePerPlayer: 3 },
   },
+  /*
+   * Two players, whose asks are not a subset of the others': the mulligan exists only here, and it
+   * was unclaimed — so a watcher's screen went blank on it. Both sweeps in this repo ran three and
+   * four players only, which is how it reached a real game.
+   */
+  {
+    board: 'Board2MixUp2',
+    factions: ['red', 'yellow'],
+    seed: 3,
+    leadersAndLore: { expansion: false, lorePerPlayer: 1 },
+  },
 ]
 
 describe('actorOf, against actions the engine really produces', () => {
@@ -260,6 +271,34 @@ describe('acting and watching are different questions', () => {
 
   it('keeps the faction on a withheld ask, because the board still names whose turn it is', () => {
     expect((viewFor(learned('blue'), SEAT) as Ask).faction).toBe('blue')
+  })
+
+  /*
+   * The dead two-player game, as a unit test.
+   *
+   * `surfaceFor` returning `undefined` means no surface claims the ask, and the first cut of this
+   * file treated that as a reason to hide it — which reintroduced the original regression for every
+   * action type the table had not got round to. `turn/mulligan` was one: offered only at two
+   * players, so no sweep played it, so nobody claimed it, so a watcher sat on an empty prompt while
+   * the actor played on through `ActionPanel`, which draws unclaimed asks deliberately.
+   *
+   * Hiding is the dangerous default here, and the asymmetry is the argument: an unclaimed *public*
+   * ask is the normal case and blanking it kills the screen, while an unclaimed *private* one
+   * requires someone to add a private surface and leave it out of `PRIVATE`.
+   */
+  it('draws an ask that no surface claims, rather than blanking it', () => {
+    const unclaimed = askOf('blue', 'turn/some-action-added-next-week')
+    expect(surfaceFor(unclaimed), 'the fixture is genuinely unclaimed').toBeUndefined()
+    expect(viewFor(unclaimed, SEAT)).toBe(unclaimed)
+    expect(viewFor(unclaimed, WATCHING)).toBe(unclaimed)
+  })
+
+  it('draws the two-player mulligan for the player who is not being offered it', () => {
+    // The reported case, by its real action types — which are now claimed by the panel.
+    const theirs = askOf('blue', 'turn/mulligan', 'turn/keep-hand')
+    expect(surfaceFor(theirs)).toBe('panel')
+    expect(viewFor(theirs, SEAT)).toBe(theirs)
+    expect(canAct(theirs, SEAT)).toBe(false)
   })
 
   it('leaves a hotseat game entirely alone', () => {

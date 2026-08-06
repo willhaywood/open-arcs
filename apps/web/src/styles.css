@@ -3562,15 +3562,18 @@ button {
   overflow: auto;
   box-shadow: 0 10px 40px -8px rgba(0, 0, 0, 0.8);
 }
-/* The draft and the Archivist's draw are full-screen pickers on the same terms. */
-.watching .draft {
-  position: fixed;
-  inset: auto 12px 12px auto;
-  width: min(460px, 42vw);
-  max-height: 62vh;
-  overflow: auto;
-  background: rgba(8, 10, 16, 0.94);
-}
+/*
+ * The draft is deliberately *not* docked, though it is a full-screen picker like the ones above.
+ *
+ * Docking it was a mistake, and the reason is in the argument for docking at all: a modal is wrong
+ * for a watcher because it walls off the board they want to watch. During the draft there is no
+ * board to watch — it has not been populated yet, which is what the draft is for — and the shared
+ * pool *is* the content. Squeezed into a 460px corner panel the pool became an unreadable scrolling
+ * column, which is the opposite of what `DraftScreen` exists to do: everyone watches what has gone,
+ * reads it, and plans against it.
+ *
+ * So it stays full-screen for watchers, inert and with its controls dimmed like everything else.
+ */
 
 /* --- the variant boxes, as the plaques printed on them --------------------- */
 /*
