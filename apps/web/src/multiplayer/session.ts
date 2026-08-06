@@ -36,6 +36,15 @@ import type { GameLink } from './link.js'
 /** How often to ask for the tail. docs/17 section 4: adequate for a game where a turn takes a minute. */
 export const POLL_MS = 2500
 
+/**
+ * How long to wait before trying the socket again after it drops.
+ *
+ * Longer than a poll on purpose: while it is down the game is still working over HTTP, so there is
+ * nothing to rush, and a tight reconnect loop against an origin that is refusing sockets would cost
+ * more than the polling it is trying to escape.
+ */
+export const RETRY_MS = 5000
+
 export interface SessionHost {
   /** The game as this client currently has it, or `null` before it has loaded. */
   current(): RuleResult | null
@@ -59,6 +68,9 @@ export class Session {
    * refuse to act for anyone else.
    */
   private seatFaction: string | null = null
+  /** The live socket, or `null` while falling back to polling. */
+  private socket: WebSocket | null = null
+  private retry: ReturnType<typeof setTimeout> | null = null
 
   constructor(
     baseUrl: string,
@@ -77,15 +89,116 @@ export class Session {
     return this.seatFaction
   }
 
-  /** Load the game from the server and start polling. */
+  /** Load the game, then listen for what everyone else does. */
   async join(): Promise<void> {
     await this.resync()
+    this.openSocket()
+  }
+
+  leave(): void {
+    this.stopPolling()
+    if (this.retry !== null) clearTimeout(this.retry)
+    this.retry = null
+    const ws = this.socket
+    this.socket = null
+    try {
+      ws?.close()
+    } catch {
+      /* already gone */
+    }
+  }
+
+  // --- push -----------------------------------------------------------------
+
+  /**
+   * Open the live socket, and fall back to polling if it will not.
+   *
+   * Failure is not exceptional: a proxy that blocks WebSockets, an origin that has not deployed the
+   * route, a `WebSocket` that does not exist in whatever is running this. Every one of those ends in
+   * `onclose`, and every one of them is survivable — polling is slower and dearer, not broken. The
+   * game must never depend on the socket, which is why `poll` stays.
+   */
+  private openSocket(): void {
+    if (typeof WebSocket === 'undefined' || typeof location === 'undefined') {
+      this.startPolling()
+      return
+    }
+    let ws: WebSocket
+    try {
+      ws = new WebSocket(this.client.liveUrl(this.link.gameId, location.href))
+    } catch {
+      this.startPolling()
+      return
+    }
+    this.socket = ws
+
+    ws.onopen = () => {
+      if (this.socket !== ws) return
+      /*
+       * One catch-up read, then stop paying for the timer. This covers the gap between the join
+       * read and the socket being live, and — on a reconnect — everything missed while it was down.
+       */
+      void this.poll().then(() => {
+        if (this.socket === ws) this.stopPolling()
+      })
+    }
+    ws.onmessage = (event: MessageEvent) => {
+      if (this.socket === ws) this.applyPush(String(event.data))
+    }
+    ws.onclose = () => {
+      if (this.socket !== ws) return
+      this.socket = null
+      /*
+       * Keep the game working first, then try to get the cheap path back. A blip on a three-hour
+       * game should not cost the socket for the rest of it, and a reopen that succeeds stops the
+       * polling again in `onopen`.
+       */
+      this.startPolling()
+      this.retry = setTimeout(() => this.openSocket(), RETRY_MS)
+    }
+  }
+
+  /**
+   * Apply what the server pushed.
+   *
+   * The payload is `{ from, entries }` — the entries themselves, not a nudge to go and fetch them,
+   * which would put an HTTP request back on every action and give away most of the saving.
+   *
+   * `from` is what makes it safe to apply blind. Three cases, and the middle one is the common one:
+   * a gap means something was missed and replay is the only honest answer; entries we already hold
+   * are our own move coming back, since publishing is optimistic and applied locally first.
+   */
+  private applyPush(raw: string): void {
+    let push: { from?: unknown; entries?: unknown }
+    try {
+      push = JSON.parse(raw) as { from?: unknown; entries?: unknown }
+    } catch {
+      return
+    }
+    const from = push.from
+    const entries = push.entries
+    if (typeof from !== 'number' || !Array.isArray(entries)) return
+
+    const have = this.host.current()?.state.journal.length ?? 0
+    if (from > have) {
+      void this.resync()
+      return
+    }
+    const already = have - from
+    if (already >= entries.length) return
+    for (const entry of entries.slice(already)) {
+      this.host.applyRemote(decodeAction(String(entry)))
+    }
+  }
+
+  private startPolling(): void {
+    if (this.timer !== null) return
     this.timer = setInterval(() => {
       void this.poll()
     }, POLL_MS)
   }
 
-  leave(): void {
+  private stopPolling(): void {
     if (this.timer !== null) clearInterval(this.timer)
     this.timer = null
   }

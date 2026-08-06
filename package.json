@@ -15,6 +15,7 @@
     "arena": "vite-node scripts/arena.ts",
     "audit": "vite-node scripts/ambition-audit.ts",
     "do:dump": "vite-node scripts/do-dump.ts",
+    "ws:check": "vite-node scripts/ws-check.ts",
     "fit": "vite-node scripts/fit-weights.ts",
     "build:site": "VITE_MULTIPLAYER_URL= npm run build --workspace @arcs/web",
     "serve": "npm run build:site && npm run dev --workspace @arcs/server",

@@ -59,7 +59,15 @@ export interface DurableObjectStorage {
   readonly sql: SqlStorage
 }
 
-/** Only what the object does to a socket: it pushes, and it tidies up after one. */
+/**
+ * Only what the object does to a socket: it pushes, and it tidies up after one.
+ *
+ * **`accept()` is left out on purpose, and that omission is load-bearing.** The real type has it,
+ * and calling it works — the sockets connect, messages arrive, every test passes — while quietly
+ * pinning the object in memory for the length of the game and costing more than the polling this
+ * replaces. Nothing observable locally distinguishes the two, so the type is the only place the
+ * mistake can be caught: `pair[1].accept()` does not compile.
+ */
 export interface WebSocketLike {
   send(message: string): void
   close(code?: number, reason?: string): void
