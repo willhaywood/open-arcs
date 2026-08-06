@@ -1,60 +1,33 @@
 /**
- * Read a local Durable Object's storage, as text.
+ * Read a local Durable Object's storage.
  *
  *   npm run do:dump                    # list every local game
  *   npm run do:dump -- <gameId>        # dump one game's journal (a unique prefix will do)
  *
- * ## Why this is needed at all
+ * ## This used to need explaining at length
  *
- * `SELECT * FROM GAMES` is the natural first attempt and it cannot work: `GAMES` is the *binding*
- * name for the Durable Object namespace, not a table. There is no table by that name anywhere.
+ * The object stored its journal through the key-value API, which lands in a reserved `__cf_kv`
+ * table that Cloudflare excludes from SQL — so a deployed game could not be read at all, and even
+ * locally the values came back V8-serialized rather than as text. This script existed largely to
+ * work around that.
  *
- * A SQLite-backed Durable Object using the key-value storage API — `storage.get`/`put`/`list`, which
- * is all `game-object.ts` uses — keeps everything in one hidden reserved table instead. Cloudflare
- * calls it `__cf_kv` and says of it: you can see it when listing tables, but **not read it through
- * the SQL API**. So in production there is no query that returns this data. That is not a gap to
- * work around; it is the storage API being honest that SQL is not its interface.
+ * The object now uses ordinary tables (`game`, `seat`, `journal`), so most of that is gone: the
+ * values are text, the index is an integer, and **the same queries work against a deployed object
+ * from the dashboard**. What is left here is convenience — finding which file is which game, and
+ * printing a journal without typing SQL.
  *
- * Values are **V8-serialized** as well, not JSON or UTF-8 — `SELECT value` would hand back bytes
- * with an `FF 0F` header. `v8.deserialize` is the decoder, and no amount of SQL substitutes for it.
- *
- * ## So this script is local only, and production has a different answer
- *
- * `wrangler dev` writes `.wrangler/state`, where miniflare emulates the same storage in a table it
- * spells `_cf_KV` and does *not* block from SQL — which is the only reason reading it here works.
- * Do not carry that inference to the deployed objects.
- *
- * For a deployed game, the API it already has is the interface:
- *
- *     curl https://<worker>/games/<gameId>?since=0
- *
- * which returns the same journal this prints. That is the only interface the design promises
- * (docs/17 rule 2), and wanting more than it in production is a sign to write a debug endpoint
- * deliberately rather than to reach through the storage layer.
- *
- * ## Layout
- *
- * One object per game (docs/17 section 4b), so one `.sqlite` file per game — named by object id
- * rather than by game id, with miniflare keeping the mapping in its own `__miniflare_do_name` table.
- * A file with no KV table is an object that was addressed but never written to, which is an ordinary
- * state: reading a game that does not exist still instantiates an object for that name. It is listed
- * as empty rather than treated as an error.
+ * Seat tokens are still withheld. They are the credential (docs/17 section 3), and a debug tool
+ * printing everything it can see is exactly where they would leak by accident.
  */
 
-import { deserialize } from 'node:v8'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 
-const DIR = 'packages/server/.wrangler/state/v3/do/arcs-multiplayer-GameObject'
+/** Named after the Worker in `wrangler.toml`; renaming that renames this directory. */
+const DIR = 'packages/server/.wrangler/state/v3/do/open-arcs-GameObject'
 
-/**
- * One `sqlite3` query, as rows of columns.
- *
- * Tab-separated rather than the default `|`, which is safe for every column read here: keys are
- * `meta` or `j:NNNNNN`, names are UUIDs, and values are always asked for as `hex()`. Shelling out
- * rather than taking a SQLite dependency, for a script that exists to look at a directory by hand.
- */
+/** One `sqlite3` query, tab-separated. Shelling out beats a dependency for a look-at-it script. */
 function query(file: string, sql: string): string[][] {
   const out = execFileSync('sqlite3', ['-separator', '\t', file, sql], { encoding: 'utf8' })
   return out
@@ -68,15 +41,11 @@ const cell = (file: string, sql: string): string | undefined => query(file, sql)
 /**
  * Whether a table exists, asked before every query that assumes one.
  *
- * The directory holds more than game objects — miniflare keeps its own `metadata.sqlite` alongside
- * them — and an object that was addressed but never written has no `_cf_KV`. Both are ordinary
- * states, so they are filtered rather than allowed to throw.
+ * The directory holds more than game objects — miniflare keeps its own `metadata.sqlite` — and an
+ * object that was addressed but never written has no tables. Both are ordinary states.
  */
 const hasTable = (file: string, table: string): boolean =>
   cell(file, `SELECT count(*) FROM sqlite_master WHERE type='table' AND name='${table}'`) === '1'
-
-/** Decode one stored value: strings come back as strings, `meta` as an object. */
-const decode = (hex: string): unknown => deserialize(Buffer.from(hex, 'hex'))
 
 if (!existsSync(DIR)) {
   console.error(`No local Durable Object state at ${DIR}`)
@@ -90,9 +59,9 @@ const games = readdirSync(DIR)
   .filter((file) => hasTable(file, '__miniflare_do_name'))
   .map((file) => {
     const name = cell(file, 'SELECT name FROM __miniflare_do_name') ?? '(unnamed)'
-    // -1 marks an object that was addressed but never written, which is not the same as empty.
-    const count = hasTable(file, '_cf_KV')
-      ? Number(cell(file, "SELECT count(*) FROM _cf_KV WHERE key LIKE 'j:%'") ?? 0)
+    // -1 marks an object addressed but never written, which is not the same as an empty journal.
+    const count = hasTable(file, 'journal')
+      ? Number(cell(file, 'SELECT count(*) FROM journal') ?? 0)
       : -1
     return { file, name, count }
   })
@@ -115,18 +84,14 @@ if (wanted === undefined) {
   const { file, name, count } = match[0]!
   console.log(`game    ${name}`)
   console.log(`actions ${count}`)
-
-  const meta = cell(file, "SELECT hex(value) FROM _cf_KV WHERE key='meta'")
-  if (meta !== undefined) {
-    const m = decode(meta) as { options: unknown; seats: readonly { faction: string }[] }
-    console.log(`options ${JSON.stringify(m.options)}`)
-    // Seat tokens are deliberately not printed: they are the credential (docs/17 section 3).
-    console.log(`seats   ${m.seats.map((s) => s.faction).join(', ')}  (tokens withheld)`)
-  }
+  console.log(`options ${cell(file, 'SELECT options FROM game WHERE id = 1') ?? '(none)'}`)
+  console.log(
+    `seats   ${query(file, 'SELECT faction FROM seat ORDER BY ord')
+      .map((r) => r[0])
+      .join(', ')}  (tokens withheld)`,
+  )
   console.log()
-
-  const rows = query(file, "SELECT key, hex(value) FROM _cf_KV WHERE key LIKE 'j:%' ORDER BY key")
-  for (const [key, hex] of rows) {
-    console.log(`${key!.slice(2)}  ${String(decode(hex!))}`)
+  for (const [idx, action] of query(file, 'SELECT idx, action FROM journal ORDER BY idx')) {
+    console.log(`${String(idx).padStart(6, '0')}  ${action}`)
   }
 }
