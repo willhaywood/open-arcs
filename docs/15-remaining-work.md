@@ -244,6 +244,9 @@ one invariant still worth adding.
   setup cards as data. What is 2-player-specific: a court of 3, a mulligan for the player without
   initiative, two fleet systems per seat instead of one, a 33-power threshold, and the six
   out-of-play resources that score as a third player. See docs/05 and docs/08.
+- **No elimination — done.** Rulebook p22: a faction with no starports or ships on the map
+  places 3 fresh ships in any gate at the end of its turn. It was missing at every player count,
+  not just at two. See docs/06 section 4b.
 - **Campaign / Blighted Reach.** Out of scope by docs/04.
 - **Trophy return at cleanup — done.** Rulebook 6.2.2 step 1: scoring Warlord returns all trophies,
   scoring Tyrant all captives, for *every* faction and not just the scorer. Omitting it let both

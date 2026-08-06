@@ -98,7 +98,13 @@ function uprisingSystems(
     return { map, kind: 'cluster' }
   }
   for (const a of cont.actions) {
-    if (a.type === 'vox/uprising-place') map.set(a['system'] as string, a)
+    /*
+     * Both are "choose a system to place pieces in", so both read as the same gesture on the map.
+     * `turn/reinforce` is the no-elimination rule (rulebook p22) offering every gate.
+     */
+    if (a.type === 'vox/uprising-place' || a.type === 'turn/reinforce') {
+      map.set(a['system'] as string, a)
+    }
   }
   return { map, kind: 'place' }
 }

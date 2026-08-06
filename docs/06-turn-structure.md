@@ -102,6 +102,29 @@ be discarded for the slot. Verified across 20 games: 266 Prelude menus, 192 acti
 Not implemented: HRF's `PreludeHold`, which parks spent tokens until the phase ends so they
 can be un-spent — ours go straight back to supply, and undo covers the same ground.
 
+## 4b. No elimination
+
+Rulebook p22: *Rarely, a player will have no starports or ships on the map. If this happens, they
+place 3 fresh ships in any gate at the end of their turn.* Arcs cannot eliminate a player, and this
+is the rule that makes that true — someone swept off the board is back on their next turn rather
+than watching a leader run away with the game.
+
+Three details worth stating, because each is easy to get wrong from the summary:
+
+- **Cities do not count.** The condition is "no starports **or ships**", so a faction reduced to
+  cities alone still comes back. That is the case that matters: a bare city with no fleet around it
+  is exactly the position losing a fleet leaves you in.
+- **"Any gate" means any gate in play**, not one they control or can reach. A swept faction controls
+  nothing, so a reachability test would have nothing to work from.
+- **Three, or as many as remain.** The fine print's general rule applies — if you must place more
+  pieces than possible, place the maximum possible — which bites when the ships are held as
+  someone else's trophies.
+
+Checked at the end of the turn, before the hand-off, since the pieces have to be back before the
+next faction acts into the space they left. It is genuinely rare: it fires in none of the recorded
+baseline games and in none of 18 full bot games across 2, 3 and 4 players, so `turn.test.ts` is its
+only real coverage.
+
 ## 5. Scope: what is implemented vs deferred
 
 This is the honest boundary, per the collaboration rules — nothing here is guessed at.

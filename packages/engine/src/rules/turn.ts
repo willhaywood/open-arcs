@@ -1242,9 +1242,103 @@ function performTurn(
 
 // --- end turn / round ------------------------------------------------------
 
+/**
+ * Ships and starports this faction has anywhere on the map.
+ *
+ * Cities are deliberately not counted. The rulebook's condition is "no starports **or ships** on
+ * the map", so a faction reduced to cities alone still qualifies — which is the interesting case,
+ * since a city with no fleet around it is exactly the position this rule exists to rescue.
+ */
+function fleetOnMap(state: GameState, faction: FactionId): number {
+  return state.board.systems.reduce((n, s) => {
+    const here = contentsOf(state.figures, Location.system(s)).filter((id) => {
+      const p = parseFigureId(id)
+      return p.color === faction && (p.piece === 'Ship' || p.piece === 'Starport')
+    })
+    return n + here.length
+  }, 0)
+}
+
+/** Reinforcements for a swept-off faction — rulebook p22, "Elimination & Concession". */
+const Reinforce = (faction: FactionId, system: SystemId): Action => ({
+  type: 'turn/reinforce',
+  faction,
+  system,
+  label: `Place ships in ${system}`,
+})
+
+/**
+ * The no-elimination rule.
+ *
+ * p22: *Rarely, a player will have no starports or ships on the map. If this happens, they place 3
+ * fresh ships in any gate at the end of their turn.* There is no elimination in Arcs — a player
+ * swept off the board comes straight back, which is what keeps a runaway leader from removing
+ * someone from the game entirely.
+ *
+ * **"Any gate" means any gate**, not one they control or can reach: they hold nothing, so a
+ * reachability test would have nothing to work from. Every gate in play is offered.
+ *
+ * Reserve ships are always fresh, so no filtering is needed — destroying a ship clears its damage
+ * on the way back (`battle.ts`). Returns `undefined` when there is nothing to decide, which covers
+ * both the ordinary case and a faction whose ships are all held as someone else's trophies.
+ */
+function offerReinforce(state: GameState, faction: FactionId): Continue | undefined {
+  if (fleetOnMap(state, faction) > 0) return undefined
+  const spare = contentsOf(state.figures, Location.reserve(faction)).filter(
+    (id) => parseFigureId(id).piece === 'Ship',
+  )
+  if (spare.length === 0) return undefined
+  const gates = state.board.systems.filter((s) => systemInfo(s).isGate)
+  return C.ask(
+    faction,
+    gates.map((g) => Reinforce(faction, g)),
+    'Swept from the map — place ships in any gate',
+  )
+}
+
+/**
+ * Place the reinforcements, then carry on with the turn hand-off.
+ *
+ * Three, or as many as remain: the fine print is explicit that if you must place more pieces than
+ * possible you place the maximum possible.
+ */
+function performReinforce(state: GameState, faction: FactionId, target: SystemId): RuleResult {
+  const ships = contentsOf(state.figures, Location.reserve(faction))
+    .filter((id) => parseFigureId(id).piece === 'Ship')
+    .slice(0, REINFORCEMENTS)
+  const figures = ships.reduce((f, id) => move(f, id, Location.system(target)), state.figures)
+  return advanceAfterTurn(
+    {
+      ...state,
+      figures,
+      log: [
+        ...state.log,
+        `${faction} was swept from the map and placed ${ships.length} ship${
+          ships.length === 1 ? '' : 's'
+        } in ${target}`,
+      ],
+    },
+    faction,
+  )
+}
+
+/** How many ships a swept faction returns with. */
+const REINFORCEMENTS = 3
+
 function performEndTurn(state: GameState, faction: FactionId): RuleResult {
   // Per-turn resets: cities become taxable and starports buildable again next turn.
   state = { ...state, taxedThisTurn: [], workedThisTurn: [], loreUsedThisTurn: [], anyBattle: false }
+  /*
+   * Checked before the hand-off, because the rule is "at the end of *their* turn" — the pieces have
+   * to be back before the next faction acts into the space they left.
+   */
+  const sweptOff = offerReinforce(state, faction)
+  if (sweptOff !== undefined) return { state, continue: sweptOff }
+  return advanceAfterTurn(state, faction)
+}
+
+/** Hand the turn on: the tail of `performEndTurn`, shared with the reinforcement path. */
+function advanceAfterTurn(state: GameState, faction: FactionId): RuleResult {
   const next = nextInOrder(state, faction)
   if (next === undefined) throw new Error('no next faction')
 
@@ -1545,6 +1639,12 @@ export const TurnModule: RuleModule = {
           action['suit'] as Suit,
           action['done'] as number,
           action['total'] as number,
+        )
+      case 'turn/reinforce':
+        return performReinforce(
+          state,
+          action['faction'] as FactionId,
+          action['system'] as SystemId,
         )
       case 'turn/end':
         return performEndTurn(state, action['faction'] as FactionId)

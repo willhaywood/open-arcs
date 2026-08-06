@@ -13,10 +13,12 @@ import {
   contentsOf,
   system as systemInfo,
   deckFor,
+  move,
   moveAll,
   defaultRegistry,
   isWaiting,
   parseCardId,
+  parseFigureId,
   startGame,
 } from '../src/index.js'
 import type { Action, GameState, RuleResult } from '../src/index.js'
@@ -801,5 +803,124 @@ describe('following: Copy is offered on every card', () => {
     const after = advance(step.state, copy!, registry)
     expect(contentsOf(after.state.cards, CardLocation.played(step.continue.faction))).toContain(played)
     expect(after.state.log.some((l) => l.includes(`copied with ${played}`))).toBe(true)
+  })
+})
+
+/**
+ * No elimination — rulebook p22.
+ *
+ * *Rarely, a player will have no starports or ships on the map. If this happens, they place 3 fresh
+ * ships in any gate at the end of their turn.* Arcs has no elimination, and this is the rule that
+ * makes that true: a player swept off the board comes straight back rather than sitting out the
+ * rest of the game while a leader runs away with it.
+ *
+ * The rule was missing entirely at every player count, so nothing here is 2-player-specific.
+ */
+describe('a faction swept from the map', () => {
+  /** Send every ship and starport `faction` has on the map back to its reserve. */
+  function sweep(state: GameState, faction: string): GameState {
+    let figures = state.figures
+    for (const s of state.board.systems) {
+      for (const id of [...contentsOf(figures, Location.system(s))]) {
+        const p = parseFigureId(id)
+        if (p.color !== faction) continue
+        if (p.piece !== 'Ship' && p.piece !== 'Starport') continue
+        figures = move(figures, id, Location.reserve(faction))
+      }
+    }
+    return { ...state, figures }
+  }
+
+  /** A mid-round position where it is `faction`'s turn to end. */
+  const midRound = (state: GameState, faction: string): GameState => ({
+    ...state,
+    current: faction as GameState['factions'][number],
+    lead: { faction: 'red', suit: 'Construction', strength: 3 } as GameState['lead'],
+  })
+
+  const endTurn = (state: GameState, faction: string) =>
+    advance(state, { type: 'turn/end', faction } as Action, registry)
+
+  it('is offered every gate, and only gates', () => {
+    const base = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 5 }, registry)
+    const out = endTurn(midRound(sweep(base.state, 'blue'), 'blue'), 'blue')
+
+    expect(out.continue.kind).toBe('ask')
+    const ask = out.continue as Extract<Continue, { kind: 'ask' }>
+    expect(ask.faction).toBe('blue')
+    expect(ask.actions.every((a) => a.type === 'turn/reinforce')).toBe(true)
+    // Every gate in play, and nothing else — "any gate" is not restricted to ones they control,
+    // which matters because a swept faction controls nothing to measure from.
+    const offered = ask.actions.map((a) => a['system'] as string).sort()
+    const gates = base.state.board.systems.filter((s) => systemInfo(s).isGate).sort()
+    expect(offered).toEqual(gates)
+  })
+
+  it('places three fresh ships in the chosen gate', () => {
+    const base = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 5 }, registry)
+    const out = endTurn(midRound(sweep(base.state, 'blue'), 'blue'), 'blue')
+    const ask = out.continue as Extract<Continue, { kind: 'ask' }>
+    const pick = ask.actions[0]!
+    const after = advance(out.state, pick, registry)
+
+    const placed = contentsOf(after.state.figures, Location.system(pick['system'] as string)).filter(
+      (id) => id.startsWith('blue/'),
+    )
+    expect(placed).toHaveLength(3)
+    // "Fresh" is free here rather than special-cased: destroying a ship clears its damage on the
+    // way back to reserve, so anything in reserve is already undamaged.
+    expect(placed.some((id) => after.state.damaged.includes(id))).toBe(false)
+  })
+
+  it('places as many as remain when the supply is short', () => {
+    // The fine print: if you must place more pieces than possible, place the maximum possible.
+    const base = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 5 }, registry)
+    let state = sweep(base.state, 'blue')
+    // Strand all but two of blue's ships as someone else's trophies.
+    const spare = contentsOf(state.figures, Location.reserve('blue')).filter(
+      (id) => parseFigureId(id).piece === 'Ship',
+    )
+    let figures = state.figures
+    for (const id of spare.slice(2)) figures = move(figures, id, Location.trophies('red'))
+    state = { ...state, figures }
+
+    const out = endTurn(midRound(state, 'blue'), 'blue')
+    const ask = out.continue as Extract<Continue, { kind: 'ask' }>
+    const pick = ask.actions[0]!
+    const after = advance(out.state, pick, registry)
+    expect(
+      contentsOf(after.state.figures, Location.system(pick['system'] as string)).filter((id) =>
+        id.startsWith('blue/'),
+      ),
+    ).toHaveLength(2)
+  })
+
+  it('leaves a faction that still holds ships or a starport alone', () => {
+    const base = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 5 }, registry)
+    const out = endTurn(midRound(base.state, 'blue'), 'blue')
+    const offered = out.continue.kind === 'ask' ? out.continue.actions.map((a) => a.type) : []
+    expect(offered).not.toContain('turn/reinforce')
+  })
+
+  /*
+   * Cities are deliberately not counted. The condition is "no starports **or ships**", so a faction
+   * reduced to cities alone still comes back — which is the case worth pinning, since a bare city
+   * is exactly the position someone is left in after losing a fleet.
+   */
+  it('comes back even while it still holds cities', () => {
+    const base = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 5 }, registry)
+    const state = sweep(base.state, 'blue')
+    const cities = state.board.systems.flatMap((s) =>
+      contentsOf(state.figures, Location.system(s)).filter(
+        (id) => id.startsWith('blue/') && parseFigureId(id).piece === 'City',
+      ),
+    )
+    expect(cities.length, 'blue still has a city on the map').toBeGreaterThan(0)
+
+    const out = endTurn(midRound(state, 'blue'), 'blue')
+    expect(out.continue.kind).toBe('ask')
+    expect((out.continue as Extract<Continue, { kind: 'ask' }>).actions[0]!.type).toBe(
+      'turn/reinforce',
+    )
   })
 })
