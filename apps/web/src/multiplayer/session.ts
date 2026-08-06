@@ -30,7 +30,7 @@
 import { decodeAction, encodeAction, replayGame } from '@arcs/engine'
 import type { Action, NewGameOptions, RuleResult } from '@arcs/engine'
 
-import { MultiplayerClient } from './client.js'
+import { ApiError, MultiplayerClient } from './client.js'
 import type { GameLink } from './link.js'
 
 /** How often to ask for the tail. docs/17 section 4: adequate for a game where a turn takes a minute. */
@@ -71,6 +71,15 @@ export class Session {
   /** The live socket, or `null` while falling back to polling. */
   private socket: WebSocket | null = null
   private retry: ReturnType<typeof setTimeout> | null = null
+  /**
+   * Set when the server says the game does not exist.
+   *
+   * A 404 on a game id is permanent — nothing here ever creates one — so retrying is asking the
+   * same question forever. Without this a tab left open on a deleted game polls *and* reconnects
+   * indefinitely, which was visible in the dev log as a steady drip of 404s, and would be a real
+   * bill against the very budget this file exists to protect.
+   */
+  private gone = false
 
   constructor(
     baseUrl: string,
@@ -119,6 +128,7 @@ export class Session {
    * game must never depend on the socket, which is why `poll` stays.
    */
   private openSocket(): void {
+    if (this.gone) return
     if (typeof WebSocket === 'undefined' || typeof location === 'undefined') {
       this.startPolling()
       return
@@ -192,7 +202,7 @@ export class Session {
   }
 
   private startPolling(): void {
-    if (this.timer !== null) return
+    if (this.timer !== null || this.gone) return
     this.timer = setInterval(() => {
       void this.poll()
     }, POLL_MS)
@@ -219,7 +229,7 @@ export class Session {
 
   /** Ask for anything new and apply it. Called on a timer; safe to call by hand. */
   async poll(): Promise<void> {
-    if (this.busy) return
+    if (this.busy || this.gone) return
     this.busy = true
     try {
       const have = this.host.current()?.state.journal.length ?? 0
@@ -233,9 +243,27 @@ export class Session {
         return
       }
       for (const entry of tail.entries) this.host.applyRemote(decodeAction(entry))
+    } catch (e) {
+      /*
+       * Only a 404 stops us. Anything else — a dropped connection, a 500, a proxy hiccup — is
+       * transient, and giving up on it would turn a blip into a dead session; the next tick is the
+       * recovery.
+       *
+       * Swallowed rather than rethrown because every caller is `void this.poll()`, so a rethrow
+       * becomes an unhandled rejection. That was the old behaviour and it was visible as a steady
+       * run of `Uncaught (in promise) ApiError` in the console — noise that said nothing actionable,
+       * since the retry already handles it.
+       */
+      if (e instanceof ApiError && e.status === 404) this.abandon()
     } finally {
       this.busy = false
     }
+  }
+
+  /** The game is gone. Stop everything and stay stopped. */
+  private abandon(): void {
+    this.gone = true
+    this.leave()
   }
 
   /**

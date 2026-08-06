@@ -289,6 +289,86 @@ describe('when there is no socket, the game still works', () => {
   })
 })
 
+describe('a game that no longer exists', () => {
+  /*
+   * A 404 on a game id is permanent — nothing creates one after the fact — so a tab left open on a
+   * deleted game must stop asking. Before this it polled *and* reconnected forever, which showed up
+   * in the dev log as a steady drip of 404s against exactly the budget this work exists to protect.
+   */
+  /*
+   * The real shape of this, which a first attempt at the test got wrong. Joining a game that never
+   * existed throws out of `join()` before polling ever starts, so nothing is being stopped and the
+   * test passes whatever the code does — mutation testing caught exactly that. The loop happens to a
+   * session that joined *successfully* and then lost its game, which is what this sets up.
+   */
+  it('stops asking once a joined game disappears', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('WebSocket', undefined)
+    vi.stubGlobal('location', { href: 'https://arcs.test/' })
+    const store = new MemoryStore()
+    const created = await store.create(OPTIONS, ['red', 'yellow', 'blue'])
+
+    let deleted = false
+    let reads = 0
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if ((init?.method ?? 'GET') === 'GET' && url.includes('/games/')) reads += 1
+      if (deleted) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'no such game' }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          }),
+        )
+      }
+      return handle(new Request(url, init), store)
+    })
+
+    const session = new Session(API, { gameId: created.gameId }, host())
+    await session.join()
+    // Polling is running: no socket exists in this environment.
+    await vi.advanceTimersByTimeAsync(POLL_MS + 10)
+    expect(reads, 'polling before the game vanishes').toBeGreaterThan(1)
+
+    deleted = true
+    await vi.advanceTimersByTimeAsync(POLL_MS + 10) // one poll discovers the 404
+    const afterDiscovery = reads
+
+    await vi.advanceTimersByTimeAsync(POLL_MS * 20)
+    expect(reads, 'nothing further once the game is known gone').toBe(afterDiscovery)
+    session.leave()
+  })
+
+  it('keeps going through a transient failure, which is not the same thing', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('WebSocket', undefined)
+    vi.stubGlobal('location', { href: 'https://arcs.test/' })
+    const store = new MemoryStore()
+    const created = await store.create(OPTIONS, ['red', 'yellow', 'blue'])
+
+    let failNext = false
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      if (failNext) {
+        failNext = false
+        return Promise.reject(new Error('network blip'))
+      }
+      return handle(new Request(String(input), init), store)
+    })
+
+    const h = host()
+    const session = new Session(API, { gameId: created.gameId }, h)
+    await session.join()
+    failNext = true
+    await vi.advanceTimersByTimeAsync(POLL_MS + 10)
+
+    // The blip must not have killed the session: a later action still arrives.
+    await store.append(created.gameId, created.seats[0]!.seatToken, 0, encodeAction(firstAction()))
+    await vi.advanceTimersByTimeAsync(POLL_MS + 10)
+    expect(h.result?.state.journal).toHaveLength(1)
+    session.leave()
+  })
+})
+
 describe('the live URL', () => {
   it('is same-origin when the build has no configured base', () => {
     const client = new MultiplayerClient('')
