@@ -57,6 +57,9 @@ jobs:
         run: |
           cd apps/web/dist/game-assets
           rm -rf f[0-9][0-9] fate empire arcs-bg.png
+          # The 1024px favicon master: 1.7 MB that nothing fetches, since index.html links the
+          # 32px and 180px versions derived from it. The master stays in the repo, not the deploy.
+          rm -f favicon.png
           du -sh . | sed 's/^/deploy size: /'
 
       # Wrangler comes from the lockfile, so CI deploys with the same version as `npm run deploy`
@@ -112,6 +115,9 @@ jobs:
         run: |
           cd apps/web/dist/game-assets
           rm -rf f[0-9][0-9] fate empire arcs-bg.png
+          # The 1024px favicon master: 1.7 MB that nothing fetches, since index.html links the
+          # 32px and 180px versions derived from it. The master stays in the repo, not the deploy.
+          rm -f favicon.png
           du -sh . | sed 's/^/deploy size: /'
 
       - uses: actions/upload-pages-artifact@v5

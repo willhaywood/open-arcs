@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Arcs</title>
+    <!--
+      `%BASE_URL%` rather than a leading slash: GitHub Pages serves this from /open-arcs/ and the
+      Worker from the domain root, and a hard-coded /favicon.png 404s on the first. Vite substitutes
+      the same `base` the asset URLs use, so one line is right on both hosts.
+
+      Served from game-assets like every other image — apps/web/public/game-assets is a symlink to
+      assets/images. The 1024px master lives there too but is not shipped; see the deploy workflow.
+    -->
+    <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%game-assets/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%game-assets/favicon-180.png" />
   </head>
   <body>
     <div id="root"></div>
