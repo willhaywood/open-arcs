@@ -25,7 +25,6 @@ import { useEffect, useRef, useState } from 'react'
 
 import { store } from '../store.js'
 import { colorOf, figureArt } from '../theme.js'
-import { Battle } from './Battle.js'
 import { asset } from '../assets.js'
 
 interface Props {
@@ -542,7 +541,6 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
           })}
       </svg>
       {highlight ? <div className="board-turn">Turn: {highlight}</div> : null}
-      <Battle state={state} cont={cont} />
       {fleet !== null ? (
         <div className="board-hint">
           Click the ships that carry on to {fleet.to} — the rest stay behind

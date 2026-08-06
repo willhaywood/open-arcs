@@ -47,6 +47,29 @@ export type Surface =
   | 'map'
   | 'ambitions'
 
+/**
+ * Surfaces a player who is **not** acting may still watch.
+ *
+ * Whose turn it is has never been secret, and neither is most of what a turn looks like — the dice,
+ * the board, the court. Watching someone play is the game. Two surfaces are different, and they are
+ * listed here rather than anywhere else for the same reason ownership is: a rule about surfaces that
+ * lives in two places is a rule that will disagree with itself.
+ *
+ *   - **`hand`** — rivals' hands are the one genuinely hidden zone in the base game (`observe.ts`).
+ *   - **`learned`** — the Archivist's five come off the top of `state.unusedLore`, which `observe.ts`
+ *     also lists as hidden. Drawing that screen for anyone else would reveal the three they discard,
+ *     which is the trap in "a watcher should just see everything".
+ *
+ * `draft` looks like it belongs with them and does not: the deal goes into a shared pool that
+ * everyone picks from in turn, so it is open information.
+ */
+const PRIVATE: readonly Surface[] = ['hand', 'learned']
+
+/** Whether a surface may be drawn for someone who is not the one being asked. */
+export function isPublicSurface(surface: Surface): boolean {
+  return !PRIVATE.includes(surface)
+}
+
 /** Card plays live in the fanned hand at the bottom of the screen. */
 const HAND = ['turn/lead', 'turn/surpass', 'turn/copy', 'turn/pivot']
 
