@@ -3514,6 +3514,64 @@ button {
   pointer-events: none;
 }
 
+/* --- watching someone else's turn ------------------------------------------
+ *
+ * The wrapper must not exist as far as layout is concerned: `.hand-row`, the Prelude and the tray
+ * are grid items of `.board-col` and share grid areas deliberately, so a box around them would
+ * move them. `display: contents` puts the children back in the parent's grid.
+ */
+.surfaces {
+  display: contents;
+}
+
+/*
+ * Dim the *controls*, not the content. The dice are the whole reason a watcher is being shown this
+ * surface at all, so they stay at full strength; only the things that would have been clickable
+ * read as unavailable. `inert` on the wrapper is what actually makes them unclickable — this is
+ * only how it looks.
+ */
+.watching button,
+.watching .hand-card,
+.watching .setup-card {
+  opacity: 0.45;
+  filter: saturate(0.6);
+}
+
+/*
+ * Modals stop being modal.
+ *
+ * `battle`, `shelf` and `slots` share `.da-backdrop`, which is `position: fixed; inset: 0` with a
+ * blur — right for the player making the decision, wrong for everyone else. A watcher cannot
+ * dismiss it (there is nothing to dismiss: the surface is driven by the ask, and the ask is not
+ * theirs), so left as a modal it is a full-screen wall over the board for as long as the active
+ * player is thinking. Here it becomes a panel beside the board instead.
+ */
+.watching .da-backdrop {
+  position: fixed;
+  inset: auto 12px 12px auto;
+  width: min(460px, 42vw);
+  max-height: 62vh;
+  background: none;
+  backdrop-filter: none;
+  pointer-events: none;
+  display: block;
+  overflow: hidden;
+}
+.watching .da-modal {
+  max-height: 62vh;
+  overflow: auto;
+  box-shadow: 0 10px 40px -8px rgba(0, 0, 0, 0.8);
+}
+/* The draft and the Archivist's draw are full-screen pickers on the same terms. */
+.watching .draft {
+  position: fixed;
+  inset: auto 12px 12px auto;
+  width: min(460px, 42vw);
+  max-height: 62vh;
+  overflow: auto;
+  background: rgba(8, 10, 16, 0.94);
+}
+
 /* --- the variant boxes, as the plaques printed on them --------------------- */
 /*
  * The Leaders & Lore Pack's box carries a cream plaque with dark letterspaced caps and a heavy

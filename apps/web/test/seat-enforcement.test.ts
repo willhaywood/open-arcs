@@ -8,10 +8,14 @@
  */
 
 import { MemoryStore, actorOf, handle } from '@arcs/server'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { handOwner, viewFor } from '../src/multiplayer/seat.js'
+import { canAct, handOwner, viewFor } from '../src/multiplayer/seat.js'
 import type { SeatView } from '../src/multiplayer/seat.js'
+import { Watching } from '../src/components/Watching.js'
+import { isPublicSurface, surfaceFor } from '../src/surfaces.js'
 import {
   applyExternal,
   defaultRegistry,
@@ -47,6 +51,21 @@ const CONFIGS: NewGameOptions[] = [
   { board: 'Board3MixUp', factions: ['red', 'yellow', 'blue'], seed: 7, leadersAndLore: true },
   { board: 'Board4MixUp1', factions: ['red', 'yellow', 'blue', 'white'], seed: 11 },
   { board: 'Board4MixUp1', factions: ['red', 'yellow', 'blue', 'white'], seed: 12, leadersAndLore: true },
+  /*
+   * The expansion pack, and not for variety's sake: the Archivist is `leader09`, so `learned` — the
+   * one surface a watcher must never be shown — is unreachable without it. Every config above ran
+   * with base leaders only, which is why the walk below never once produced it, and why the
+   * assertion about private surfaces used to hold no matter what `isPublicSurface` said.
+   *
+   * Seed 5 reaches the Archivist's draw at step 12 on this board; it was picked by searching seeds
+   * 1-40 for one that does, rather than assumed.
+   */
+  {
+    board: 'Board3MixUp',
+    factions: ['red', 'yellow', 'blue'],
+    seed: 5,
+    leadersAndLore: { expansion: true, lorePerPlayer: 3 },
+  },
 ]
 
 describe('actorOf, against actions the engine really produces', () => {
@@ -191,40 +210,114 @@ describe('the server tells a client which seat it holds', () => {
   })
 })
 
-describe('the UI is never offered another seat’s decision', () => {
-  const ask = (faction: string, n: number): Ask =>
+describe('acting and watching are different questions', () => {
+  const askOf = (faction: string, ...types: string[]): Ask =>
     ({
       kind: 'ask',
       faction,
-      actions: Array.from({ length: n }, (_, i) => ({ type: 't', faction, label: `${i}` })),
+      actions: types.map((type, i) => ({ type, faction, label: `${i}` })),
     }) as unknown as Ask
 
   const SEAT: SeatView = { kind: 'seat', faction: 'red' }
   const HOTSEAT: SeatView = { kind: 'hotseat' }
   const WATCHING: SeatView = { kind: 'spectator' }
 
-  it('empties the actions of an ask addressed to someone else', () => {
-    const theirs = viewFor(ask('blue', 3), SEAT)
-    expect(theirs.kind).toBe('ask')
-    expect((theirs as Ask).actions).toEqual([])
-    // The faction survives, because the board still has to show whose turn it is.
-    expect((theirs as Ask).faction).toBe('blue')
+  /** A battle roll: the surface a watcher most wants, and the one this work exists to restore. */
+  const battle = (faction: string) => askOf(faction, 'battle/roll')
+  /** The Archivist's draw, off the hidden lore deck. */
+  const learned = (faction: string) => askOf(faction, 'leaders/learned')
+
+  it('lets nobody but the asked seat act', () => {
+    expect(canAct(battle('red'), SEAT)).toBe(true)
+    expect(canAct(battle('blue'), SEAT)).toBe(false)
+    expect(canAct(battle('blue'), WATCHING)).toBe(false)
+    // Hotseat plays every seat, so it always may.
+    expect(canAct(battle('blue'), HOTSEAT)).toBe(true)
   })
 
-  it('passes your own ask through untouched', () => {
-    const mine = ask('red', 3)
+  /*
+   * The regression this replaces. `viewFor` used to empty the actions of *any* ask not addressed to
+   * you, which stopped you acting and also stopped you seeing: `surfaceFor` returns nothing for an
+   * ask with no actions, so the battle window and its dice went blank for everyone but the roller.
+   */
+  it('still draws a public surface for someone who cannot act on it', () => {
+    const theirs = battle('blue')
+    expect(viewFor(theirs, SEAT)).toBe(theirs)
+    expect(viewFor(theirs, WATCHING)).toBe(theirs)
+    expect(surfaceFor(viewFor(theirs, SEAT))).toBe('battle')
+  })
+
+  it('withholds a private surface entirely', () => {
+    // The Archivist's five come off `state.unusedLore`, which `observe.ts` lists as hidden: drawing
+    // this for anyone else reveals the three they discard.
+    const theirs = learned('blue')
+    expect((viewFor(theirs, SEAT) as Ask).actions).toEqual([])
+    expect((viewFor(theirs, WATCHING) as Ask).actions).toEqual([])
+    // ...and your own is untouched, by identity: nothing is rebuilt for the seat being asked.
+    const mine = learned('red')
     expect(viewFor(mine, SEAT)).toBe(mine)
   })
 
-  it('leaves a hotseat game entirely alone, since it plays every seat', () => {
-    const any = ask('blue', 3)
-    expect(viewFor(any, HOTSEAT)).toBe(any)
+  it('keeps the faction on a withheld ask, because the board still names whose turn it is', () => {
+    expect((viewFor(learned('blue'), SEAT) as Ask).faction).toBe('blue')
   })
 
-  it('offers a spectator nothing, whoever is acting', () => {
-    for (const f of ['red', 'blue', 'yellow']) {
-      expect((viewFor(ask(f, 3), WATCHING) as Ask).actions).toEqual([])
+  it('leaves a hotseat game entirely alone', () => {
+    const any = learned('blue')
+    expect(viewFor(any, HOTSEAT)).toBe(any)
+  })
+})
+
+/**
+ * The measurement that found the regression, kept as a test.
+ *
+ * Walking real games and comparing the surface an actor resolves to against the surface a
+ * non-acting seat resolves to is exactly the check that would have caught nine surfaces going
+ * blank. Hand-written asks cannot do this job: the bug was in which surfaces real play produces.
+ */
+describe('across real games, a watcher loses only the private surfaces', () => {
+  it('resolves every public surface identically for a seat that cannot act', () => {
+    const lost = new Set<string>()
+    const kept = new Set<string>()
+    /** Every surface the walk produced at all, so the expectation is not derived from the result. */
+    const reached = new Set<string>()
+    let asks = 0
+
+    for (const options of CONFIGS) {
+      let r: RuleResult = startGame(options, registry)
+      for (let i = 0; i < 400; i++) {
+        const c = r.continue
+        if (c.kind !== 'ask' || c.actions.length === 0) break
+        asks++
+        const other = options.factions.find((f) => f !== c.faction)!
+        const seen = surfaceFor(viewFor(c, { kind: 'seat', faction: other }))
+        const actual = surfaceFor(c)
+        if (actual !== undefined) {
+          reached.add(actual)
+          ;(seen === actual ? kept : lost).add(actual)
+        }
+        r = applyExternal(r, c.actions[(i * 7) % c.actions.length]!, registry)
+        if (r.state.isOver) break
+      }
     }
+
+    expect(asks, 'the walk actually reached asks').toBeGreaterThan(500)
+    /*
+     * Both directions, against `reached` rather than against `lost`.
+     *
+     * The first cut of this compared `lost` to `['hand', 'learned'].filter((s) => lost.has(s))`,
+     * which derives the expectation from the answer: it caught a *public* surface going dark, and
+     * passed unchanged when a private one leaked, because an empty `lost` matches an empty expected.
+     * That is the half that matters — making `learned` public is the mutation this test exists for.
+     *
+     * Anchoring on the surfaces the walk actually produced fixes it: every private surface the walk
+     * reached must be lost, and every other surface it reached must be kept.
+     */
+    const expectedLost = [...reached].filter((s) => !isPublicSurface(s as never)).sort()
+    expect(expectedLost, 'the walk reaches the private surfaces at all').toEqual(['hand', 'learned'])
+    expect([...lost].sort(), 'exactly the private surfaces are withheld').toEqual(expectedLost)
+    // And the ones that matter are genuinely reaching a watcher.
+    expect(kept, 'the battle surface survives for a watcher').toContain('battle')
   })
 })
 
@@ -245,5 +338,36 @@ describe('whose hand is on screen', () => {
     const mine: SeatView = { kind: 'seat', faction: 'red' }
     expect(handOwner(mine, 'red')).toBe('red')
     expect(handOwner(mine, 'yellow')).toBe('red')
+  })
+})
+
+/**
+ * The `inert` attribute itself, because everything else here tests the decision and not the effect.
+ *
+ * `canAct` returning false is only advice until something acts on it, and the whole of that
+ * something is one attribute in one component. Deleting it left all 58 tests passing while a watcher
+ * could press every button on screen — the browser caught that, and no test did. The attribute is
+ * also easy to lose by accident: React 18 does not type `inert`, so it is passed through a cast that
+ * a future React upgrade will want to remove.
+ *
+ * `renderToStaticMarkup` is enough and needs no DOM. It cannot tell us the browser honors `inert` —
+ * that was checked by hit-testing a real click against an actor doing the same thing — but it does
+ * tell us we still emit it.
+ */
+describe('the wrapper that makes watching inert', () => {
+  const markup = (canAct: boolean): string =>
+    renderToStaticMarkup(createElement(Watching, { canAct }, 'contents'))
+
+  it('marks the subtree inert for a client that may not act', () => {
+    expect(markup(false)).toContain('inert')
+  })
+
+  it('leaves it interactive for one that may', () => {
+    expect(markup(true)).not.toContain('inert')
+  })
+
+  it('renders the children either way, which is the point of not hiding them', () => {
+    expect(markup(false)).toContain('contents')
+    expect(markup(true)).toContain('contents')
   })
 })
