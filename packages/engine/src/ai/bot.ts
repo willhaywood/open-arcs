@@ -184,6 +184,39 @@ export interface PathProbe {
  */
 export type Explore = (path: readonly Action[]) => PathProbe | undefined
 
+export interface ForeseeOptions {
+  /**
+   * Determinized deals of the rivals' hands, outcomes averaged by the bot.
+   *
+   * One deal judges the replies off a single imaginary distribution of the unseen cards — the
+   * hand-shaped version of judging a roll by one sample. A few deals make it a judgement about
+   * what rivals *could* hold, which is all this faction is entitled to know.
+   */
+  readonly deals: number
+  /** Step cap for the reply drive; a reply that stalls is scored where it stopped. */
+  readonly maxSteps?: number
+}
+
+/**
+ * Apply a line, then let the rivals answer it: play every other faction's turns until the ask
+ * returns to self, and report how the position looks on the far side — once per deal.
+ *
+ * The V4 counterpart of `Explore`, and the one place the engine models opponents at all. Two rules
+ * make it honest:
+ *
+ *   - **Rivals play sampled hands, never their real ones.** Their true hands are hidden from this
+ *     faction, and a reply computed from them is the docs/19 section 2k oracle wearing cards
+ *     instead of dice. The harness deals each rival a hand from the unseen pool — deck, rivals'
+ *     hands and discard pooled together, which is exactly this faction's information set — under a
+ *     journal-derived generator, so it is reproducible on any client and independent of the truth.
+ *   - **The reply model is fixed.** Rivals are played by the shipped one-ply bot, the measured
+ *     opponent, and nothing about the line being judged can change how they are modeled.
+ */
+export type Foresee = (
+  path: readonly Action[],
+  options: ForeseeOptions,
+) => readonly ObservedState[]
+
 export interface RolloutOptions {
   /** Playouts per candidate; averaged, so this is the accuracy-against-noise dial. */
   readonly samples: number
@@ -239,6 +272,7 @@ export interface Bot {
     lookahead?: Lookahead,
     rollout?: Rollout,
     explore?: Explore,
+    foresee?: Foresee,
   ): BotDecision
 }
 

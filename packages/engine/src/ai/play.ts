@@ -11,9 +11,12 @@
  * the same moves are the same file (docs/03 section 9a).
  */
 
-import { advance, applyExternal, defaultRegistry, encodeAction, rng } from '../index.js'
+import { CardLocation, advance, applyExternal, defaultRegistry, encodeAction, rng } from '../index.js'
+import { contentsOf, moveAll } from '../tracker.js'
+import { shuffle } from '../rng.js'
 import { observe } from '../observe.js'
 import { refuses } from './heuristic.js'
+import { standardBot } from './goal.js'
 
 import type { RuleRegistry, RuleResult } from '../dispatch.js'
 import type { FactionId } from '../ids.js'
@@ -21,7 +24,7 @@ import type { Action } from '../action.js'
 import type { Continue } from '../continue.js'
 import type { GameState } from '../state.js'
 import type { ObservedState } from '../observe.js'
-import type { Bot, BotDecision, Explore, PathProbe, Probe, RolloutOptions } from './bot.js'
+import type { Bot, BotDecision, Explore, Foresee, PathProbe, Probe, RolloutOptions } from './bot.js'
 
 /** Is this seat played by a bot? */
 export function isBotSeat(bots: readonly FactionId[] | undefined, faction: FactionId): boolean {
@@ -214,6 +217,43 @@ const SAMPLES = 5
  * Every candidate at a decision is sampled with the *same* salts, deliberately: comparing options
  * under common random numbers is what lets a real difference between them show through the noise.
  */
+/**
+ * The same position with every rival's hand re-dealt from the unseen pool.
+ *
+ * Pool = deck + rivals' hands + discard: exactly the zones `observe` hides from `self`, so a
+ * sampled hand is any hand this faction cannot rule out. Sizes are preserved everywhere — the
+ * count of a hand is public, its contents are not — and `self`'s own hand never moves. The
+ * shuffle consumes the state's generator and the advanced generator is kept, so the deal and the
+ * play that follows it draw from one derived stream.
+ */
+function dealRivals(state: GameState, self: FactionId): GameState {
+  const rivals = state.factions.filter((f) => f !== self)
+  const hands = rivals.map((r) => [...contentsOf(state.cards, CardLocation.hand(r))])
+  const deck = [...contentsOf(state.cards, CardLocation.deck())]
+  const discard = [...contentsOf(state.cards, CardLocation.discard())]
+  /*
+   * Sorted before shuffling, and the sort is the no-cheat property holding. Two states with the
+   * same information set — same unseen cards, same sizes — can differ in which hidden zone each
+   * card physically sits in, and a shuffle is order-sensitive: pool them in zone order and the
+   * truth leaks through the indices, producing different deals for observer-identical worlds. The
+   * test that caught this swapped one card between a rival's hand and the deck and watched the
+   * replies change.
+   */
+  const pool = [...hands.flat(), ...deck, ...discard].sort()
+  if (pool.length === 0) return state
+
+  const [shuffled, nextRng] = shuffle(state.rng, pool)
+  let cards = state.cards
+  let cursor = 0
+  const take = (n: number): string[] => shuffled.slice(cursor, (cursor += n))
+  for (let i = 0; i < rivals.length; i++) {
+    cards = moveAll(cards, take(hands[i]!.length), CardLocation.hand(rivals[i]!))
+  }
+  cards = moveAll(cards, take(deck.length), CardLocation.deck())
+  cards = moveAll(cards, take(discard.length), CardLocation.discard())
+  return { ...state, cards, rng: nextRng }
+}
+
 function probeFrom(state: GameState, salt: number): GameState {
   return { ...state, rng: rng((state.journal.length + 1) * 0x9e3779b1 + salt * 0x85ebca77) }
 }
@@ -605,6 +645,65 @@ export function stepBot(
     }
   }
 
+  /*
+   * The V4 half: apply a line, then let the rivals answer it.
+   *
+   * ## Determinized BEFORE the path is applied, and the order is load-bearing
+   *
+   * Rivals must reply from **sampled** hands — their true hands are hidden from this faction, and
+   * a reply computed from them is the section 2k oracle wearing cards instead of dice. The swap
+   * happens on the base state, before the line is replayed on top, because the engine builds a
+   * rival's ask *from their hand*: swap after landing and the pending ask still lists their true
+   * cards, so the reply would either play a card the swapped hand does not hold or leak the truth
+   * anyway. Swapping first, the whole machine downstream — asks included — sees only the sample.
+   * This faction's own line replays identically on the swapped state, because nothing in its own
+   * turn's legality reads a rival's hand.
+   *
+   * ## The pool is exactly this faction's information set
+   *
+   * Deck, every rival's hand, and the discard, pooled and re-dealt with sizes preserved. Those are
+   * precisely the zones `observe` hides; `played` piles and the court are public and stay put.
+   * A rival's sampled hand can therefore contain any card this faction cannot account for — which
+   * is the honest meaning of "they could be holding anything".
+   *
+   * ## Replies are played by the shipped bot, on the ordinary machinery
+   *
+   * Each reply decision goes through `stepBot` with `standardBot` — the measured opponent, the
+   * proven-terminating one — threading `AskedThisTurn` exactly as `runBots` does. The drive stops
+   * when the ask returns to this faction, the game ends, or the step cap cuts it; a reply that
+   * stalls is scored where it stopped rather than discarded.
+   */
+  const foresee: Foresee = (path, options) => {
+    const out: ObservedState[] = []
+    const cap = options.maxSteps ?? 200
+    for (let d = 0; d < options.deals; d++) {
+      try {
+        /*
+         * One generator per deal drives the shuffle, the replayed line and the replies alike —
+         * derived from the journal, so any client reproduces it, and offset well away from the
+         * salts `sampleOutcomes` and `rollout` use so the streams never collide.
+         */
+        const base = probeFrom(result.state, 4000 + d)
+        const swapped = dealRivals(base, faction)
+        let at: RuleResult = { ...result, state: swapped }
+        for (const a of path) at = advance(at.state, a, reg)
+
+        let asked: AskedThisTurn = NO_ASKS
+        for (let i = 0; i < cap; i++) {
+          const c = at.continue
+          if (c.kind !== 'ask' || c.faction === faction) break
+          const step = stepBot(at, standardBot, c.faction, reg, asked)
+          at = step.result
+          asked = step.asked
+        }
+        out.push(observe(at.state, faction))
+      } catch {
+        // One fewer opinion, not a reason to drop the line.
+      }
+    }
+    return out
+  }
+
   const lookahead = (action: Action): Probe | undefined => {
     try {
       const next = advance(probeFrom(result.state, 0), action, reg)
@@ -657,6 +756,7 @@ export function stepBot(
     lookahead,
     rollout,
     explore,
+    foresee,
   )
   return {
     result: applyExternal(result, decision.action, registry),
