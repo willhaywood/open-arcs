@@ -40,6 +40,7 @@ export type BotSpec =
       readonly width: number
       readonly depth: number
       readonly rivalIntent?: boolean
+      readonly replies?: { readonly roots: number; readonly deals: number }
     }
   | {
       readonly kind: 'rollout'
@@ -82,6 +83,7 @@ export function buildBot(spec: BotSpec): Bot {
         width: spec.width,
         depth: spec.depth,
         ...(spec.rivalIntent === true ? { rivalIntent: true } : {}),
+        ...(spec.replies === undefined ? {} : { replies: spec.replies }),
       })
     case 'rollout':
       return rolloutBot({
@@ -132,13 +134,18 @@ export function parseSpec(name: string): BotSpec {
     }
   }
   if (kind === 'search') {
-    // `search:3:14` sets width and depth; `search:3:14:rival` also scores rivals under their own intent.
-    return {
+    // `search:3:14` sets width and depth; `:rival` scores rivals under their own intent;
+    // `:reply[:roots:deals]` re-ranks the strongest lines by the rivals' foreseen replies.
+    const spec: BotSpec = {
       kind: 'search',
       width: Number(rest[0] ?? 3),
       depth: Number(rest[1] ?? 14),
-      ...(rest[2] === 'rival' ? { rivalIntent: true } : {}),
+      ...(rest.includes('rival') ? { rivalIntent: true } : {}),
+      ...(rest[2] === 'reply'
+        ? { replies: { roots: Number(rest[3] ?? 3), deals: Number(rest[4] ?? 2) } }
+        : {}),
     }
+    return spec
   }
   if (kind === 'rollout') {
     // `rollout:4:chapter` plays each sample to the end of the chapter instead of counting turns.

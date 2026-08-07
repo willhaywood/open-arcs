@@ -126,6 +126,83 @@ describe('the search bot', () => {
   })
 })
 
+describe('the reply-ranked search bot (v4)', () => {
+  const v4 = () => searchBot({ width: 3, depth: 14, replies: { roots: 3, deals: 2 } })
+
+  it('re-ranks by replies where they change the answer', () => {
+    /*
+     * Seed 3, step 32, found by sweeping: red's follow. Tier-1 surpasses with Administration-3;
+     * after the rivals' replies are foreseen, Administration-6 wins instead. Pinned so a silent
+     * fallback to tier-1 (foresee dropped, replies option ignored, checked set never consulted)
+     * fails here rather than passing on some other disagreement.
+     */
+    let cur = opening(3)
+    let asked = NO_ASKS
+    for (let i = 0; i < 32; i++) {
+      const step = stepBot(cur, standardBot, botToAct(cur, THREE)!, registry, asked)
+      cur = step.result
+      asked = step.asked
+    }
+    const f = botToAct(cur, THREE)!
+    expect(f).toBe('red')
+    const tier1 = stepBot(cur, searchBot(), f, registry, asked).decision
+    const tier2 = stepBot(cur, v4(), f, registry, asked).decision
+    expect(String(tier1.action['label'])).toBe('Surpass with Administration-3')
+    expect(String(tier2.action['label'])).toBe('Surpass with Administration-6')
+    // The diagnostic panel shows which candidates were reply-checked.
+    expect(tier2.considered?.some((c) => c.note?.includes('after replies'))).toBe(true)
+  })
+
+  it('is deterministic with replies on', () => {
+    const cur = opening(2)
+    const f = botToAct(cur, THREE)!
+    const a = stepBot(cur, v4(), f, registry, NO_ASKS).decision
+    const b = stepBot(cur, v4(), f, registry, NO_ASKS).decision
+    expect(JSON.stringify(a.action)).toBe(JSON.stringify(b.action))
+    expect(a.considered?.map((c) => c.score)).toEqual(b.considered?.map((c) => c.score))
+  })
+
+  it('with one reply-checked root, the tier-1 winner is re-valued but never dethroned', () => {
+    /*
+     * The scale-mixing guard, given a consequence a test can hold. A reply-checked value and a
+     * tier-1 value are measured at different horizons — replies systematically deflate — so the
+     * winner comes from the checked set alone. With `roots: 1` that pins an exact behavior: the
+     * single checked line IS the tier-1 winner, so v4 must choose whatever v3 chooses, however
+     * badly the replies deflate it. Dropping the guard let a deflated top line lose to an
+     * unchecked runner-up still priced at its own rosy horizon — 7 of 12 card plays on this seed
+     * flipped that way. Step 82 is the first.
+     */
+    let cur = opening(3)
+    let asked = NO_ASKS
+    for (let i = 0; i < 82; i++) {
+      const step = stepBot(cur, standardBot, botToAct(cur, THREE)!, registry, asked)
+      cur = step.result
+      asked = step.asked
+    }
+    const f = botToAct(cur, THREE)!
+    const c = cur.continue
+    if (c.kind !== 'ask') throw new Error('expected an ask')
+    expect(c.actions.some((a) => a.type.startsWith('turn/')), 'a card-play ask').toBe(true)
+    const one = searchBot({ width: 3, depth: 14, replies: { roots: 1, deals: 2 } })
+    const a = stepBot(cur, one, f, registry, asked).decision
+    const b = stepBot(cur, searchBot(), f, registry, asked).decision
+    expect(JSON.stringify(a.action)).toBe(JSON.stringify(b.action))
+  })
+
+  it('degrades to tier-1 exactly when the harness cannot foresee', () => {
+    const cur = opening(3)
+    const f = botToAct(cur, THREE)!
+    const c = cur.continue
+    if (c.kind !== 'ask') throw new Error('expected an ask')
+    // Explore captured, foresee withheld: the v4 bot must decide exactly as v3 does.
+    const explore = captureExplore(cur)
+    const observed = observe(cur.state, f)
+    const with4 = v4().decide(observed, c.actions, undefined, undefined, explore)
+    const with3 = searchBot().decide(observed, c.actions, undefined, undefined, explore)
+    expect(JSON.stringify(with4.action)).toBe(JSON.stringify(with3.action))
+  })
+})
+
 describe('the Explore capability', () => {
   it('is a pure function of the path: cached prefixes change nothing', () => {
     const cur = opening(1)
