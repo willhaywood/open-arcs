@@ -33,7 +33,8 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Slot armour (`resourcesGuarded`) | **no measurable effect** — the gap *was* the noise floor, at both 120 and 1000 games | 3j |
 | Lore activation (`loreLive`/`loreArmed`) | **measurably worse** — 2-3 points behind against a 0-1 point floor, in two variants | 3k |
 | Per-rival intent in `valueOf` | **no measurable effect** — +3 points one run, level the next, floor 2 points; the probed-state variant livelocked and measured worse | 6 |
-| Own-turn beam search at the card play (V3) | **suggestive, not past the floor** — +5 points one run, but the twins themselves spread 5 points; stronger settings under measurement | 7 |
+| Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
+| Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 
 ### Why they all failed, in one sentence
 
@@ -1991,11 +1992,78 @@ drifted and the mutation was silently a no-op — assert replacement counts in m
 | vs standard, twinned | 36% wins, 22.5 power | 33%, 22.5 | **5 points, 1.2 power** |
 
 +5 points in the head-to-head — and then the noise run's twins spread 5 points between byte-identical
-bots, two and a half times the floor section 3c measured for V1-family matchups. Averaged over every
-search seat played, the edge is ~2.4 points against an observed floor of 2-5: **suggestive, not a
-result**. Two honest ways forward — more games at these settings, or stronger settings where a larger
-true effect needs fewer games — and the 6x16 configuration is under measurement as this is written.
+bots, two and a half times the floor section 3c measured for V1-family matchups. On that run alone:
+suggestive, not a result.
 
-Worth noting for whoever reads the next table: games with a search seat run shorter (721-742 mean
+### The 6x16 configuration, and what pooling four runs says
+
+| run | search | standard | twin floor |
+| --- | --- | --- | --- |
+| 6x16 vs standard x2 | 35% wins, 20.4 power | 32%, 20.2 | — |
+| 6x16 vs standard, twinned | 37% / 33% wins | 30%, 21.7 | 4 points, 0.6 power |
+
+Doubling the beam width did not grow the edge — **the binding constraint is what the evaluator can
+see, not search effort** — but the second pair of runs did something more useful than growing it:
+it replicated it. Across all four runs (3,996 games), six search seats were measured against
+standard, five came out ahead, mean **+3.2 points** — against a pooled floor of roughly 1.2 points
+at that volume. No single run clears its own floor; the pooled, replicated effect does, clearly.
+
+So the honest verdict is an upgrade on "suggestive": **a small, real edge of about +3 points**,
+consistent across two configurations, and 3x14 is the one to ship (same effect, a third the cost).
+The pooled analysis was not pre-registered, which is why it is stated as +3 with replication rather
+than dressed up with a significance claim.
+
+Worth noting for whoever reads the next table: games with a search seat run shorter (718-754 mean
 decisions against 776-781 in the rival runs) at higher mean power for everyone, which is what
 sharper play accelerating the whole game looks like.
+
+## 8. V4 — the rivals' replies, over determinized hands
+
+The one capability docs/03 always said a static evaluator cannot have: seeing what happens *after*
+your turn. Tier 1's beam scores a turn at its own rosy end; the class of mistake a human feels and
+punishes — the Relic left in a 1-key slot beside a fleet, the city built where it invites a siege,
+the declaration the next player flips — lives entirely on the far side of that horizon.
+
+### The hidden-hand problem, and the honest answer
+
+Simulating a rival's reply means giving the reply bot an observation for that rival, and building
+it from the true state hands the model their real cards — section 2k's oracle wearing cards instead
+of dice. `Foresee` (`play.ts`) determinizes instead: each rival is dealt a hand from the unseen
+pool — deck, rivals' hands and discard together, which is exactly the deciding faction's
+information set — under a journal-derived generator, sizes preserved, self's hand untouched.
+Replies are then driven by `standardBot`, the measured opponent model, until the ask returns to
+self.
+
+Two things the property tests caught while building it, both worth remembering:
+
+- **The pool must be canonicalized before shuffling.** Pooled in zone order, the truth leaks
+  through the indices — a shuffle is order-sensitive, so observer-identical worlds dealt different
+  hands. The no-cheat test (two states differing only in hidden contents must foresee byte-identical
+  replies) failed on exactly this, and sorting the pool is the fix.
+- **The swap must happen before the line is replayed, not after.** The engine builds a rival's ask
+  from their hand, so swapping after landing leaves a pending ask that lists their true cards.
+
+`search-v4` re-ranks the top 3 tier-1 lines by mean value over 2 deals of foreseen replies, winner
+chosen among the reply-checked only (tier-1 and tier-2 values sit at different horizons — replies
+systematically deflate — and letting an unchecked line win at its rosy price flipped 7 of 12 card
+plays before the guard was pinned). Cost: median 0.87s per card play.
+
+### Measured — 999 games per run, both protocols, twins
+
+| protocol | v4 | standard | twin floor |
+| --- | --- | --- | --- |
+| 3p, vs standard x2 | **43%** wins, 22.2 power, rank 1.85 | 29%, 19.1, 2.04 | — |
+| 3p, twinned | 41% / 33% wins | 26%, 19.8 | 8 points |
+| 2p, head-to-head | **67%** wins, 31.5 power | 33%, 22.3 | — |
+| 2p, twinned | 50% / 50%, 29.5 / 29.5 power | — | **~0 points** |
+
+Every v4 seat measured beats standard by +7 to +15 (mean +12) at three players — the worst copy
+clears the twin spread on its own. At two players the result needs no statistics: two to one, on a
+floor of zero. **This is the first idea since the goal layer to clear its own floor in a single
+run**, and it did so by an order of magnitude, which is what "the evaluator's blindness was the
+binding constraint" predicted if replies were the biggest blind spot left.
+
+The ladder ships it as **brutal** (`levels.ts`); the gate this section set for it is passed in
+both protocols. Games with a v4 seat also run *much* shorter at two players (413-462 mean decisions
+against ~700) — punishment compounds fastest head-to-head, which is exactly where the group this
+was built for actually plays.
