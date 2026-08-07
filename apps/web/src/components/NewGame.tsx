@@ -20,7 +20,7 @@
  */
 
 import { boardsFor, leaderPool, lorePool, maxLorePerPlayer } from '@arcs/engine'
-import type { FactionId, NewGameOptions } from '@arcs/engine'
+import type { BotLevel, FactionId, NewGameOptions } from '@arcs/engine'
 import { useState } from 'react'
 
 import { SETUP_CARDS } from '../setups.js'
@@ -32,6 +32,21 @@ import { MULTIPLAYER_URL, multiplayerEnabled } from '../multiplayer/config.js'
 import { hashFor } from '../multiplayer/link.js'
 import { colorOf } from '../theme.js'
 import { asset } from '../assets.js'
+
+/**
+ * The levels the menu offers, in play order. 'brutal' earned its slot by measurement — the gate
+ * docs/19 section 8 set for it: 2:1 over normal head-to-head at two players against a zero twin
+ * floor, +12 mean points at three. The engine's mapping (`botForLevel`) is the single source of
+ * what each name resolves to.
+ */
+const OFFERED_LEVELS: readonly BotLevel[] = ['easy', 'normal', 'hard', 'brutal']
+
+const LEVEL_NOTES: Readonly<Record<BotLevel, string>> = {
+  easy: 'sound instincts, fumbles the close calls',
+  normal: 'the bot the game has always shipped',
+  hard: 'every card play searched to the end of the turn it buys',
+  brutal: 'hard, plus your replies are foreseen before it commits',
+}
 
 const ALL_FACTIONS: FactionId[] = ['red', 'yellow', 'blue', 'white']
 
@@ -79,6 +94,7 @@ export function NewGame(): JSX.Element {
   const [lorePer, setLorePer] = useState(1)
   /** Seats played by a bot. Order follows seating, not click order — see `enterGame`. */
   const [bots, setBots] = useState<string[]>([])
+  const [botLevel, setBotLevel] = useState<BotLevel>('normal')
 
   const byName = new Map(boardsFor(players).map((b) => [b.name, b]))
 
@@ -111,6 +127,8 @@ export function NewGame(): JSX.Element {
       seed,
       ...(leaders ? { leadersAndLore: { expansion, lorePerPlayer } } : {}),
       ...(bots.length > 0 ? { bots: seats.filter((f) => bots.includes(f)) } : {}),
+      // Absent for 'normal', so a game without a chosen level is byte-identical to an old one.
+      ...(bots.length > 0 && botLevel !== 'normal' ? { botLevel } : {}),
     }
   }
 
@@ -149,6 +167,7 @@ export function NewGame(): JSX.Element {
       ...(leaders ? { leadersAndLore: { expansion, lorePerPlayer } } : {}),
       // Same: absent rather than empty, so a base game's options are unchanged by this existing.
       ...(bots.length > 0 ? { bots: seats.filter((f) => bots.includes(f)) } : {}),
+      ...(bots.length > 0 && botLevel !== 'normal' ? { botLevel } : {}),
     })
   }
 
@@ -362,6 +381,30 @@ export function NewGame(): JSX.Element {
                 ? 'every seat is a bot — watch it play'
                 : `${players - bots.length} played by hand`}
           </em>
+          {/*
+            * How strongly the bots play. Only drawn once a bot seat exists — a strength for nobody
+            * is noise — and the level names come from the engine's own ladder, so this list cannot
+            * drift from what `botForLevel` actually resolves.
+            */}
+          {bots.length > 0 ? (
+            <div className="ng-bot-level">
+              <span className="ng-sub-label">Strength</span>
+              <div className="ng-bot-row">
+                {OFFERED_LEVELS.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    className={`ng-bot${botLevel === l ? ' on' : ''}`}
+                    disabled={revealed}
+                    onClick={() => setBotLevel(l)}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <em className="ng-bot-note">{LEVEL_NOTES[botLevel]}</em>
+            </div>
+          ) : null}
         </div>
 
         {revealed ? (
