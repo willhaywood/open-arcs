@@ -33,6 +33,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Slot armour (`resourcesGuarded`) | **no measurable effect** — the gap *was* the noise floor, at both 120 and 1000 games | 3j |
 | Lore activation (`loreLive`/`loreArmed`) | **measurably worse** — 2-3 points behind against a 0-1 point floor, in two variants | 3k |
 | Per-rival intent in `valueOf` | **no measurable effect** — +3 points one run, level the next, floor 2 points; the probed-state variant livelocked and measured worse | 6 |
+| Own-turn beam search at the card play (V3) | **suggestive, not past the floor** — +5 points one run, but the twins themselves spread 5 points; stronger settings under measurement | 7 |
 
 ### Why they all failed, in one sentence
 
@@ -1950,3 +1951,51 @@ bot keeps one intent for everyone; the option stays for later work to measure in
 The section 0 lesson holds its streak: this is the fourth plausible evaluator idea in a row —
 guard, lore, declare-cost-as-strength, now rival intent — to measure as nothing or worse. The
 register, not the argument, is the arbiter.
+
+## 7. V3 — the own-turn beam search
+
+The card play was still priced by `PIP_VALUE x pips` — the crudest number in the bot at the
+highest-weight decision in the game, and the thing every failed rollout attempt (3a, 3d, 3e) was
+trying to replace. Those failed on **variance**: playouts under a weak policy are noisy re-measurements
+of the evaluator. A deterministic beam does not pay that tax — the only randomness is dice inside a
+line, sampled under derived generators like every probe.
+
+`search.ts`: at a card-play ask, each candidate root gets its own beam over the whole turn it opens
+— card, declare, prelude, pips, sub-flows — scored by `valueOf` where the turn actually left the
+board. Pass terminates at depth one and scores the position after passing, so it needs no special
+case. Every other ask delegates to the V1 machinery with the same weights, so an arena gap is
+attributable to the search alone. The harness capability is `Explore` (`play.ts`): apply a whole
+hypothetical line, prefix-cached so extension costs one advance per node.
+
+### Two regressions found on the way, both of them old friends
+
+- **A shared beam starved roots.** Pruning on intermediate value culled just-led cards — pure cost
+  until their pips are spent, the exact state `settle()` exists to skip — and the bot chose Pass on
+  turn one, section 2h's pathology back from the dead. Per-root beams fix it: width decides how well
+  each root's turn is played, never whether a root gets to finish.
+- **Lines drowned in the arrange sub-flow.** Value-neutral swaps filled every beam to its depth cap,
+  so pips were never reached, every card scored as "played, bought nothing", and Pass won 35:48
+  against standard's 1:82. The per-line cycle gate is the strictly-improving-repeat rule applied
+  inside hypothetical lines, where `stepBot`'s turn history cannot see. Pass:play settled at 4:79.
+
+Cost: median 0.13s, max 0.26s per searched decision at 6x16 on an uncontended machine (~10 searched
+decisions per seat per game). Determinism pinned by test; five mutations caught, including a
+prefix-cache poisoning that first appeared to survive because the mutation script's needle had
+drifted and the mutation was silently a no-op — assert replacement counts in mutation scripts.
+
+### Measured — 999 games x2 with twin, width 3 depth 14
+
+| run | search 3x14 | standard | twin floor |
+| --- | --- | --- | --- |
+| vs standard x2 | **37%** wins, 20.7 power, rank 1.92 | 32%, 20.2, 2.01 | — |
+| vs standard, twinned | 36% wins, 22.5 power | 33%, 22.5 | **5 points, 1.2 power** |
+
++5 points in the head-to-head — and then the noise run's twins spread 5 points between byte-identical
+bots, two and a half times the floor section 3c measured for V1-family matchups. Averaged over every
+search seat played, the edge is ~2.4 points against an observed floor of 2-5: **suggestive, not a
+result**. Two honest ways forward — more games at these settings, or stronger settings where a larger
+true effect needs fewer games — and the 6x16 configuration is under measurement as this is written.
+
+Worth noting for whoever reads the next table: games with a search seat run shorter (721-742 mean
+decisions against 776-781 in the rival runs) at higher mean power for everyone, which is what
+sharper play accelerating the whole game looks like.

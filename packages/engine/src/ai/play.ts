@@ -11,7 +11,7 @@
  * the same moves are the same file (docs/03 section 9a).
  */
 
-import { advance, applyExternal, defaultRegistry, rng } from '../index.js'
+import { advance, applyExternal, defaultRegistry, encodeAction, rng } from '../index.js'
 import { observe } from '../observe.js'
 import { refuses } from './heuristic.js'
 
@@ -21,7 +21,7 @@ import type { Action } from '../action.js'
 import type { Continue } from '../continue.js'
 import type { GameState } from '../state.js'
 import type { ObservedState } from '../observe.js'
-import type { Bot, BotDecision, Probe, RolloutOptions } from './bot.js'
+import type { Bot, BotDecision, Explore, PathProbe, Probe, RolloutOptions } from './bot.js'
 
 /** Is this seat played by a bot? */
 export function isBotSeat(bots: readonly FactionId[] | undefined, faction: FactionId): boolean {
@@ -531,6 +531,80 @@ export function stepBot(
     return out
   }
 
+  /*
+   * The V3 half: apply a whole line of this faction's answers and report where it lands.
+   *
+   * **The prefix cache is what makes a beam affordable, and it must be a pure optimisation.** A
+   * search extends lines one action at a time, so without the cache every extension replays its
+   * whole prefix — O(depth) advances per node instead of one. The cache keys on the encoded line,
+   * which is exact: `encodeAction` is the journal's own serialisation, so two paths share a key
+   * precisely when they are the same actions in the same order. The separator is `'\u0000'`
+   * because encoded actions can themselves contain spaces (labels do), so a space-joined key made
+   * two different paths collide — written as the escape sequence, never the raw byte, which turns
+   * the file binary in the eyes of every grep. Scoped to this one decision, like everything else
+   * built here, so no state leaks between decisions and purity holds.
+   *
+   * Randomness is handled the way `settledSamples` handles it: the salt-0 world answers first, and
+   * if the line moved the generator it is re-applied whole under further salts — a salt whose line
+   * throws is one fewer opinion. Re-applying whole rather than caching per-salt keeps the cache
+   * from multiplying, and the expensive case (a line through a battle) is exactly the case where
+   * honesty about odds is worth the replay.
+   */
+  const exploreCache = new Map<string, RuleResult>()
+  const explore: Explore = (path: readonly Action[]): PathProbe | undefined => {
+    if (path.length === 0) return undefined
+    try {
+      // Longest cached prefix, then advance the remainder — one advance per new node in a search.
+      let start = 0
+      let current: RuleResult | undefined
+      const keys = path.map((a) => encodeAction(a))
+      for (let i = path.length - 1; i >= 1; i--) {
+        const hit = exploreCache.get(keys.slice(0, i).join('\u0000'))
+        if (hit !== undefined) {
+          start = i
+          current = hit
+          break
+        }
+      }
+      let at = current ?? advance(probeFrom(result.state, 0), path[0]!, reg)
+      if (current === undefined) {
+        start = 1
+        exploreCache.set(keys.slice(0, 1).join('\u0000'), at)
+      }
+      for (let i = start; i < path.length; i++) {
+        at = advance(at.state, path[i]!, reg)
+        exploreCache.set(keys.slice(0, i + 1).join('\u0000'), at)
+      }
+
+      const landed = observe(at.state, faction)
+      const samples: ObservedState[] = [landed]
+      // The generator moving is what "random" means here, exactly as `sampleOutcomes` reads it.
+      if (at.state.rng.seed !== probeFrom(result.state, 0).rng.seed) {
+        for (let s = 1; s < SAMPLES; s++) {
+          try {
+            let re = advance(probeFrom(result.state, s), path[0]!, reg)
+            for (let i = 1; i < path.length; i++) re = advance(re.state, path[i]!, reg)
+            samples.push(observe(re.state, faction))
+          } catch {
+            // One fewer opinion, not a reason to drop the line.
+          }
+        }
+      }
+
+      const c = at.continue
+      const mine = c.kind === 'ask' && c.faction === faction
+      return {
+        observed: landed,
+        samples,
+        actions: mine ? c.actions : [],
+        mine,
+        ...(mine && c.prompt !== undefined ? { prompt: c.prompt } : {}),
+      }
+    } catch {
+      return undefined
+    }
+  }
+
   const lookahead = (action: Action): Probe | undefined => {
     try {
       const next = advance(probeFrom(result.state, 0), action, reg)
@@ -582,6 +656,7 @@ export function stepBot(
     result.continue.actions,
     lookahead,
     rollout,
+    explore,
   )
   return {
     result: applyExternal(result, decision.action, registry),

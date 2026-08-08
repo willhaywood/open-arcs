@@ -10,7 +10,7 @@
  * measuring one thing and printing another, and nothing downstream could tell.
  */
 
-import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, goalBot, standardBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, trivialBot } from '@arcs/engine'
+import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, goalBot, standardBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, searchBot, trivialBot } from '@arcs/engine'
 import type { Bot, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
@@ -34,6 +34,12 @@ export type BotSpec =
       readonly kind: 'heuristic'
       /** Evaluator weights; omitted means the hand-set ones. Sent as data so a shard can rebuild it. */
       readonly weights?: Readonly<Record<string, number>>
+    }
+  | {
+      readonly kind: 'search'
+      readonly width: number
+      readonly depth: number
+      readonly rivalIntent?: boolean
     }
   | {
       readonly kind: 'rollout'
@@ -71,6 +77,12 @@ export function buildBot(spec: BotSpec): Bot {
       return spec.weights === undefined
         ? heuristicBot
         : heuristicBotWith(spec.weights as Weights, 'heuristic-fitted')
+    case 'search':
+      return searchBot({
+        width: spec.width,
+        depth: spec.depth,
+        ...(spec.rivalIntent === true ? { rivalIntent: true } : {}),
+      })
     case 'rollout':
       return rolloutBot({
         samples: spec.samples,
@@ -119,6 +131,15 @@ export function parseSpec(name: string): BotSpec {
       throw new Error(`No fitted weights at ${FITTED} — run \`npm run fit\` first.`)
     }
   }
+  if (kind === 'search') {
+    // `search:3:14` sets width and depth; `search:3:14:rival` also scores rivals under their own intent.
+    return {
+      kind: 'search',
+      width: Number(rest[0] ?? 3),
+      depth: Number(rest[1] ?? 14),
+      ...(rest[2] === 'rival' ? { rivalIntent: true } : {}),
+    }
+  }
   if (kind === 'rollout') {
     // `rollout:4:chapter` plays each sample to the end of the chapter instead of counting turns.
     const chapter = rest[1] === 'chapter'
@@ -132,7 +153,7 @@ export function parseSpec(name: string): BotSpec {
   }
   throw new Error(
     `Unknown bot "${name}" — known: standard, rival, baseline, goal, feasible, declare, contest, ` +
-      `guard, lore, cost, trivial, heuristic, rollout[:samples:turns]`,
+      `guard, lore, cost, trivial, heuristic, rollout[:samples:turns], search[:width:depth]`,
   )
 }
 

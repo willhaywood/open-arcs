@@ -136,6 +136,54 @@ export interface Probe {
  */
 export type Lookahead = (action: Action) => Probe | undefined
 
+/**
+ * Where a multi-step line of play lands.
+ *
+ * The V3 counterpart of `Probe`, for a bot that searches *sequences* rather than pricing single
+ * actions. Same division of labour as `Lookahead` and `Rollout`: the harness applies the line,
+ * because only it holds the full `GameState`; the bot sees the landing position through the same
+ * redaction as everything else.
+ */
+export interface PathProbe {
+  /** The landing position in the salt-0 world. Equivalent to `samples[0]`. */
+  readonly observed: ObservedState
+  /**
+   * The landing position under several derived generators — more than one only when the line
+   * consumed randomness. A line through a battle must be judged on odds, not on one imaginary
+   * roll: the same argument as `Probe.samples`, compounded over however many rolls the line made.
+   */
+  readonly samples: readonly ObservedState[]
+  /**
+   * What the landing ask offers this faction, or `[]` when the line has left its hands — the turn
+   * passed to a rival, the game ended, or the engine stopped asking. `[]` is what tells a search
+   * the line is complete rather than extendable.
+   */
+  readonly actions: readonly Action[]
+  /** The landing ask still belongs to this faction. Redundant with `actions.length` today, kept explicit. */
+  readonly mine: boolean
+  /**
+   * The landing ask's prompt, when it has one. A search needs it for the same reason `stepBot`
+   * keeps `AskedThisTurn`: the engine writes progress into prompts ("action 2 of 3"), so a line
+   * that lands on a byte-identical prompt without improving the position is going in circles — the
+   * arrange sub-flow's value-neutral swaps filled every beam to its depth cap before this existed,
+   * and each card line scored as "played, bought nothing".
+   */
+  readonly prompt?: string
+}
+
+/**
+ * Apply a whole line of actions hypothetically and report where it lands.
+ *
+ * `path` starts from the ask being decided: `explore([a])` is `lookahead(a)` without the settling,
+ * and `explore([a, b, c])` is the position three of this faction's answers deep. Returns
+ * `undefined` when any step of the line cannot be applied — a searched line that has become
+ * illegal is a dead branch, not an error.
+ *
+ * Like every probe, lines run on derived generators (`probeFrom`), never the game's own — a search
+ * that saw the real dice would be the section 2k oracle compounded over every step of every line.
+ */
+export type Explore = (path: readonly Action[]) => PathProbe | undefined
+
 export interface RolloutOptions {
   /** Playouts per candidate; averaged, so this is the accuracy-against-noise dial. */
   readonly samples: number
@@ -190,6 +238,7 @@ export interface Bot {
     actions: readonly Action[],
     lookahead?: Lookahead,
     rollout?: Rollout,
+    explore?: Explore,
   ): BotDecision
 }
 
