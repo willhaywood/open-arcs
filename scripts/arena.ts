@@ -130,11 +130,26 @@ const started = Date.now()
  */
 const every = Math.max(1, Math.round(games / 40))
 let completed = 0
+/*
+ * ETA from the pace of the last few reports rather than the whole run. The global mean is honest
+ * only while conditions hold still, and they measurably do not: a run that shared the machine
+ * with another for its first half carried that history in its ETA for the rest — 231 minutes
+ * printed where two hours were real. A sliding window forgets old contention at the cost of a
+ * noisier early estimate, which is the right trade for a number whose job is "when should I look".
+ */
+const recent: { at: number; done: number }[] = []
 const progress = (): void => {
   completed++
   if (completed % every !== 0 && completed !== games) return
   const elapsed = Date.now() - started
-  const pace = elapsed / completed
+  recent.push({ at: elapsed, done: completed })
+  if (recent.length > 6) recent.shift()
+  const window = recent.length > 1 ? recent[recent.length - 1]! : undefined
+  const base = recent.length > 1 ? recent[0]! : undefined
+  const pace =
+    window !== undefined && base !== undefined && window.done > base.done
+      ? (window.at - base.at) / (window.done - base.done)
+      : elapsed / completed
   const left = Math.round((pace * (games - completed)) / 1000)
   const fmt = (s: number): string => (s >= 60 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s` : `${s}s`)
   process.stderr.write(

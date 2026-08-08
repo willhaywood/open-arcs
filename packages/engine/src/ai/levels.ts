@@ -1,0 +1,49 @@
+/**
+ * The difficulty ladder: one mapping, one place.
+ *
+ * Levels name a *bot configuration*, and the mapping lives here rather than in the UI or the
+ * store so "which bot is hard?" has exactly one answer — the same argument `surfaces.ts` makes
+ * about Ask ownership, applied to opponents. The level is carried in `NewGameOptions.botLevel`
+ * and persisted with the save, so a loaded game keeps the opponent it was started against;
+ * replay is untouched either way, because the journal records actions, not who chose them.
+ *
+ * What each level is, and why (measurements in docs/19 sections 6-8):
+ *
+ *   - **easy** — the frozen baseline's evaluator, fumbling close calls deterministically
+ *     (`easy.ts`). Sound instincts, no polish.
+ *   - **normal** — `standardBot`, what the game has always shipped. The default, and what an
+ *     absent `botLevel` means, so every existing save plays exactly as it did.
+ *   - **hard** — the tier-1 beam search (`search-v3(3x14)`): the same judgement as normal with
+ *     every card play searched to the end of the turn it buys. Measured ~+3 points over normal,
+ *     replicated across two configurations and 3,996 games (docs/19 section 7).
+ *   - **brutal** — tier-2 (`search-v4`): hard, plus the strongest lines re-ranked by what the
+ *     position looks like after the rivals reply from sampled hands. Measured past its gate by a
+ *     distance nothing else in the register approaches: 67%-33% over normal at two players
+ *     against a zero twin floor, +12 mean points at three (docs/19 section 8).
+ */
+
+import { easyBot } from './easy.js'
+import { standardBot } from './goal.js'
+import { searchBot } from './search.js'
+import type { Bot } from './bot.js'
+
+export const BOT_LEVELS = ['easy', 'normal', 'hard', 'brutal'] as const
+export type BotLevel = (typeof BOT_LEVELS)[number]
+
+const HARD = searchBot({ width: 3, depth: 14 })
+const BRUTAL = searchBot({ width: 3, depth: 14, replies: { roots: 3, deals: 2 } })
+
+/** The bot a level names. `undefined` — no level chosen — is normal, which keeps old saves intact. */
+export function botForLevel(level: BotLevel | undefined): Bot {
+  switch (level) {
+    case 'easy':
+      return easyBot
+    case 'hard':
+      return HARD
+    case 'brutal':
+      return BRUTAL
+    case 'normal':
+    case undefined:
+      return standardBot
+  }
+}

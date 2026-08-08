@@ -28,6 +28,8 @@ export * from './ai/baseline.js'
 export * from './ai/goal.js'
 export * from './ai/guard.js'
 export * from './ai/rival.js'
+export * from './ai/easy.js'
+export * from './ai/levels.js'
 export * from './ai/play.js'
 export * from './ai/rollout.js'
 export * from './ai/search.js'
@@ -78,6 +80,7 @@ import { StandardActionsModule } from './rules/standard-actions.js'
 import { TurnModule } from './rules/turn.js'
 import { VoxModule } from './rules/vox.js'
 import { AMBITIONS } from './state.js'
+import type { BotLevel } from './ai/levels.js'
 import type { LeadersAndLoreOptions } from './leaders.js'
 import type { GameState } from './state.js'
 import { emptyTracker } from './tracker.js'
@@ -101,6 +104,13 @@ export interface NewGameOptions {
    * is for. See docs/19 section 2 and docs/03 section 9a.
    */
   readonly bots?: readonly FactionId[]
+  /**
+   * How strongly the bot seats play. Absent means 'normal' — the bot the game always shipped — so
+   * every save made before levels existed loads and plays identically. One level for the whole
+   * game rather than per seat: the mapping lives in `ai/levels.ts`, and the journal is unaffected
+   * either way, since it records actions rather than who chose them.
+   */
+  readonly botLevel?: BotLevel
 }
 
 export function defaultRegistry(): RuleRegistry {

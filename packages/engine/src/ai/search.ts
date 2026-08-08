@@ -47,7 +47,7 @@ import { isCardPlay } from './rollout.js'
 import { valueOf } from './value.js'
 import type { Action } from '../action.js'
 import type { ObservedState } from '../observe.js'
-import type { Bot, BotDecision, Considered, Explore, Lookahead, PathProbe, Rollout } from './bot.js'
+import type { Bot, BotDecision, Considered, Explore, Foresee, Lookahead, PathProbe, Rollout } from './bot.js'
 import type { RivalIntent } from './value.js'
 
 export interface SearchOptions {
@@ -77,9 +77,20 @@ export interface SearchOptions {
    * either way.
    */
   readonly rivalIntent?: boolean
+  /**
+   * Re-rank the strongest lines by what the position looks like AFTER the rivals reply.
+   *
+   * Tier 1's horizon is the end of this bot's own turn — the one place a static evaluation is
+   * structurally blind is the move that looks fine until somebody answers it. `roots` best lines
+   * are played through the rivals' turns (`Foresee`: sampled hands, the shipped bot as the
+   * opponent model), `deals` imagined worlds each, and re-ranked by the mean of where they land.
+   * The rest keep their tier-1 ranking; the winner is chosen among the reply-checked.
+   */
+  readonly replies?: { readonly roots: number; readonly deals: number }
 }
 
 export const DEFAULT_SEARCH: SearchOptions = { width: 3, depth: 14 }
+export const DEFAULT_REPLIES = { roots: 3, deals: 2 } as const
 
 /** One line under consideration: the actions taken and where they landed. */
 interface Line {
@@ -105,7 +116,11 @@ interface Line {
 
 export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
   const useRival = options.rivalIntent === true
-  const id = `search-v3(${options.width}x${options.depth}${useRival ? ',rival' : ''})`
+  const r = options.replies
+  const id =
+    r === undefined
+      ? `search-v3(${options.width}x${options.depth}${useRival ? ',rival' : ''})`
+      : `search-v4(${options.width}x${options.depth},r${r.roots}x${r.deals}${useRival ? ',rival' : ''})`
   /*
    * Everything that is not the card play. Same weights, same fitness, same rival scoring — so an
    * arena gap between this bot and `rivalBot` is attributable to the search alone.
@@ -122,6 +137,7 @@ export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
       lookahead?: Lookahead,
       rollout?: Rollout,
       explore?: Explore,
+      foresee?: Foresee,
     ): BotDecision {
       // Not the searched decision, or no way to search it: a weaker bot, not a broken game.
       if (explore === undefined || !isCardPlay(actions)) {
@@ -246,11 +262,40 @@ export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
         return delegate.decide(observed, actions, lookahead, rollout)
       }
 
+      /*
+       * Tier 2: the strongest lines are re-ranked by where they land AFTER the rivals reply.
+       *
+       * Only the top few, because a reply drive is two rivals' whole turns per deal — and only
+       * among themselves: a reply-checked value and a tier-1 value are measured at different
+       * horizons, so the winner is chosen from the checked set rather than mixing scales. A line
+       * whose foresee comes back empty keeps its tier-1 value (a weaker judgement, not a dropped
+       * candidate), and no foresee at all degrades to pure tier-1 — the `Lookahead` rule again.
+       */
+      const checked = new Set<number>()
+      if (foresee !== undefined && options.replies !== undefined) {
+        const { roots, deals } = options.replies
+        const ranked = results
+          .map((res, i) => ({ res, i }))
+          .filter((x): x is { res: { line: Line; value: number }; i: number } => x.res !== undefined)
+          .sort((a, b) => b.res.value - a.res.value || a.i - b.i)
+          .slice(0, Math.max(1, roots))
+        for (const { res, i } of ranked) {
+          const landed = foresee(res.line.path, { deals })
+          if (landed.length === 0) continue
+          const value = landed.reduce((n, s) => n + score(s), 0) / landed.length
+          results[i] = { line: res.line, value }
+          checked.add(i)
+        }
+      }
+
       // Strictly greater keeps the earliest root of a tie — offer order, like everything else.
+      // When any line was reply-checked, the winner comes from the checked set alone.
       let bestAt = -1
       for (let i = 0; i < results.length; i++) {
         const r = results[i]
-        if (r !== undefined && (bestAt === -1 || r.value > results[bestAt]!.value)) bestAt = i
+        if (r === undefined) continue
+        if (checked.size > 0 && !checked.has(i)) continue
+        if (bestAt === -1 || r.value > results[bestAt]!.value) bestAt = i
       }
       const bestTerminal = results[bestAt]!
 
@@ -260,11 +305,15 @@ export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
         .map((x) => ({
           action: x.action,
           score: x.r.value,
-          note: `best of a ${x.r.line.path.length}-step line`,
+          note:
+            `best of a ${x.r.line.path.length}-step line` +
+            (checked.has(pool.indexOf(x.action)) ? ', after replies' : ''),
         }))
 
       const chosen = bestTerminal.line
-      const others = results.filter((r, i) => r !== undefined && i !== bestAt)
+      const others = results.filter(
+        (r, i) => r !== undefined && i !== bestAt && (checked.size === 0 || checked.has(i)),
+      )
       const runnerUp = others.length === 0 ? undefined : Math.max(...others.map((r) => r!.value))
       const margin = runnerUp === undefined ? undefined : bestTerminal.value - runnerUp
 
