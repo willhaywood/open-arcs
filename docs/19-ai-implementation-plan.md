@@ -32,6 +32,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Fitting from choices (interventional pairs) | correct design, zero signal — label noise ~20x effect | 3i |
 | Slot armour (`resourcesGuarded`) | **no measurable effect** — the gap *was* the noise floor, at both 120 and 1000 games | 3j |
 | Lore activation (`loreLive`/`loreArmed`) | **measurably worse** — 2-3 points behind against a 0-1 point floor, in two variants | 3k |
+| Per-rival intent in `valueOf` | **no measurable effect** — +3 points one run, level the next, floor 2 points; the probed-state variant livelocked and measured worse | 6 |
 
 ### Why they all failed, in one sentence
 
@@ -76,12 +77,20 @@ Not another search or fitting idea. Both remaining levers are engineering:
 2. **A cheap-but-strong playout policy** — what section 3d could not afford. Makes each playout a
    better estimate rather than needing more of them.
 
-### Known evaluator blind spots, still open
+### Known evaluator blind spots
 
-Concrete and cheap to describe, from the worked examples in section 2: **income is invisible** (it
-declares on resources held, never on capacity to generate), **planet types are never read**, and
-**card suits in hand are never read**. A bot with three cities on Material planets and two
-Administration cards will not push for Tycoon, because nothing it looks at can see any of that.
+The three this section originally listed — **income invisible**, **planet types never read**,
+**card suits in hand never read** — were all closed by the goal layer (section 4: `incomeFor`,
+`feasibility`, `declareReadiness`). This note was stale for a while and read as open work; the worked
+example ("three cities on Material planets and two Administration cards will not push for Tycoon")
+is exactly what `feasibility` and `declareReadiness` now see.
+
+Still open, and cheap to describe:
+
+- **Rivals are scored under your own intent** (`valueOf`) — the bot cannot see what an opponent is
+  going for, so it cannot deny. Addressed by section 6.
+- **Court cards are priced by suit and keys only** (`courtWorth`) — no card text is ever read, so a
+  swingy card and a dull one with the same suit and keys are the same card to the bot.
 
 ## 1. The seven prerequisites, verified
 
@@ -1902,3 +1911,42 @@ score (docs/03 section 7).
 
 Steps 1 and 2 are small and unblock the rest; step 4 is the one most likely to be skipped and most
 expensive to skip.
+
+## 6. Per-rival intent — a null, and a livelock worth remembering
+
+The blind spot (section 0): `valueOf` scored every rival under *your* intent, so the bot could not
+see what an opponent was going for and could not deny. The fix looked obvious — score each rival
+under `intentFor(observed, rival, feasibility)`, public state only, one extra intent computation
+per rival per evaluation. `rivalBot` carries it; `heuristicBotWith` grew the option.
+
+### The first version was wrong in a way the arena caught and an argument did not
+
+Rival intents were recomputed on each **probed** state, on the reasoning that my candidate action
+can change a rival's position and their intent should follow it. Two failures, one loud:
+
+- **Candidates could move the measuring stick.** A rival's `contest()` reads *my* holdings — the
+  anti-flap rule (section 2b) violated from the rival's side — so the bot found +0.018 in
+  discarding its own Material: real resources spent to twitch an imputed number.
+- **The strictly-improving-repeat gate stopped terminating.** Its argument requires `valueOf` to be
+  one fixed function per decision; with intents shifting under each candidate it was not. Arena
+  seed 245 cycled Prelude → arrange → swap → Done for 20,000 actions — 1 unfinished game in 999,
+  reproduced first try, now pinned as a test (`rival-intent.test.ts`).
+
+Fixed by computing rival intents **once per decision from the pre-action state** and holding them
+fixed across candidates. Nothing a candidate does can then shift the yardstick, and the gate's
+bounded quantity is real again.
+
+### Measured, fixed version, 999 games x2 with twin
+
+| run | rival-intent | standard | twin floor |
+| --- | --- | --- | --- |
+| vs standard x2 | 35% wins, 18.8 power | 32%, 18.5 | — |
+| vs standard, twinned | 34% wins, 18.8 power | 34%, 18.7 | 2 points, 0.4 power |
+
+Three points ahead once, dead level on the rerun: **the floor talking, not a result.** The shipped
+bot keeps one intent for everyone; the option stays for later work to measure in combination
+(section 7's search takes it as a flag, off by default, for exactly that reason).
+
+The section 0 lesson holds its streak: this is the fourth plausible evaluator idea in a row —
+guard, lore, declare-cost-as-strength, now rival intent — to measure as nothing or worse. The
+register, not the argument, is the arbiter.

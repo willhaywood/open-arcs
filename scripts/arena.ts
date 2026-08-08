@@ -118,6 +118,32 @@ const show = (o: GameOutcome, i: number): void => {
 
 const started = Date.now()
 
+/*
+ * Progress, to stderr so a run redirected to a file still has a clean report on stdout while the
+ * terminal (or a `tail -f`) shows how far along it is. A long run used to be silent from the
+ * banner to the table — up to forty minutes of nothing, with no way to tell a healthy run from a
+ * hung one short of `ps`. The ETA is the observed pace extrapolated, which is honest enough here
+ * because games are independent and similar in cost; it firms up as the sample grows.
+ *
+ * Every ~2.5% rather than every game: a 999-game run prints ~40 lines instead of 999, so the log
+ * stays readable, while an 8-game run still reports each game.
+ */
+const every = Math.max(1, Math.round(games / 40))
+let completed = 0
+const progress = (): void => {
+  completed++
+  if (completed % every !== 0 && completed !== games) return
+  const elapsed = Date.now() - started
+  const pace = elapsed / completed
+  const left = Math.round((pace * (games - completed)) / 1000)
+  const fmt = (s: number): string => (s >= 60 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s` : `${s}s`)
+  process.stderr.write(
+    `  ${String(completed).padStart(String(games).length)}/${games} games` +
+      `  ${fmt(Math.round(elapsed / 1000))} elapsed` +
+      (completed === games ? '\n' : `  ~${fmt(left)} left\n`),
+  )
+}
+
 if (jobs === 1) {
   const registry = defaultRegistry()
   const outcomes: GameOutcome[] = []
@@ -130,6 +156,7 @@ if (jobs === 1) {
     )
     outcomes.push(o)
     show(o, i)
+    progress()
   }
   report(outcomes, Date.now() - started)
 } else {
@@ -179,6 +206,7 @@ if (jobs === 1) {
         const { index, outcome } = JSON.parse(line) as { index: number; outcome: GameOutcome }
         collected[index] = outcome
         show(outcome, index)
+        progress()
       }
     })
 

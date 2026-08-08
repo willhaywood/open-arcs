@@ -12,7 +12,7 @@
 import { intentFor, structuralFitness } from './intent.js'
 import type { Fitness } from './intent.js'
 import { WEIGHTS, termsFor, topTerms, valueOf } from './value.js'
-import type { Weights } from './value.js'
+import type { RivalIntent, Weights } from './value.js'
 import type { Action } from '../action.js'
 import type { Bot, BotDecision, Considered, Lookahead } from './bot.js'
 import type { ObservedState } from '../observe.js'
@@ -61,12 +61,32 @@ function describe(action: Action): string {
  * find out whether fitting produced a better *player* rather than merely a better predictor of the
  * outcome under the policy that generated the data.
  */
+export interface HeuristicOptions {
+  /**
+   * Score each rival under the intent *they* would derive, rather than under this bot's own.
+   *
+   * Off by default: the frozen baseline scores everyone with one intent, and the golden test pins
+   * that behaviour. `true` judges rivals by the same `fitness` this bot judges itself with — see
+   * `RivalIntent` in `value.ts` for why the difference is what makes denial visible.
+   *
+   * Also accepts the function itself. That exists for the tests, and the reason is worth keeping:
+   * a mutation that computed the *acting* faction's intent inside the lambda — the one-token
+   * mistake this option makes possible — passed every test that only compared against the default,
+   * because recomputing anyone's intent on the probed state moves the same decisions. The wrong
+   * variant has to be constructible for a test to pin the difference between it and the right one.
+   */
+  readonly rivalIntent?: boolean | RivalIntent
+}
+
 export function heuristicBotWith(
   weights: Weights,
   id = 'heuristic-v1',
   /** How chapter goals are judged. Swappable so a stronger answer can be measured against the frozen one. */
   fitness: Fitness = structuralFitness,
+  opts: HeuristicOptions = {},
 ): Bot {
+  const explicitRival: RivalIntent | undefined =
+    typeof opts.rivalIntent === 'function' ? opts.rivalIntent : undefined
   return {
   id,
   decide(observed: ObservedState, actions: readonly Action[], lookahead?: Lookahead): BotDecision {
@@ -74,6 +94,36 @@ export function heuristicBotWith(
     if (first === undefined) throw new Error('heuristicBot: no actions on offer')
 
     const intent = intentFor(observed, observed.self, fitness)
+    /*
+     * Rival intents are computed **once per decision, from the pre-action state**, and held fixed
+     * while every candidate is scored. The first version recomputed them on each probed state —
+     * "my action can change a rival's position, so read their intent off the position it produces"
+     * — and that reasoning was measured wrong twice over:
+     *
+     *   - **It let candidates move the measuring stick.** A rival's `contest()` reads *my*
+     *     holdings, so discarding my own Material shifted their recomputed intent, repriced their
+     *     whole position, and netted +0.018 — the bot paid real resources to twitch an imputed
+     *     number. This is the anti-flap rule (docs/19 section 2b) violated from the other side:
+     *     rival intent read things that move across my own actions.
+     *   - **It broke the livelock gate.** The strictly-improving-repeat rule terminates because
+     *     every repeat increases a bounded quantity — which requires `valueOf` to be one fixed
+     *     function per decision. With intents shifting under each candidate it was not, and seed
+     *     245 in the arena cycled Prelude → arrange → swap → Done for 20,000 actions.
+     *
+     * Fixed per decision, both hold again: no candidate can differ by intent-shift alone, and the
+     * gate's bounded quantity is a real one.
+     */
+    const rivalIntent: RivalIntent | undefined =
+      opts.rivalIntent === true
+        ? (() => {
+            const views = new Map(
+              observed.factions
+                .filter((f) => f !== observed.self)
+                .map((f) => [f, intentFor(observed, f, fitness)] as const),
+            )
+            return (_probed, rival) => views.get(rival) ?? intent
+          })()
+        : explicitRival
 
     /*
      * Without lookahead there is nothing to evaluate — scoring an action without applying it is
@@ -90,7 +140,7 @@ export function heuristicBotWith(
      * `valueOf` needs no lookahead, so this is free — and it is the only reference point that makes
      * "did that achieve anything" answerable at all.
      */
-    const here = valueOf(observed, observed.self, intent, weights)
+    const here = valueOf(observed, observed.self, intent, weights, rivalIntent)
 
     /*
      * Rollbacks are dropped before anything is weighed, so they cannot win on score or on a
@@ -126,8 +176,10 @@ export function heuristicBotWith(
        * sample and this is the same arithmetic as before.
        */
       const gained =
-        probe.samples.reduce((n, s) => n + valueOf(s, observed.self, intent, weights), 0) /
-        probe.samples.length
+        probe.samples.reduce(
+          (n, s) => n + valueOf(s, observed.self, intent, weights, rivalIntent),
+          0,
+        ) / probe.samples.length
       const score = gained + probe.actionsAhead * PIP_VALUE
       /*
        * **A repeating action must strictly improve the position to be eligible at all.**

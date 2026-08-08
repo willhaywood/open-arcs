@@ -445,26 +445,58 @@ export function termsFor(
 const sum = (terms: readonly Term[]): number => terms.reduce((n, t) => n + t.power, 0)
 
 /**
+ * How a rival's intent is judged when scoring their position.
+ *
+ * The probed state is passed in, and the shipped implementation **deliberately ignores it**,
+ * answering from intents computed once per decision on the pre-action state (`heuristic.ts`). The
+ * first version read the probed state — "score the rival's intent off the position my action
+ * produces" — which sounds more accurate and measured worse in two ways: candidates could shift a
+ * rival's imputed intent (a rival's contest term reads *my* holdings, so discarding my own
+ * resources repriced their position), and a value function that moves under each candidate breaks
+ * the strictly-improving-repeat gate's termination argument — seed 245 livelocked on exactly that.
+ * The parameter stays because a future caller may have a sound use for the probed state; the
+ * lesson stays with it.
+ */
+export type RivalIntent = (observed: ObservedState, rival: FactionId) => ChapterIntent
+
+/**
  * The position's worth to `self`, relative to the best opponent.
  *
- * Opponents are scored with `self`'s own intent, which is a deliberate simplification: modelling
- * what each rival is going for is a V2 concern, and using one intent for everyone at least prices
- * their positions on the same scale as ours.
+ * Opponents are scored with `self`'s own intent by default, which is a deliberate simplification —
+ * it prices their positions on the same scale as ours, and it is what the frozen baseline does.
+ *
+ * `rivalIntent` replaces that: each rival is scored under what *they* are going for. The
+ * difference is what makes denial visible. Under one intent, a rival's trophies are worth whatever
+ * my plan says trophies are worth — nothing, if I am not chasing Warlord — so a move that hands a
+ * warlike rival two easy kills can score as harmless. Under their own intent the same trophies are
+ * priced as the Warlord they are actually winning. `intentFor` reads only public, slow-moving
+ * state, so this stays honest (no hidden information) and cheap (no search).
+ *
+ * Optional with the old behaviour as the default, because `heuristicBot` shares this code path
+ * with the frozen baseline and the golden test pins its exact outcomes (`baseline.test.ts`). A bot
+ * switches it on the way the goal layer switches on a weight: explicitly, under a new id, so the
+ * arena can attribute the difference.
  */
 export function valueOf(
   observed: ObservedState,
   self: FactionId,
   intent: ChapterIntent,
   weights: Weights = WEIGHTS,
+  rivalIntent?: RivalIntent,
 ): number {
-  const score = (f: FactionId): number => {
-    const x = featuresOf(observed, f, intent)
+  const score = (f: FactionId, view: ChapterIntent): number => {
+    const x = featuresOf(observed, f, view)
     let total = 0
     for (const k of FEATURES) total += x[k] * weights[k]
     return total
   }
-  const mine = score(self)
-  const best = Math.max(0, ...observed.factions.filter((f) => f !== self).map(score))
+  const mine = score(self, intent)
+  const best = Math.max(
+    0,
+    ...observed.factions
+      .filter((f) => f !== self)
+      .map((f) => score(f, rivalIntent?.(observed, f) ?? intent)),
+  )
   return mine - best
 }
 
