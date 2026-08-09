@@ -416,9 +416,28 @@ function performFollowMain(state: GameState, faction: FactionId): RuleResult {
     options.push({ ...Copy(faction, id), faction, label: `Copy with ${id}` })
   }
 
+  /*
+   * **No Pass here — a follower must play a card.**
+   *
+   * Rulebook p10: "On your turn, you must play an action card in one of three ways" (Surpass, Copy
+   * or Pivot), and only "players with no cards in their hand skip their turn". Passing belongs to
+   * the initiative holder alone (p8), where it is a different move entirely: it hands the marker on
+   * and *immediately ends the round*.
+   *
+   * Offering it here let a follower fire the initiative-holder's rule. Reported from a real game
+   * and reproduced from the save: yellow led Administration-2, blue copied, white held Aggression-4
+   * and was offered Pass — taking it logged "initiative passes to red", cleared the lead and
+   * restarted the round, handing the human a lead out of turn. It also let bots hoard cards for
+   * free, so a chapter ended with hands still full.
+   *
+   * Nobody can be stranded by this. Every card above pushes a `Copy` option unconditionally — Copy
+   * puts the card face down for one action of the lead suit, so its own suit never disqualifies it —
+   * and `advanceAfterTurn` skips a faction holding nothing before this function is ever reached.
+   * A follower who gets here therefore always has at least one legal play.
+   */
   return {
     state: { ...state, current: faction },
-    continue: C.ask(faction, [...options, Pass(faction)], `${faction} follows ${lead.cardId}`),
+    continue: C.ask(faction, options, `${faction} follows ${lead.cardId}`),
   }
 }
 

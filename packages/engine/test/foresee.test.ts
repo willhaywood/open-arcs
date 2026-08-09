@@ -13,7 +13,6 @@ import { describe, expect, it } from 'vitest'
 import {
   CardLocation,
   botToAct,
-  isCardPlay,
   contentsOf,
   defaultRegistry,
   moveAll,
@@ -28,24 +27,34 @@ import type { Action, Bot, FactionId, Foresee, GameState, RuleResult } from '../
 const registry = defaultRegistry()
 const THREE: readonly FactionId[] = ['red', 'yellow', 'blue']
 
-/** Drive a real game to its first card-play ask at or past `minSteps`, with standard play. */
+/**
+ * Drive a real game to an ask at or past `minSteps` that offers `turn/pass`.
+ *
+ * A **lead** ask, in other words: passing belongs to the initiative holder, and a follower must
+ * play a card (rulebook p10). These tests foresee through a pass because it is the shortest line
+ * that genuinely hands play to the rivals — so the fixture has to seek the ask that offers one,
+ * rather than any card play. Seeking "a card play" was enough while followers could also pass; the
+ * moment that stopped, the fixture started landing on follow menus with nothing to pass with.
+ */
 function midGame(seed: number, minSteps: number): RuleResult {
   let cur = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed }, registry)
   let asked: AskedThisTurn = NO_ASKS
-  for (let i = 0; i < minSteps + 60; i++) {
+  for (let i = 0; i < minSteps + 400; i++) {
     const c = cur.continue
-    if (i >= minSteps && c.kind === 'ask' && isCardPlay(c.actions)) return cur
+    if (i >= minSteps && c.kind === 'ask' && c.actions.some((a) => a.type === 'turn/pass')) {
+      return cur
+    }
     const f = botToAct(cur, THREE)
     if (f === undefined) break
     const step = stepBot(cur, standardBot, f, registry, asked)
     cur = step.result
     asked = step.asked
   }
-  throw new Error('no card-play ask reached — fixture broke')
+  throw new Error('no ask offering turn/pass reached — fixture broke')
 }
 
 /**
- * The path every test foresees through: `turn/pass`, which ends the turn in one action.
+ * The path every test foresees through: `turn/pass`, which hands play on in one action.
  *
  * Load-bearing, and the first version got it wrong: a one-action *card* path lands on this
  * faction's own declare or Prelude ask, so the reply drive stopped before any rival moved and

@@ -82,16 +82,19 @@ describe('valueOf with rival intent', () => {
 describe('the rival-intent bot', () => {
   it('reaches a different decision than standard on a real position', () => {
     /*
-     * Seed 1, step 459, found by sweeping full games for the first disagreement (re-swept when
-     * rival intents became per-decision-fixed — the previous pin at step 311 was a decision the
-     * probed-state variant made, and that variant no longer exists). Blue's Prelude: `standardBot`
-     * begins its actions, `rivalBot` spends a Material to build first. Pinning the step (not just
-     * "they differ somewhere") is what makes a silent `opts`-dropping regression fail here rather
-     * than pass on a different disagreement.
+     * Seed 1, step 522, found by sweeping full games for the first disagreement. Blue chases a
+     * declared Keeper and returns a captive: `standardBot` takes the Material, `rivalBot` takes the
+     * Relic — the resource its ambition actually scores. Pinning the step (not just "they differ
+     * somewhere") is what makes a silent `opts`-dropping regression fail here rather than pass on
+     * a different disagreement.
+     *
+     * Re-swept three times now, and the pin moving is expected rather than alarming: it names a
+     * point in a *driven game*, so anything that changes the legal action set moves it. Both tax
+     * offers and follower passes did.
      */
     let cur: RuleResult = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 1 }, registry)
     let asked: AskedThisTurn = NO_ASKS
-    for (let i = 0; i < 459; i++) {
+    for (let i = 0; i < 522; i++) {
       const f = botToAct(cur, THREE)
       expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
       const step = stepBot(cur, standardBot, f!, registry, asked)
@@ -102,8 +105,8 @@ describe('the rival-intent bot', () => {
     expect(f).toBe('blue')
     const standard = stepBot(cur, standardBot, f!, registry, asked).decision
     const rival = stepBot(cur, rivalBot, f!, registry, asked).decision
-    expect(String(standard.action['label'])).toContain('Begin actions')
-    expect(String(rival.action['label'])).toContain('Build')
+    expect(String(standard.action['label'])).toContain('Material')
+    expect(String(rival.action['label'])).toContain('Relic')
   })
 
   it('scores rivals under the RIVAL’s intent, not a recomputation of its own', () => {

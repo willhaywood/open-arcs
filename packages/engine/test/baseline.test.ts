@@ -76,14 +76,22 @@ describe('the frozen baseline', () => {
  * for whoever led them first.
  */
 /*
- * Regenerated once, for the rules fix that stopped `offerTax` offering a tax which provably could
- * not do anything (an exhausted supply, own city, no trait able to fire). The evaluator is
- * untouched — `weightsMatchBaseline` above still passes — and the games moved because the legal
- * action set did, which is the exception the note describes rather than a redefinition of the bot.
- * Previous values, for the record: [11,30,33], [27,25,16], [27,25,28].
+ * Regenerated for two rules fixes, both of which changed the **legal action set** rather than the
+ * bot. The evaluator is untouched throughout — `weightsMatchBaseline` above still passes — which is
+ * the exception the note describes rather than a redefinition of the frozen baseline.
+ *
+ *   - `offerTax` stopped offering a tax that provably could not do anything (exhausted supply, own
+ *     city, no trait able to fire).
+ *   - A *follower* stopped being offered Pass (rulebook p10: a follower must play a card; passing
+ *     belongs to the initiative holder). Bots can no longer skip a turn for free, so cards get
+ *     spent, which moves games the most of anything here.
+ *
+ * These numbers are for both together, recomputed after merging — neither branch's figures were
+ * right for the combination. Values before either fix, for the record:
+ * [11,30,33], [27,25,16], [27,25,28].
  */
 const GOLDEN = [
-  [22, 36, 21],
-  [46, 34, 13],
-  [18, 20, 37],
+  [32, 6, 9],
+  [55, 20, 17],
+  [7, 35, 17],
 ]
