@@ -25,8 +25,9 @@ import {
   planetResource,
   slotsOf,
   startGame,
+  supplyOf,
 } from '../src/index.js'
-import type { FactionId, GameState } from '../src/index.js'
+import type { Action, FactionId, GameState } from '../src/index.js'
 
 const registry = defaultRegistry()
 const THREE: readonly FactionId[] = ['red', 'yellow', 'blue']
@@ -108,5 +109,107 @@ describe('taxing', () => {
     expect(out.state.log.join(' ')).toContain('no room')
     // And the capture still happens, so the action was not a no-op.
     expect(contentsOf(out.state.figures, Location.captives('red')).length).toBe(1)
+  })
+})
+
+/**
+ * The follow-up report: "the AI taxes its own city when there is nothing left to tax."
+ *
+ * It did, 20% of the time — 50 of 251 taxes across six driven games hit an exhausted supply and
+ * gained nothing. Taxing an empty supply is *legal*, so the engine was not breaking a rule; it was
+ * offering an action that provably could not do anything, and an Administration pip with nothing
+ * else to buy took it.
+ *
+ * The tests below are almost all **escape hatches** rather than the fix itself, and that is
+ * deliberate. Withholding an option is only safe while "gains nothing" stays certain: a tax can
+ * also capture an agent, pay a leader's bonus, trigger Mythic or trigger Ruthless. Getting any of
+ * those wrong hides a legal move — a rules bug traded for a cosmetic one — so each is pinned by a
+ * test asserting the option is **still offered**.
+ */
+describe('a tax that could not do anything is not offered', () => {
+  /**
+   * Empty the supply of `r`, so taxing for it can gain nothing.
+   *
+   * Parked in blue's overflow rather than a "scrapped" bin: every resource location has to be
+   * registered in the tracker, and overflow is the one that exists and belongs to nobody's slots,
+   * so red's holdings and blue's own slots are both untouched by the drain.
+   */
+  function drain(s: GameState, r: string): GameState {
+    let next = s
+    for (const id of [...contentsOf(next.resources, `supply:${r}`)]) {
+      next = { ...next, resources: move(next.resources, id, 'overflow:blue') }
+    }
+    return next
+  }
+
+  /** The Tax menu red is offered right now. */
+  function taxMenu(s: GameState): readonly Action[] {
+    const open = advance(
+      s,
+      { type: 'action/take', faction: 'red', action: 'Tax', then: { type: 'turn/end', faction: 'red' } } as never,
+      registry,
+    )
+    const c = open.continue
+    return c.kind === 'ask' ? c.actions : []
+  }
+
+  const taxesFor = (s: GameState, system: string): number =>
+    taxMenu(s).filter((a) => String(a['label'] ?? '').includes(system)).length
+
+  it('withholds it: own city, empty supply, no traits in play', () => {
+    const { state, system } = ruledPlanet('red', true)
+    expect(taxesFor(state, system), 'the fixture offers the tax to begin with').toBeGreaterThan(0)
+    expect(taxesFor(drain(state, 'Material'), system)).toBe(0)
+  })
+
+  it("still offers a rival's city — the tax captures an agent", () => {
+    // The escape hatch that matters most: nothing is gained in resources, but a captive is.
+    const { state, system } = ruledPlanet('yellow', true)
+    expect(taxesFor(drain(state, 'Material'), system)).toBeGreaterThan(0)
+  })
+
+  it('still offers it when a leader would pay a bonus resource', () => {
+    /*
+     * Firebrand (Agitator): a Weapon alongside the taxed resource, but only on a Copy or Pivot —
+     * so the fixture has to have pivoted for the trait to be live at all.
+     */
+    const { state, system } = ruledPlanet('red', true)
+    const s: GameState = {
+      ...drain(state, 'Material'),
+      leaders: { ...state.leaders, red: 'leader15' },
+      roundPlays: [{ faction: 'red', cardId: 'Aggression-3', kind: 'pivot' }],
+    }
+    expect(taxesFor(s, system)).toBeGreaterThan(0)
+  })
+
+  it('still offers it when Mythic could reshape the planet', () => {
+    /*
+     * Shaper: "after you tax a city, you may place 1 resource over the planet's icon." The tax
+     * gains nothing and the reshape is the whole point of taking it.
+     *
+     * Red must hold a resource **of a different type than the planet** — Mythic covers the printed
+     * icon, so a Material token cannot reshape a Material planet, and this board's setup deals red
+     * two Materials and nothing else. Handing it a Relic is what makes the trait live; without
+     * that the option is correctly withheld, which cost a fixture rewrite to notice.
+     */
+    const { state, system } = ruledPlanet('red', true)
+    const drained = drain(state, 'Material')
+    const relic = contentsOf(drained.resources, 'supply:Relic')[0]!
+    const s: GameState = {
+      // Off the *drained* tracker — spreading `drain(...)` and then overriding `resources` from
+      // the original state silently un-drains the supply, and the test passes for the wrong reason.
+      ...drained,
+      resources: move(drained.resources, relic, 'cityslot:red:0'),
+      leaders: { ...state.leaders, red: 'leader14' },
+    }
+    expect(supplyOf(s.resources, 'Material').length, 'the supply really is empty').toBe(0)
+    expect(taxesFor(s, system)).toBeGreaterThan(0)
+  })
+
+  it('still offers it when Ruthless could squeeze the building', () => {
+    // Overseer: "once per turn, when you tax any city, you may hit the building to tax again."
+    const { state, system } = ruledPlanet('red', true)
+    const s: GameState = { ...drain(state, 'Material'), leaders: { ...state.leaders, red: 'leader10' } }
+    expect(taxesFor(s, system)).toBeGreaterThan(0)
   })
 })

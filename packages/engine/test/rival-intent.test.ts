@@ -114,16 +114,19 @@ describe('the rival-intent bot', () => {
      * faction's intent inside the rival lambda — a one-token mistake — moves many of the same
      * decisions, because recomputing anyone's intent moves them. What distinguishes the two is a
      * position where the rival's own goals price their board differently from ours, and seed 1
-     * step 311 is the first such divergence (found by sweeping, re-swept for the
-     * per-decision-fixed semantics): blue declares Tycoon under rival-aware scoring, and skips the
-     * declaration under the wrong-faction variant.
+     * step 313 is the first such divergence (found by sweeping): blue declares Tycoon under
+     * rival-aware scoring, and skips the declaration under the wrong-faction variant.
+     *
+     * Re-swept twice, and the step moving is expected rather than alarming: the pin names a point
+     * in a *driven game*, so any change to the legal action set shifts it. It moved 311 -> 313 when
+     * `offerTax` stopped offering taxes that could do nothing.
      */
     const wrongFaction = heuristicBotWith(STANDARD_WEIGHTS, 'wrong-faction', feasibility, {
       rivalIntent: (obs, _rival) => intentFor(obs, obs.self, feasibility),
     })
     let cur: RuleResult = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 1 }, registry)
     let asked: AskedThisTurn = NO_ASKS
-    for (let i = 0; i < 311; i++) {
+    for (let i = 0; i < 313; i++) {
       const f = botToAct(cur, THREE)
       expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
       const step = stepBot(cur, rivalBot, f!, registry, asked)
