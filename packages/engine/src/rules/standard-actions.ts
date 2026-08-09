@@ -46,6 +46,7 @@ import {
   slotKeys,
   openSlots,
   overflowTokens,
+  supplyOf,
   spendToken,
 } from '../resources.js'
 import type { GameState } from '../state.js'
@@ -846,6 +847,49 @@ function cityOwner(state: GameState, faction: FactionId, city: string): FactionI
   return state.factions.find((f) => f === (color as FactionId))
 }
 
+/**
+ * Can this tax have **no effect whatsoever**?
+ *
+ * Taxing an exhausted supply is legal — the rulebook does not forbid it and `gain` simply reports
+ * `gained: false` — but offering an action that provably does nothing is how the bot came to spend
+ * a fifth of its taxes on air (20% of 251 across six games). `performTurn` already declines to
+ * stall on a suit that can buy nothing; this is the same idea one level down.
+ *
+ * **Conservative by construction, and that direction is the whole safety argument.** A tax is not
+ * only a resource grab — `performTaxCity` can also capture an agent, pay a leader's bonus, trigger
+ * Mythic and trigger Ruthless. Saying "nothing" when something was possible deletes a legal move,
+ * which would be a real rules bug traded for a cosmetic one; saying "something" when nothing was
+ * possible merely leaves a useless option on the menu. So every clause below must be *certain*, and
+ * the two trait gates are read from `mythicTokens` / `canRuthless` rather than restated, because a
+ * restatement is exactly what would drift and start hiding useful taxes.
+ */
+function taxGainsNothing(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  city: string,
+  resource: Resource | undefined,
+): boolean {
+  // No known resource means we cannot reason about the supply at all — keep the option.
+  if (resource === undefined) return false
+  if (supplyOf(state.resources, resource).length > 0) return false
+  /*
+   * The capture, read the way `performTaxCity` reads it: Empath's Bond taxes a rival's city
+   * *without* the usual capture, so under the Bond even a rival's city gains nothing here.
+   */
+  const owner = loreActive(state, faction, EMPATHS_BOND)
+    ? undefined
+    : cityOwner(state, faction, city)
+  if (owner !== undefined) return false
+  // A leader's bonus resource is still a gain, if any of them is still in the supply.
+  for (const r of taxBonusResources(state, faction)) {
+    if (supplyOf(state.resources, r).length > 0) return false
+  }
+  if (mythicTokens(state, faction, system, city).length > 0) return false
+  if (canRuthless(state, faction, system, city)) return false
+  return true
+}
+
 function offerTax(state: GameState, faction: FactionId, then: PipReturn): Continue {
   const options: Action[] = []
   for (const s of state.board.systems) {
@@ -853,6 +897,7 @@ function offerTax(state: GameState, faction: FactionId, then: PipReturn): Contin
     // offers one option per type rather than the single printed resource a planet has.
     for (const city of taxableAt(state, faction, s)) {
       for (const r of gateCityTypes(state, s)) {
+        if (taxGainsNothing(state, faction, s, city, r)) continue
         options.push({
           ...TaxCity(faction, s, then),
           city,
@@ -869,6 +914,7 @@ function offerTax(state: GameState, faction: FactionId, then: PipReturn): Contin
     // One option per City, not per system — a 2-slot planet can hold two of your Cities,
     // and each may be taxed once. Cities already taxed this turn are withheld.
     for (const city of taxableAt(state, faction, s)) {
+      if (taxGainsNothing(state, faction, s, city, planetResource(state, s))) continue
       const owner = cityOwner(state, faction, city)
       options.push({
         ...TaxCity(faction, s, then),
@@ -883,6 +929,7 @@ function offerTax(state: GameState, faction: FactionId, then: PipReturn): Contin
     // Inspiring's empty building slots, taxed "like Loyal cities" — the planet's resource, and
     // no captive, since nobody owns an empty slot.
     for (const slot of taxableSlotsAt(state, faction, s)) {
+      if (taxGainsNothing(state, faction, s, slot, planetResource(state, s))) continue
       options.push({
         ...TaxCity(faction, s, then),
         city: slot,
@@ -1009,6 +1056,35 @@ const MythicPlace = (
  *
  * One option per distinct type held, because two Fuel are the same choice.
  */
+/**
+ * The tokens Mythic could reshape this planet with, or `[]` when it cannot fire at all.
+ *
+ * Split out of `offerMythic` so `taxGainsNothing` can ask the same question without restating the
+ * gates. Restating them is the failure mode that matters here: the filter withholds a tax option,
+ * so a gate that drifts out of sync would start hiding a *useful* tax — a rules bug traded for a
+ * cosmetic one.
+ */
+function mythicTokens(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  city: string,
+): readonly string[] {
+  if (!hasTrait(state, faction, 'Mythic')) return []
+  if (isEmptySlot(city)) return []
+  if (systemInfo(system).isGate) return []
+  if (state.planetTypes[system] !== undefined) return []
+  const out: string[] = []
+  const seen = new Set<Resource>()
+  for (const token of heldTokens(state.resources, slotsOf(state, faction))) {
+    const r = parseResourceToken(token).resource
+    if (seen.has(r) || r === planetResource(state, system)) continue
+    seen.add(r)
+    out.push(token)
+  }
+  return out
+}
+
 function offerMythic(
   state: GameState,
   faction: FactionId,
@@ -1016,23 +1092,12 @@ function offerMythic(
   city: string,
   then: PipReturn,
 ): Continue {
-  if (!hasTrait(state, faction, 'Mythic')) return C.then(then as Action)
-  if (isEmptySlot(city)) return C.then(then as Action)
-  if (systemInfo(system).isGate) return C.then(then as Action)
-  if (state.planetTypes[system] !== undefined) return C.then(then as Action)
-
-  const options: Action[] = []
-  const seen = new Set<Resource>()
-  for (const token of heldTokens(state.resources, slotsOf(state, faction))) {
-    const r = parseResourceToken(token).resource
-    if (seen.has(r) || r === planetResource(state, system)) continue
-    seen.add(r)
-    options.push({
-      ...MythicPlace(faction, system, token, then),
-      faction,
-      label: `Reshape ${system} into a ${r} planet (Mythic)`,
-    })
-  }
+  const tokens = mythicTokens(state, faction, system, city)
+  const options: Action[] = tokens.map((token) => ({
+    ...MythicPlace(faction, system, token, then),
+    faction,
+    label: `Reshape ${system} into a ${parseResourceToken(token).resource} planet (Mythic)`,
+  }))
   if (options.length === 0) return C.then(then as Action)
   return C.ask(
     faction,
@@ -1389,6 +1454,23 @@ const RuthlessHit = (
  *
  * Inspiring's synthetic empty slots are excluded — there is no building there to hit.
  */
+/**
+ * Can Ruthless still fire on this building? Split out of `offerRuthless` for the same reason
+ * `mythicTokens` is: `taxGainsNothing` must read the gates rather than restate them.
+ */
+function canRuthless(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  building: string,
+): boolean {
+  if (!hasTrait(state, faction, RUTHLESS)) return false
+  if (state.loreUsedThisTurn.includes(RUTHLESS)) return false
+  if (isEmptySlot(building)) return false
+  // The building has to still be standing to be hit — a battle may have taken it since.
+  return contentsOf(state.figures, Location.system(system)).includes(building)
+}
+
 function offerRuthless(
   state: GameState,
   faction: FactionId,
@@ -1397,13 +1479,7 @@ function offerRuthless(
   kind: 'tax' | 'build',
   then: PipReturn,
 ): Continue {
-  if (!hasTrait(state, faction, RUTHLESS)) return C.then(then as Action)
-  if (state.loreUsedThisTurn.includes(RUTHLESS)) return C.then(then as Action)
-  if (isEmptySlot(building)) return C.then(then as Action)
-  // The building has to still be standing to be hit — a battle may have taken it since.
-  if (!contentsOf(state.figures, Location.system(system)).includes(building)) {
-    return C.then(then as Action)
-  }
+  if (!canRuthless(state, faction, system, building)) return C.then(then as Action)
 
   const p = parseFigureId(building)
   const dies = state.damaged.includes(building)

@@ -75,8 +75,15 @@ describe('the frozen baseline', () => {
  * spread narrowed markedly — which is the point of the rule: those two ambitions no longer compound
  * for whoever led them first.
  */
+/*
+ * Regenerated once, for the rules fix that stopped `offerTax` offering a tax which provably could
+ * not do anything (an exhausted supply, own city, no trait able to fire). The evaluator is
+ * untouched — `weightsMatchBaseline` above still passes — and the games moved because the legal
+ * action set did, which is the exception the note describes rather than a redefinition of the bot.
+ * Previous values, for the record: [11,30,33], [27,25,16], [27,25,28].
+ */
 const GOLDEN = [
-  [11, 30, 33],
-  [27, 25, 16],
-  [27, 25, 28],
+  [22, 36, 21],
+  [46, 34, 13],
+  [18, 20, 37],
 ]
