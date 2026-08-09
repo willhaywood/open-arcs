@@ -82,16 +82,18 @@ describe('valueOf with rival intent', () => {
 describe('the rival-intent bot', () => {
   it('reaches a different decision than standard on a real position', () => {
     /*
-     * Seed 1, step 459, found by sweeping full games for the first disagreement (re-swept when
-     * rival intents became per-decision-fixed — the previous pin at step 311 was a decision the
-     * probed-state variant made, and that variant no longer exists). Blue's Prelude: `standardBot`
-     * begins its actions, `rivalBot` spends a Material to build first. Pinning the step (not just
-     * "they differ somewhere") is what makes a silent `opts`-dropping regression fail here rather
-     * than pass on a different disagreement.
+     * Seed 2, step 158, found by sweeping full games for the first disagreement. Yellow chases a
+     * declared Warlord: `standardBot` influences Silver Tongues, `rivalBot` influences Loyal
+     * Pilots. Pinning the step (not just "they differ somewhere") is what makes a silent
+     * `opts`-dropping regression fail here rather than pass on a different disagreement.
+     *
+     * Re-swept twice now, and the pin moving is expected rather than alarming: it names a point in
+     * a *driven game*, so anything that changes the legal action set moves it. Seed 1 no longer
+     * disagrees at all once followers must play a card.
      */
-    let cur: RuleResult = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 1 }, registry)
+    let cur: RuleResult = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 2 }, registry)
     let asked: AskedThisTurn = NO_ASKS
-    for (let i = 0; i < 459; i++) {
+    for (let i = 0; i < 158; i++) {
       const f = botToAct(cur, THREE)
       expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
       const step = stepBot(cur, standardBot, f!, registry, asked)
@@ -99,11 +101,11 @@ describe('the rival-intent bot', () => {
       asked = step.asked
     }
     const f = botToAct(cur, THREE)
-    expect(f).toBe('blue')
+    expect(f).toBe('yellow')
     const standard = stepBot(cur, standardBot, f!, registry, asked).decision
     const rival = stepBot(cur, rivalBot, f!, registry, asked).decision
-    expect(String(standard.action['label'])).toContain('Begin actions')
-    expect(String(rival.action['label'])).toContain('Build')
+    expect(String(standard.action['label'])).toContain('Silver Tongues')
+    expect(String(rival.action['label'])).toContain('Loyal Pilots')
   })
 
   it('scores rivals under the RIVAL’s intent, not a recomputation of its own', () => {

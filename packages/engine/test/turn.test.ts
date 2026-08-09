@@ -20,8 +20,12 @@ import {
   parseCardId,
   parseFigureId,
   startGame,
+  standardBot,
+  botToAct,
 } from '../src/index.js'
-import type { Action, GameState, RuleResult } from '../src/index.js'
+import { NO_ASKS, stepBot } from '../src/ai/play.js'
+import type { AskedThisTurn } from '../src/ai/play.js'
+import type { Action, FactionId, GameState, RuleResult } from '../src/index.js'
 
 const THREE = ['red', 'yellow', 'blue'] as const
 const FOUR = ['red', 'yellow', 'blue', 'white'] as const
@@ -922,5 +926,93 @@ describe('a faction swept from the map', () => {
     expect((out.continue as Extract<Continue, { kind: 'ask' }>).actions[0]!.type).toBe(
       'turn/reinforce',
     )
+  })
+})
+
+/**
+ * A follower must play a card (rulebook p10), and only the initiative holder may pass (p8).
+ *
+ * Reported from a real game and reproduced from the save: yellow led Administration-2, blue
+ * copied, and white — holding Aggression-4 — was offered Pass. Taking it ran the *initiative
+ * holder's* rule, so the log read "initiative passes to red", the lead was cleared and the round
+ * restarted, handing a human the lead out of turn. It also let bots hoard cards for free, ending
+ * chapters with hands still full.
+ */
+describe('passing belongs to the initiative holder', () => {
+  const drive = (seed: number, steps: number): RuleResult => {
+    let cur = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed }, registry)
+    let asked: AskedThisTurn = NO_ASKS
+    for (let i = 0; i < steps; i++) {
+      const f = botToAct(cur, THREE)
+      if (f === undefined) break
+      const step = stepBot(cur, standardBot, f, registry, asked)
+      cur = step.result
+      asked = step.asked
+    }
+    return cur
+  }
+
+  it('never offers Pass to a follower, across real games', () => {
+    /*
+     * The invariant, swept rather than staged: any ask whose prompt is a follow must not contain
+     * `turn/pass`. A lead ask may, which is what stops this passing vacuously — the counter
+     * asserts leads were actually seen.
+     */
+    let follows = 0
+    let leads = 0
+    for (let seed = 1; seed <= 4; seed++) {
+      let cur = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed }, registry)
+      let asked: AskedThisTurn = NO_ASKS
+      for (let i = 0; i < 700; i++) {
+        const c = cur.continue
+        if (c.kind === 'ask' && c.prompt !== undefined) {
+          const canPass = c.actions.some((a) => a.type === 'turn/pass')
+          if (/ follows /.test(c.prompt)) {
+            follows++
+            expect(canPass, `a follower was offered Pass: ${c.prompt}`).toBe(false)
+          } else if (/ leads$/.test(c.prompt)) {
+            leads++
+            expect(canPass, `the leader lost Pass: ${c.prompt}`).toBe(true)
+          }
+        }
+        const f = botToAct(cur, THREE)
+        if (f === undefined) break
+        const step = stepBot(cur, standardBot, f, registry, asked)
+        cur = step.result
+        asked = step.asked
+      }
+    }
+    expect(follows, 'the sweep actually reached follow asks').toBeGreaterThan(50)
+    expect(leads, 'the sweep actually reached lead asks').toBeGreaterThan(20)
+  })
+
+  it('always leaves a follower something to play — Copy is unconditional', () => {
+    /*
+     * What makes removing Pass safe. Copy puts any card face down for one action of the lead suit,
+     * so a card's own suit never disqualifies it, and `advanceAfterTurn` skips a faction holding
+     * nothing before the follow menu is reached. A follower who is asked therefore always has a
+     * legal play — otherwise this change would deadlock the round.
+     */
+    for (let seed = 1; seed <= 4; seed++) {
+      let cur = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed }, registry)
+      let asked: AskedThisTurn = NO_ASKS
+      for (let i = 0; i < 700; i++) {
+        const c = cur.continue
+        if (c.kind === 'ask' && / follows /.test(c.prompt ?? '')) {
+          expect(c.actions.length, `a follower had no legal play: ${c.prompt}`).toBeGreaterThan(0)
+        }
+        const f = botToAct(cur, THREE)
+        if (f === undefined) break
+        const step = stepBot(cur, standardBot, f, registry, asked)
+        cur = step.result
+        asked = step.asked
+      }
+    }
+  })
+
+  it('lets a chapter end with hands emptied rather than hoarded', () => {
+    // The other half of the report: free passing meant cards were never spent.
+    const end = drive(1, 900)
+    expect(end.state.chapter).toBeGreaterThan(1)
   })
 })

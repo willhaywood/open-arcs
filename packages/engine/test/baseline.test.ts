@@ -75,8 +75,16 @@ describe('the frozen baseline', () => {
  * spread narrowed markedly — which is the point of the rule: those two ambitions no longer compound
  * for whoever led them first.
  */
+/*
+ * Regenerated once, for the rules fix that stopped a *follower* being offered Pass (rulebook p10:
+ * a follower must play a card; passing belongs to the initiative holder). The evaluator is
+ * untouched — `weightsMatchBaseline` above still passes — and the games moved because the legal
+ * action set did, which is the exception the note describes rather than a redefinition of the bot.
+ * Bots can no longer skip a turn for free, so cards actually get spent.
+ * Previous values, for the record: [11,30,33], [27,25,16], [27,25,28].
+ */
 const GOLDEN = [
-  [11, 30, 33],
+  [32, 2, 9],
   [27, 25, 16],
-  [27, 25, 28],
+  [8, 31, 34],
 ]
