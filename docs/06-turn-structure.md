@@ -77,23 +77,43 @@ card's full pips; copy and pivot grant one.
 Implemented in `prelude.ts` (the table and eligibility) and `rules/turn.ts` (the flow).
 Between playing your card and spending its first pip you may spend **any** resources, each
 for one free action. It is a loop — every spend returns to the menu — so there is no limit
-beyond what you hold. Transcribed from `game-common.scala:1632-1775`.
+beyond what you hold. Transcribed from `game-common.scala:1632-1775`, and checked against
+**rulebook p17** ("Resources"), which is the authority for the table below.
 
-| Resource | Buys |
-| --- | --- |
-| Material | Build, Repair |
-| Fuel | Move |
-| Relic | Secure |
-| Weapon | *no action* — adds a **Battle option** to a card whose suit cannot battle |
-| Psionic | whatever the **lead card's** suit buys |
+| Resource | Buys | Rulebook p17 |
+| --- | --- | --- |
+| Material | Build, Repair | take a Build or Repair action |
+| Fuel | Move | take a Move action |
+| Relic | Secure | take a Secure action |
+| Weapon | *no action* — adds a **Battle option** to a card whose suit cannot battle | this turn you may spend **any** action pips from your card play on Battle actions |
+| Psionic | whatever the **lead card's** suit buys | take an action listed on the lead card |
 
 The tempting shortcut is to reuse the suit→action map for all of them, and it is wrong:
 Mobilization buys Move *and* Influence, but Fuel buys only Move. Only Psionic really is the
 suit map, keyed off the **lead** card — a follower who pivoted into another suit still copies
 the lead, which is why `state.lead.suit` is passed separately from the suit being acted in.
 
-The Weapon option is bought at most once (`state.anyBattle`), is not offered on an Aggression
-card that can already battle, and is cleared at end of turn with the other per-turn flags.
+### The Weapon is a modifier, not a purchase — and it is meant to be
+
+Every other resource buys exactly one action; a Weapon buys none and instead lets **every pip
+of the played card** battle. One Weapon on a 4-pip Construction card is therefore up to four
+battles, which looks so out of line with the others that it has been reported as a bug. It is
+the rule: p17 says to act as though "or Battle" were added to the played card, so the card is
+what changes, not a single action. Anyone re-reading this should check p17 before "fixing" it.
+
+Two consequences worth stating, because both are easy to get wrong in the other direction:
+
+- **Weapons do not convert other resources' Prelude actions.** p17 says so explicitly, and it
+  falls out of where the flag is read: `state.anyBattle` is consulted only by `performTurn`,
+  which offers the card's pips, and never by `preludeOffers`. A Fuel's Move stays a Move.
+- **A Psionic can still buy a Battle**, when the *lead* card is Aggression — that is the
+  Psionic rule ("an action listed on the lead card"), not the Weapon rule, and the two are
+  independent.
+
+`state.anyBattle` carries it: set once in the Prelude, read by every pip, cleared at end of
+turn with the other per-turn flags. The option is not offered twice, and not offered at all on
+an Aggression card that can already battle — **neither restriction is in the rulebook**, and
+both are safe because the flag is a boolean: a second Weapon would set what is already set.
 
 **This is where outrage finally bites.** An outraged resource offers no actions; it can still
 be discarded for the slot. Verified across 20 games: 266 Prelude menus, 192 actions bought,
