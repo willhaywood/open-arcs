@@ -972,7 +972,7 @@ function performTaxCity(
   }
   // Mythic comes after the overflow is settled, so the Shaper reshapes the planet holding what it
   // actually ended up with rather than what it briefly had in hand.
-  const after = Mythic(faction, system, city, Ruthless(faction, system, city, 'tax', then))
+  const after = Mythic(faction, system, city, Ruthless(faction, system, city, 'tax', then, resource))
   return { state: next, continue: overflowThen(next, faction, after) }
 }
 
@@ -1350,13 +1350,23 @@ function performBuild(
 /** Marker for the once-per-turn limit, in the same list the lore one-shots use. */
 const RUTHLESS = 'Ruthless'
 
+/*
+ * `resource` rides the whole Ruthless chain, and it is not optional decoration.
+ *
+ * Ruthless re-takes the action with the building it just hit, and for a **gate** city there is no
+ * printed resource to re-derive: Gate Stations picks the type when the tax is offered, so the
+ * choice lives only in the original action. Without it here, `performRuthlessAgain` called
+ * `performTaxCity` with `undefined` and the re-tax crashed on `supply:undefined`. Latent until
+ * followers stopped being able to pass, which changed how far games run.
+ */
 const Ruthless = (
   faction: FactionId,
   system: SystemId,
   building: string,
   kind: 'tax' | 'build',
   then: PipReturn,
-): Action => ({ type: 'leaders/ruthless', faction, system, building, kind, then })
+  resource?: Resource,
+): Action => ({ type: 'leaders/ruthless', faction, system, building, kind, then, resource })
 
 const RuthlessAgain = (
   faction: FactionId,
@@ -1364,7 +1374,8 @@ const RuthlessAgain = (
   building: string,
   kind: 'tax' | 'build',
   then: PipReturn,
-): Action => ({ type: 'leaders/ruthless-again', faction, system, building, kind, then })
+  resource?: Resource,
+): Action => ({ type: 'leaders/ruthless-again', faction, system, building, kind, then, resource })
 
 const RuthlessHit = (
   faction: FactionId,
@@ -1372,7 +1383,8 @@ const RuthlessHit = (
   building: string,
   kind: 'tax' | 'build',
   then: PipReturn,
-): Action => ({ type: 'leaders/ruthless-hit', faction, system, building, kind, then })
+  resource?: Resource,
+): Action => ({ type: 'leaders/ruthless-hit', faction, system, building, kind, then, resource })
 
 /**
  * Ruthless: "Once per turn, when you **tax** any city or **build** a ship at a starport, you may
@@ -1396,6 +1408,7 @@ function offerRuthless(
   building: string,
   kind: 'tax' | 'build',
   then: PipReturn,
+  resource?: Resource,
 ): Continue {
   if (!hasTrait(state, faction, RUTHLESS)) return C.then(then as Action)
   if (state.loreUsedThisTurn.includes(RUTHLESS)) return C.then(then as Action)
@@ -1412,7 +1425,7 @@ function offerRuthless(
     faction,
     [
       {
-        ...RuthlessHit(faction, system, building, kind, then),
+        ...RuthlessHit(faction, system, building, kind, then, resource),
         faction,
         label: `Hit the ${p.color} ${p.piece} in ${system} and ${verb}${dies ? ' (destroys it)' : ''}`,
       },
@@ -1429,6 +1442,7 @@ function performRuthlessHit(
   building: string,
   kind: 'tax' | 'build',
   then: PipReturn,
+  resource?: Resource,
 ): RuleResult {
   const p = parseFigureId(building)
   const destroyed = state.damaged.includes(building)
@@ -1470,7 +1484,7 @@ function performRuthlessHit(
    * the court step and the action it interrupts do not have to be threaded together — the repeat
    * is simply what the ransack continues to.
    */
-  const repeat = RuthlessAgain(faction, system, building, kind, then)
+  const repeat = RuthlessAgain(faction, system, building, kind, then, resource)
   const victim = destroyed && p.piece === 'City' ? cityOwner(next, faction, building) : undefined
   if (victim === undefined) return { state: next, continue: C.then(repeat) }
   return { state: next, continue: offerRuthlessRansack(next, faction, victim, repeat) }
@@ -1484,10 +1498,11 @@ function performRuthlessAgain(
   building: string,
   kind: 'tax' | 'build',
   then: PipReturn,
+  resource?: Resource,
 ): RuleResult {
   // Taken directly, so the once-per-turn limits the first use already spent do not stop it.
   return kind === 'tax'
-    ? performTaxCity(state, faction, system, then, building)
+    ? performTaxCity(state, faction, system, then, building, resource)
     : performBuild(state, faction, 'Ship', system, then, building)
 }
 
@@ -2582,6 +2597,7 @@ export const StandardActionsModule: RuleModule = {
             action['building'] as string,
             action['kind'] as 'tax' | 'build',
             action['then'] as PipReturn,
+            action['resource'] as Resource | undefined,
           ),
         }
       case 'leaders/ruthless-hit':
@@ -2592,6 +2608,7 @@ export const StandardActionsModule: RuleModule = {
           action['building'] as string,
           action['kind'] as 'tax' | 'build',
           action['then'] as PipReturn,
+          action['resource'] as Resource | undefined,
         )
       case 'leaders/ruthless-again':
         return performRuthlessAgain(
@@ -2601,6 +2618,7 @@ export const StandardActionsModule: RuleModule = {
           action['building'] as string,
           action['kind'] as 'tax' | 'build',
           action['then'] as PipReturn,
+          action['resource'] as Resource | undefined,
         )
       case 'leaders/mythic':
         return {
