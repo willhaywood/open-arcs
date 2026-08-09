@@ -243,7 +243,24 @@ function dealRivals(state: GameState, self: FactionId): GameState {
   if (pool.length === 0) return state
 
   const [shuffled, nextRng] = shuffle(state.rng, pool)
-  let cards = state.cards
+
+  /*
+   * **Everything is parked before anything is dealt, and that is the second half of the no-cheat
+   * property.**
+   *
+   * `move` returns the tracker untouched when a card is already at its destination, so a dealt hand
+   * built in place keeps whichever cards happened to be there in their original positions and
+   * appends the rest. The *set* is then correct while the *order* still encodes where the cards
+   * really were — and order is not cosmetic: it is the order `hand()` returns, so it is the order
+   * the reply bot sees its options in, and ties break on it. Two observer-identical worlds produced
+   * different leads through nothing but that.
+   *
+   * Parking the whole pool in `self`'s hand first makes every card arrive from somewhere else, so
+   * each zone ends up in exactly the dealt order. Self's hand is the one card zone that is never
+   * part of the pool, and every parked card is dealt back out again, so it holds precisely its own
+   * cards when this returns.
+   */
+  let cards = moveAll(state.cards, pool, CardLocation.hand(self))
   let cursor = 0
   const take = (n: number): string[] => shuffled.slice(cursor, (cursor += n))
   for (let i = 0; i < rivals.length; i++) {
