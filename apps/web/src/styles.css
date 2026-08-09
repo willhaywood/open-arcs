@@ -1384,15 +1384,53 @@ button {
 .hand-card:hover .card-plays {
   display: flex;
 }
+/*
+ * The fan rises above the bot tray while a card is hovered — **z-index only**.
+ *
+ * The play buttons open *upward*, into the `bot` grid row, so whenever a tray is up they land
+ * under it. `.hand-card:hover` already claims `z-index: 100`, but `.hand` is positioned with
+ * `z-index: 40` and therefore a stacking context: the card's 100 competes with its siblings and
+ * never with the tray's 46. Raising the container is what escapes.
+ *
+ * **Do not add `position` here.** The first version set `position: relative`, overriding `.hand`'s
+ * `absolute` — which is what centres the fan (`left: 50%`, `translateX(-50%)`) and hangs it past
+ * the row (`bottom: -84px`). The fan jumped out of place the moment a card was hovered. `.hand` is
+ * already positioned, so the z-index alone does the whole job.
+ */
+.hand:has(.hand-card:hover) {
+  z-index: 60;
+}
+/*
+ * LEAD / SURPASS / COPY / PIVOT, in the app's own button vocabulary.
+ *
+ * These were a plain blue pill in the system font — the one control on screen that looked like it
+ * came from a different application. The idiom is the toolbar's (`.topbar .ghost`): display face,
+ * letterspaced caps, the hand-cut corner radius, near-black stock under a gold hairline.
+ *
+ * **Gold at rest and accent under the cursor**, which is docs/10's palette rule read exactly: black,
+ * grey and gold are the printed furniture, and `--accent` is reserved for what you can click *right
+ * now* so a blue fill still means "this is the thing about to happen". These appear only on a
+ * playable card, so the card's own hover is what says "live"; the button says which play.
+ */
 .play-btn {
-  background: var(--accent);
-  color: #001;
-  border: none;
-  border-radius: 6px;
-  padding: 5px 12px;
+  font-family: var(--font-display);
   font-weight: 700;
-  font-size: 13px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  background: linear-gradient(rgba(14, 17, 24, 0.97), rgba(10, 12, 18, 0.99));
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  border-radius: 7px 3px 6px 2px / 3px 6px 2px 7px;
+  padding: 6px 13px;
+  cursor: pointer;
+  box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.75);
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.play-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #001018;
 }
 .play-hint {
   color: var(--accent);
@@ -3105,10 +3143,60 @@ button {
     linear-gradient(rgba(8, 10, 15, 0.9), rgba(8, 10, 15, 0.96)),
     url('/game-assets/arcs-bg.webp') center / cover fixed;
 }
+/*
+ * The drawn setup card, where the board matters but the start screen's deck is gone: the
+ * multiplayer link screen and the leaders-and-lore draft. The card art carries its own frame, so
+ * this only sizes it and names it in the screen's own vocabulary — gold letterspaced caps.
+ */
+.setup-board {
+  margin: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.setup-board img {
+  display: block;
+  width: min(320px, 60vw);
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 8px 26px -10px rgba(0, 0, 0, 0.9);
+}
+.setup-board figcaption {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+/*
+ * Compact sits inline in the draft header beside the title, so it takes the header's baseline
+ * rather than a column of its own and stays small enough not to push the rows down the page.
+ */
+.setup-board.compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.setup-board.compact img {
+  width: 92px;
+}
+.setup-board.compact figcaption {
+  font-size: 11px;
+}
+
 .draft-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  /*
+   * Wraps rather than crushing. The header carried three items comfortably and now carries four
+   * with the board thumbnail, which on a narrow screen squeezed the title into three lines. Wrapping
+   * costs nothing at any width that fits — no line break happens when there is room — and keeps the
+   * board visible on small screens instead of hiding information to protect the layout.
+   */
+  flex-wrap: wrap;
   gap: 20px;
   max-width: 1500px;
   margin: 0 auto 18px;
@@ -4635,11 +4723,39 @@ button {
  * screenshot and covered the southern systems in play — the pieces you most need to see while a bot
  * is moving them.
  */
+/*
+ * Right-aligned and small once the seat is a human's again.
+ *
+ * Centered, it was a 522px bar spanning the middle of the row the hand's play buttons open into —
+ * so choosing a card meant reading LEAD / SURPASS / COPY through it. The tray at that moment is
+ * only reporting what a bot already did and offering the run controls, so it is the thing that
+ * should yield. Out to the right edge it clears the fan, which is centered, and the diagnostics it
+ * drops in compact mode are what let it shrink rather than merely move.
+ */
 .bot-tray.compact {
   grid-area: bot;
   align-self: center;
-  justify-self: center;
+  justify-self: end;
   padding-bottom: 0;
+  padding-right: 12px;
+}
+.bot-tray.compact .bot-inner {
+  gap: 10px;
+  font-size: 11px;
+}
+/*
+ * `margin-left: auto` pushes the modes to the far edge, which is what makes the full-width tray a
+ * bar. Compact is a chip, so the parts sit together and the whole thing is what moves right.
+ */
+.bot-tray.compact .bot-modes {
+  margin-left: 0;
+}
+/* The pace only matters while a bot is actually running; compact is mostly the report after one. */
+.bot-tray.compact .bot-pace input {
+  width: 56px;
+}
+.bot-tray.compact .bot-mode {
+  padding: 3px 7px;
 }
 .bot-tray.compact .bot-inner {
   display: inline-flex;
@@ -4832,6 +4948,66 @@ button {
   font-size: 11px;
   color: var(--muted);
   font-style: normal;
+}
+
+/*
+ * Bot strength, color-coded as a severity ramp.
+ *
+ * The selected level used to differ from the unselected ones by `rgba(255,255,255,0.06)` — about
+ * two per cent of contrast on a dark panel, which is not a state anyone can read at a glance. It
+ * matters more here than on most toggles, because the choice is invisible from then on: the game
+ * never says again which opponent you are playing.
+ *
+ * **Filled rather than outlined, and that is what keeps it out of the factions' way.** The seat
+ * buttons directly above are outlined chips carrying faction color, and two of the four faction
+ * colors (red, yellow) sit right next to where a difficulty ramp naturally lands. Hue alone would
+ * make "brutal" and "red" a guess; a solid chip with near-black text is structurally a different
+ * object from an outlined one, so the two rows never read as the same kind of control.
+ *
+ * The ramp itself is conventional on purpose — calm green, the house gold for the default, amber
+ * for caution, red for danger — so it needs no legend, which is just as well now that the level
+ * descriptions are gone.
+ */
+.ng-bot-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ng-level {
+  --level: var(--gold);
+  border-color: color-mix(in srgb, var(--level) 45%, transparent);
+  color: color-mix(in srgb, var(--level) 75%, #8b93a1);
+}
+.ng-level:hover:not(:disabled):not(.on) {
+  border-color: color-mix(in srgb, var(--level) 70%, transparent);
+  color: var(--level);
+}
+.ng-level.on {
+  background: var(--level);
+  border-color: var(--level);
+  /* Near-black rather than white: every color in the ramp is light enough that dark type wins. */
+  color: #10131a;
+  font-weight: 900;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--level) 55%, transparent),
+    0 4px 14px -4px color-mix(in srgb, var(--level) 65%, transparent);
+}
+.ng-level.easy {
+  --level: #6fbf73;
+}
+.ng-level.normal {
+  --level: var(--gold);
+}
+.ng-level.hard {
+  --level: #e08a3c;
+}
+/*
+ * Lighter than the red faction's own #d94b3f, and measured rather than picked: the faction red
+ * puts the chip's dark label at 4.45:1, a hair under the 4.5 AA threshold, where this clears it.
+ * The divergence is useful twice over — it also stops the brutal chip reading as the red seat
+ * button sitting a row above it.
+ */
+.ng-level.brutal {
+  --level: #e05b4d;
 }
 
 
