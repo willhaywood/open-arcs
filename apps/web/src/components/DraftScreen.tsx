@@ -20,6 +20,7 @@ import type { Action, Continue, FactionId, GameState } from '@arcs/engine'
 import { useEffect, useState } from 'react'
 
 import { store } from '../store.js'
+import { SetupBoard } from './SetupBoard.js'
 import { colorOf, figureArt } from '../theme.js'
 import { LeaderCardReader, cardArt, cardName } from './LeaderCardReader.js'
 import { asset } from '../assets.js'
@@ -172,6 +173,12 @@ export function DraftScreen({
     <div className="draft">
       <div className="draft-head">
         <span className="draft-title">Leaders and Lore</span>
+        {/*
+          * The board being drafted for. The draft runs before setup places a piece, so the live
+          * map behind this screen is empty — the setup card is what actually shows the clusters
+          * and starting positions a leader has to be good on.
+          */}
+        <SetupBoard board={state.board.name} compact />
         <span className="draft-turn">
           <span className="draft-who" style={{ color: colorOf(faction) }}>
             {faction}

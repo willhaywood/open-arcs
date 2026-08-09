@@ -41,13 +41,6 @@ import { asset } from '../assets.js'
  */
 const OFFERED_LEVELS: readonly BotLevel[] = ['easy', 'normal', 'hard', 'brutal']
 
-const LEVEL_NOTES: Readonly<Record<BotLevel, string>> = {
-  easy: 'sound instincts, fumbles the close calls',
-  normal: 'the bot the game has always shipped',
-  hard: 'every card play searched to the end of the turn it buys',
-  brutal: 'hard, plus your replies are foreseen before it commits',
-}
-
 const ALL_FACTIONS: FactionId[] = ['red', 'yellow', 'blue', 'white']
 
 /*
@@ -190,6 +183,7 @@ export function NewGame(): JSX.Element {
         )}
         <ShareGame
           game={created}
+          board={picked ?? ''}
           onEnter={(seatToken) => {
             /*
              * Put the creator's own link in the address bar before joining. `joinSession` stashes
@@ -394,7 +388,14 @@ export function NewGame(): JSX.Element {
                   <button
                     key={l}
                     type="button"
-                    className={`ng-bot${botLevel === l ? ' on' : ''}`}
+                    /*
+                     * The level name is also its style hook, so the ramp in the stylesheet is keyed
+                     * by the same string the engine resolves — a level added to `BOT_LEVELS` and
+                     * offered here shows up uncolored rather than mis-colored, which is the
+                     * failure that names itself.
+                     */
+                    className={`ng-bot ng-level ${l}${botLevel === l ? ' on' : ''}`}
+                    aria-pressed={botLevel === l}
                     disabled={revealed}
                     onClick={() => setBotLevel(l)}
                   >
@@ -402,7 +403,6 @@ export function NewGame(): JSX.Element {
                   </button>
                 ))}
               </div>
-              <em className="ng-bot-note">{LEVEL_NOTES[botLevel]}</em>
             </div>
           ) : null}
         </div>

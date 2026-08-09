@@ -28,19 +28,28 @@
 import { useState } from 'react'
 
 import { linkFor } from '../multiplayer/link.js'
+import { SetupBoard } from './SetupBoard.js'
 import type { CreatedGame } from '../multiplayer/client.js'
 import { colorOf } from '../theme.js'
 import type { FactionId } from '@arcs/engine'
 
 interface Props {
   game: CreatedGame
+  /**
+   * The board this game was created on.
+   *
+   * Shown because this screen is the only thing between choosing a setup and inviting people to
+   * play it: the multiplayer path never turns the drawn card over, so without this the creator
+   * shares four links to a board none of them has seen.
+   */
+  board: string
   /** Called when the creator takes their own seat and enters the game. */
   onEnter: (seatToken: string) => void
 }
 
 const origin = (): string => `${window.location.origin}${window.location.pathname}`.replace(/\/$/, '')
 
-export function ShareGame({ game, onEnter }: Props): JSX.Element {
+export function ShareGame({ game, board, onEnter }: Props): JSX.Element {
   const [copied, setCopied] = useState<string | null>(null)
 
   const link = (seatToken?: string): string => linkFor(origin(), game.gameId, seatToken)
@@ -83,6 +92,11 @@ export function ShareGame({ game, onEnter }: Props): JSX.Element {
 
   return (
     <div className="ng-body mp-share">
+      <div className="ng-field">
+        <span className="ng-label">Setup</span>
+        <SetupBoard board={board} />
+      </div>
+
       <div className="ng-field">
         <span className="ng-label">Player Links</span>
 
