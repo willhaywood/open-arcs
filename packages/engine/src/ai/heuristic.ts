@@ -201,10 +201,12 @@ export function heuristicBotWith(
        * cannot go round forever. It still permits honest re-entry — taking one pip of three comes
        * back to a *different* question anyway, and anything that genuinely gains passes the gate.
        */
-      if (probe.repeats && gained <= here) stuck.add(action)
+      const ineligible = probe.repeats && gained <= here
+      if (ineligible) stuck.add(action)
       considered.push({
         action,
         score,
+        eligible: !ineligible,
         note:
           topTerms(termsFor(probe.observed, observed.self, intent, weights)) +
           (probe.samples.length > 1 ? ` [${probe.samples.length} rolls]` : '') +

@@ -25,6 +25,17 @@ export interface Considered {
   readonly score: number
   /** Optional term-level breakdown — "ambition +3.1, tempo −0.4". */
   readonly note?: string
+  /**
+   * Whether the anti-livelock gate would let this action be chosen — see `heuristic.ts`.
+   *
+   * Reported rather than filtered out, because the diagnostic panel shows everything that was
+   * weighed. But it has to be *reported*, because a caller that re-ranks `considered` is otherwise
+   * free to pick something the gate ruled out, and the gate's termination argument only holds if
+   * every repeat strictly improves. `easy.ts` was doing exactly that, and hung one game in five.
+   *
+   * Absent means eligible: bots that have no gate leave it off.
+   */
+  readonly eligible?: boolean
 }
 
 export interface BotDecision {

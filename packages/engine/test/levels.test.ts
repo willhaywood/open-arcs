@@ -12,17 +12,17 @@ import {
   BOT_LEVELS,
   loadGame,
   serializeGame,
-  baselineBot,
   botForLevel,
   botToAct,
   defaultRegistry,
   easyBot,
+  playGameAt,
   standardBot,
   startGame,
 } from '../src/index.js'
 import { NO_ASKS, stepBot } from '../src/ai/play.js'
 import type { AskedThisTurn } from '../src/ai/play.js'
-import type { FactionId } from '../src/index.js'
+import type { FactionId, RuleResult } from '../src/index.js'
 
 const registry = defaultRegistry()
 const THREE: readonly FactionId[] = ['red', 'yellow', 'blue']
@@ -69,6 +69,56 @@ describe('the level in a save', () => {
 })
 
 describe('the easy bot', () => {
+  /** Drive `steps` of seed 1 with normal deciding, and return the position it reaches. */
+  const driveTo = (steps: number): { cur: RuleResult; asked: AskedThisTurn } => {
+    let cur: RuleResult = startGame(
+      { board: 'Board3Frontiers', factions: [...THREE], seed: 1 },
+      registry,
+    )
+    let asked: AskedThisTurn = NO_ASKS
+    for (let i = 0; i < steps; i++) {
+      const f = botToAct(cur, THREE)
+      expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
+      const step = stepBot(cur, standardBot, f!, registry, asked)
+      cur = step.result
+      asked = step.asked
+    }
+    return { cur, asked }
+  }
+
+  /** What easy ranked first — its judgement, before the fumble picks among the close calls. */
+  const ranksTop = (at: { cur: RuleResult; asked: AskedThisTurn }): string => {
+    const f = botToAct(at.cur, THREE)!
+    const considered = stepBot(at.cur, easyBot, f, registry, at.asked).decision.considered
+    expect(considered, 'easy reports what it weighed').toBeDefined()
+    return String([...considered!].sort((a, b) => b.score - a.score)[0]!.action['label'])
+  }
+
+  it('finishes the game that livelocked before the fumble respected the gate', () => {
+    /*
+     * Arena game index 2 of `easy,standard,standard`: yellow (easy) cycled "Arrange your resource
+     * slots" → "Done" for 20,000 actions at log 201, chapter 3, round 5.
+     *
+     * The cause was easy re-admitting what the evaluator's anti-livelock gate had ruled out.
+     * `considered` reports every candidate, including ineligible ones, and easy re-ranked that
+     * whole list — so the gate decided the inner bot's pick and easy then discarded it. Neither
+     * action writes to the log, and `publicHash` reads only public state, so the hash never moved
+     * and the same choice came up forever.
+     *
+     * Pinned as a whole game rather than a position, because that is how it presents: not an error
+     * but 49 unfinished games in 240, against a `standard,standard,standard` control that lost
+     * none. The bot this one replaced hung at the same rate, so this is not about the weights.
+     */
+    const o = playGameAt(
+      [easyBot, standardBot, standardBot],
+      2,
+      { seed: 1, board: 'Board3Frontiers', factions: [...THREE] },
+      registry,
+    )
+    expect(o.seed).toBe(1)
+    expect(o.finished, o.reason).toBe(true)
+  })
+
   it('is deterministic: the same position fumbles the same way twice', () => {
     const cur = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 2 }, registry)
     const f = botToAct(cur, THREE)!
@@ -77,12 +127,51 @@ describe('the easy bot', () => {
     expect(JSON.stringify(a.action)).toBe(JSON.stringify(b.action))
   })
 
-  it('departs from the baseline’s top choice somewhere in a real game', () => {
+  it('ranks the Weapon’s battle option top — it sees what normal sees', () => {
     /*
-     * The whole point of the slack: if easy always agreed with the baseline it would BE the
-     * baseline with a different name. Drive one game with easy deciding; count where the inner
-     * bot's top pick and easy's pick differ. Zero departures fails — the hash never being
-     * consulted is exactly the mutation this exists to catch.
+     * The pin on the rebase itself. Easy used to run `BASELINE_WEIGHTS`, which is not "normal but
+     * weaker" — it is the evaluator from before the whole goal layer, with income, declare-cost,
+     * contest, `leadZeroed` and `battleUnlocked` all at 0. So easy was not playing worse, it was
+     * blind to rules the other three levels can see, and it showed: it declared ambitions nobody
+     * could score and never once spent a Weapon.
+     *
+     * Seed 1 step 145 is the position `weapon-option.test.ts` pins for the same reason. What is
+     * asserted is easy's *ranking*, not its pick — the pick is the fumble's business, and here the
+     * fumble does shrug to a peer within `SLACK`. Under the old weights the option scores 0 and
+     * cannot rank top, so reverting the rebase fails here.
+     */
+    expect(ranksTop(driveTo(145))).toContain('add Battle option')
+  })
+
+  it('judges chapter goals by feasibility, the way normal does', () => {
+    /*
+     * The other half of the rebase, and it needs its own position: the weights came with
+     * `feasibility` as the fitness, and leaving easy on `structuralFitness` would keep it blind to
+     * what its position can actually *produce* — the same mistake as the weights, one layer down.
+     *
+     * Seed 1 step 126 is the first divergence, found by sweeping: easy copies with Construction-5,
+     * where the same weights on structural fitness pivot with Administration-6 instead. Ranking
+     * again, not the pick.
+     *
+     * The sweep is worth doing carefully — feasibility shifts nearly every *score* while leaving
+     * the *order* alone, so a sweep that compares anything but the chosen action finds a
+     * divergence at almost every step and pins a position where the fitness changes nothing.
+     */
+    expect(ranksTop(driveTo(126))).toContain('Copy with Construction-5')
+  })
+
+  it('departs from its inner bot’s top choice somewhere in a real game', () => {
+    /*
+     * The whole point of the slack: if easy always took the top pick it would BE normal with a
+     * different name. Drive one game with easy deciding; count where its pick differs from the
+     * inner bot's. Zero departures fails — the hash never being consulted is exactly the mutation
+     * this exists to catch.
+     *
+     * Compared against **`standardBot`**, which since easy was rebased onto `STANDARD_WEIGHTS` is
+     * decision-identical to easy's inner bot. It used to compare against `baselineBot`, and that
+     * comparison went vacuous the moment the weights diverged: two different evaluators disagree
+     * all game long, so the count stayed positive with the fumble deleted and the test asserted
+     * nothing. Same weights on both sides is what makes a departure attributable to the slack.
      */
     let cur = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 1 }, registry)
     let asked: AskedThisTurn = NO_ASKS
@@ -91,8 +180,8 @@ describe('the easy bot', () => {
       const f = botToAct(cur, THREE)
       if (f === undefined) break
       const easy = stepBot(cur, easyBot, f, registry, asked)
-      const base = stepBot(cur, baselineBot, f, registry, asked)
-      if (JSON.stringify(easy.decision.action) !== JSON.stringify(base.decision.action)) {
+      const top = stepBot(cur, standardBot, f, registry, asked)
+      if (JSON.stringify(easy.decision.action) !== JSON.stringify(top.decision.action)) {
         departures++
       }
       cur = easy.result

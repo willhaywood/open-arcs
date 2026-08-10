@@ -113,14 +113,24 @@ const RollBattle = (
 const isShip = (piece: string) => piece === 'Ship'
 const isBuilding = (piece: string) => piece === 'City' || piece === 'Starport'
 
-function piecesAt(state: GameState, s: SystemId, color: ColorId, kind: (p: string) => boolean) {
+/**
+ * The parts of the state these three read: the map and the pieces on it, both public.
+ *
+ * Widened from `GameState` so `canBattle` can also be asked of an `ObservedState` — the AI's
+ * evaluator needs "is there a battle to be had", and it must read *this* rather than keep a copy,
+ * because this is the same predicate `canTake` uses to decide whether Battle reaches the pip menu.
+ * A valuation that prices an option the engine would not offer is worse than no valuation.
+ */
+type Battlefield = Pick<GameState, 'board' | 'figures'>
+
+function piecesAt(state: Battlefield, s: SystemId, color: ColorId, kind: (p: string) => boolean) {
   return contentsOf(state.figures, Location.system(s)).filter((id) => {
     const f = parseFigureId(id)
     return f.color === color && kind(f.piece)
   })
 }
 
-function enemiesAt(state: GameState, s: SystemId, self: FactionId): ColorId[] {
+function enemiesAt(state: Battlefield, s: SystemId, self: FactionId): ColorId[] {
   const colors = new Set<ColorId>()
   for (const id of contentsOf(state.figures, Location.system(s))) {
     const f = parseFigureId(id)
@@ -135,7 +145,7 @@ function enemiesAt(state: GameState, s: SystemId, self: FactionId): ColorId[] {
  * Is there any battle to declare? Used to keep Battle off the pip menu when it could only
  * burn the pip — see `canTake` in standard-actions.ts.
  */
-export function canBattle(state: GameState, faction: FactionId): boolean {
+export function canBattle(state: Battlefield, faction: FactionId): boolean {
   return state.board.systems.some(
     (s) =>
       piecesAt(state, s, faction, isShip).length > 0 && enemiesAt(state, s, faction).length > 0,

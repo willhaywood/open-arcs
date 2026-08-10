@@ -48,13 +48,24 @@ describe('the standard bot', () => {
     expect(STANDARD_WEIGHTS.resourcesGuarded).toBe(0)
   })
 
-  it('is the contest set plus the price of declaring, and nothing else', () => {
+  it('makes the Weapon option visible, which is why the bot spends them', () => {
+    /*
+     * Shipped on opponent quality, not strength: it measured a null (34% against 33% on a 1-point
+     * floor, docs/19 section 9) and took Weapon spending from 1% to 26%. A bot hoarding four Weapons
+     * it will never use looks broken in the same way `leadZeroed` was added to stop.
+     */
+    expect(STANDARD_WEIGHTS.battleUnlocked).toBeGreaterThan(0)
+    // Above what a Weapon is worth, or it could never flip the decision it exists to flip.
+    expect(STANDARD_WEIGHTS.battleUnlocked).toBeGreaterThan(STANDARD_WEIGHTS.weapons)
+  })
+
+  it('is the contest set plus the price of declaring and the Weapon option, and nothing else', () => {
     // Stated as a diff rather than a copy of the numbers, so re-tuning any inherited weight does not
     // silently fail here — only *adding* to the standard set does.
     const diff = Object.keys(STANDARD_WEIGHTS).filter(
       (k) => STANDARD_WEIGHTS[k as keyof typeof STANDARD_WEIGHTS] !== CONTEST_WEIGHTS[k as keyof typeof CONTEST_WEIGHTS],
     )
-    expect(diff).toEqual(['leadZeroed'])
+    expect(diff.sort()).toEqual(['battleUnlocked', 'leadZeroed'])
   })
 
   it('leaves the frozen baseline alone — it is the reference, not the product', () => {
