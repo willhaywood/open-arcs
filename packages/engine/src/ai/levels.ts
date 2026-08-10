@@ -9,8 +9,10 @@
  *
  * What each level is, and why (measurements in docs/19 sections 6-8):
  *
- *   - **easy** — the frozen baseline's evaluator, fumbling close calls deterministically
- *     (`easy.ts`). Sound instincts, no polish.
+ *   - **easy** — normal's evaluator, fumbling close calls deterministically (`easy.ts`). Sound
+ *     instincts, no polish. It ran the *frozen baseline's* evaluator until this was noticed, which
+ *     made it blind to every goal-layer fix the other three levels have rather than merely worse at
+ *     using them — see `easy.ts` for why that reads as broken instead of beatable.
  *   - **normal** — `standardBot`, what the game ships. The default, and what an absent `botLevel`
  *     means. It now also spends Weapons for their Prelude battle option, which measured as a null
  *     on strength and took Weapon spending from 1% to 26% (docs/19 section 9) — shipped for the

@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| Easy rebased on the shipped weights | **not a strength idea** — it is the ladder's bottom rung. Uncovered a livelock in easy that predated it: 49 of 240 arena games unfinished, now 0 | 10 |
 
 ### Why they all failed, in one sentence
 
@@ -2120,3 +2121,70 @@ same way, and to the player who reported it, it did.
 
 So this is a **shipping decision on opponent quality, not a strength claim** — and it is only
 defensible while stated that way.
+
+## 10. Easy: rebased on the shipped weights, and the livelock that found
+
+Two changes to the ladder's bottom rung, one intended and one that the first change made visible.
+
+### The rebase
+
+`easyBot` ran `BASELINE_WEIGHTS` with `structuralFitness` — chosen as "the weakest configuration that
+still plays a coherent game". That reasoning was wrong. `BASELINE_WEIGHTS` is not normal-but-weaker;
+it is the evaluator from *before the entire goal layer*, with `incomeDeclared`, `declareReady`,
+`standingContested`, `leadZeroed` and `battleUnlocked` all at 0. Easy was therefore not playing
+worse, it was **blind to rules the other three levels can see**: it declared ambitions nobody could
+score — the behaviour section 4 shipped `leadZeroed` to stop — and never once spent a Weapon.
+
+Those are the tells that read as *broken* rather than *beatable*. Easy now runs `STANDARD_WEIGHTS`
+with `feasibility` — normal's evaluator exactly — and differs from normal only by `SLACK`.
+
+Measured take-up of the battle option, driven games: easy 0% before, and afterwards it ranks the
+option **top** at the position section 9 pins, with the fumble then shrugging to a peer.
+
+### The livelock
+
+Adding an `easy` spec to the arena — the first time the level had ever been run at volume — showed
+one game in five never finishing:
+
+| seats | finished | wall clock |
+| --- | --- | --- |
+| `easy,standard,standard` | **191 / 240** | 30m43s |
+| `standard,standard,standard` (control) | 240 / 240 | 9m02s |
+
+The cycle, from the driven game: yellow alternating "Arrange your resource slots" → "Done" for
+20,000 actions at log 201, chapter 3, round 5 — the same shape as the arrange/swap livelock in
+section 2's gate note, and the same one that came back under probed-state rival intents (section 6).
+
+**Cause: easy re-admitted what the gate excluded.** `heuristic.ts` refuses a repeated action that
+does not strictly improve the position, and that gate is the reason a turn terminates. But it
+decides the inner bot's *pick*, while `considered` reports every candidate including the ineligible
+ones — and easy's whole job is to discard the pick and re-rank that list. Neither cycling action
+writes to the log, and `publicHash` reads only public state, so the hash never moved and the same
+"random" choice came up forever.
+
+**Not a property of the weights.** The pre-rebase easy, reconstructed and run on the same games, hung
+*more*: 12 of 40, against the rebased bot's 8 of 40. This has been in every shipped easy game since
+the level existed. It did not present as a crash, because the app steps bots on a timer rather than
+through `runBots` — it presented as a game that never handed the turn back.
+
+**Fix:** `Considered` carries `eligible`, set where the gate is already computed, and easy fumbles
+within the gate's pool with the same fallback the inner bot uses. No new termination argument — it
+inherits the existing one.
+
+| | before | after |
+| --- | --- | --- |
+| stuck, 40-game sample | 8 / 40 | **0 / 40** |
+| arena, 240 games | 191 finished, 30m43s | **240 finished, 7m11s** |
+| easy wins vs standard | 4% | 5% |
+| easy mean power | 5.8 | 7.0 |
+
+Strength is unchanged, which is the point: easy is still comfortably the easiest rung (5% wins
+against normal's 48%, power 7.0 against 21.8), and is now weak by *fumbling close calls* rather than
+by being blind to the game or by hanging.
+
+### For the register
+
+The lesson generalizes past this bot. Any caller that re-ranks `considered` is re-deciding without
+the gate, and the gate is load-bearing for termination. That is why `eligible` is reported rather
+than the ineligible candidates being dropped: the diagnostic panel still shows everything weighed,
+and the next re-ranker has something to respect.

@@ -10,7 +10,7 @@
  * measuring one thing and printing another, and nothing downstream could tell.
  */
 
-import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, goalBot, standardBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, searchBot, trivialBot, weaponBot } from '@arcs/engine'
+import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, easyBot, goalBot, standardBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, searchBot, trivialBot, weaponBot } from '@arcs/engine'
 import type { Bot, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
@@ -31,6 +31,7 @@ export type BotSpec =
   | { readonly kind: 'standard' }
   | { readonly kind: 'rival' }
   | { readonly kind: 'weapon' }
+  | { readonly kind: 'easy' }
   | {
       readonly kind: 'heuristic'
       /** Evaluator weights; omitted means the hand-set ones. Sent as data so a shard can rebuild it. */
@@ -75,6 +76,8 @@ export function buildBot(spec: BotSpec): Bot {
       return rivalBot
     case 'weapon':
       return weaponBot
+    case 'easy':
+      return easyBot
     case 'trivial':
       return trivialBot
     case 'heuristic':
@@ -120,6 +123,7 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'standard') return { kind: 'standard' }
   if (kind === 'rival') return { kind: 'rival' }
   if (kind === 'weapon') return { kind: 'weapon' }
+  if (kind === 'easy') return { kind: 'easy' }
   if (kind === 'heuristic') {
     // `heuristic:fitted` plays the weights `npm run fit` last wrote.
     if (rest[0] !== 'fitted') return { kind: 'heuristic' }
