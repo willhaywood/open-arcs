@@ -10,7 +10,7 @@
  * measuring one thing and printing another, and nothing downstream could tell.
  */
 
-import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, goalBot, standardBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, searchBot, trivialBot } from '@arcs/engine'
+import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, goalBot, standardBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, searchBot, trivialBot, weaponBot } from '@arcs/engine'
 import type { Bot, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
@@ -30,6 +30,7 @@ export type BotSpec =
   | { readonly kind: 'cost' }
   | { readonly kind: 'standard' }
   | { readonly kind: 'rival' }
+  | { readonly kind: 'weapon' }
   | {
       readonly kind: 'heuristic'
       /** Evaluator weights; omitted means the hand-set ones. Sent as data so a shard can rebuild it. */
@@ -72,6 +73,8 @@ export function buildBot(spec: BotSpec): Bot {
       return standardBot
     case 'rival':
       return rivalBot
+    case 'weapon':
+      return weaponBot
     case 'trivial':
       return trivialBot
     case 'heuristic':
@@ -116,6 +119,7 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'cost') return { kind: 'cost' }
   if (kind === 'standard') return { kind: 'standard' }
   if (kind === 'rival') return { kind: 'rival' }
+  if (kind === 'weapon') return { kind: 'weapon' }
   if (kind === 'heuristic') {
     // `heuristic:fitted` plays the weights `npm run fit` last wrote.
     if (rest[0] !== 'fitted') return { kind: 'heuristic' }
@@ -159,7 +163,7 @@ export function parseSpec(name: string): BotSpec {
     }
   }
   throw new Error(
-    `Unknown bot "${name}" — known: standard, rival, baseline, goal, feasible, declare, contest, ` +
+    `Unknown bot "${name}" — known: standard, rival, weapon, baseline, goal, feasible, declare, contest, ` +
       `guard, lore, cost, trivial, heuristic, rollout[:samples:turns], search[:width:depth]`,
   )
 }

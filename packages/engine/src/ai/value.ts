@@ -16,6 +16,7 @@
 
 import { LORE_AMBITION, hasLore, loreActive } from '../lore.js'
 import { metric, rivalHoldings } from '../rules/ambitions.js'
+import { canBattle } from '../rules/battle.js'
 import { declareReadiness } from './declare-ready.js'
 import { incomeFor } from './income.js'
 import { AMBITIONS } from '../state.js'
@@ -129,6 +130,7 @@ export const FEATURES = [
   'loreArmed',
   'leadZeroed',
   'weapons',
+  'battleUnlocked',
   'cities',
   'starports',
   'shipsFresh',
@@ -194,6 +196,12 @@ export const WEIGHTS: Weights = {
    */
   leadZeroed: 0,
   weapons: 0.25,
+  /*
+   * The Weapon's Prelude option, off by default like every other goal-layer addition, so the frozen
+   * baseline stays byte-identical and a bot that switches it on can be attributed the difference.
+   * `WEAPON_WEIGHTS` in `weapon.ts` turns it on.
+   */
+  battleUnlocked: 0,
   cities: 2.0,
   starports: 1.2,
   shipsFresh: 0.35,
@@ -270,6 +278,34 @@ export function featuresOf(
     else x.resourcesUndeclared += scaled
   }
   x.weapons = countResource(observed.resources, slots, 'Weapon')
+
+  /*
+   * **What a Weapon actually buys, which nothing here could previously see.**
+   *
+   * Spending a Weapon in the Prelude grants no action; it adds Battle to the played card's pips for
+   * the turn (rulebook p17, `state.anyBattle`). No feature read that flag, so the spend scored as a
+   * pure loss — the Weapon left the board for nothing measurable — and the bot declined it 271 times
+   * out of 274 offered, hoarding Weapons all game. The same shape as leading a card scoring as pure
+   * cost before pips were priced (docs/19 section 2g).
+   *
+   * **Binary, and it has to be.** The natural scale is "how many pips could become battles", but
+   * pips live on the continuation rather than the state (`Probe.actionsAhead`), so `valueOf`
+   * structurally cannot see them — the same constraint that keeps `PIP_VALUE` outside this file.
+   *
+   * **Gated on a battle actually being available**, via the engine's own `canBattle` — the very
+   * predicate `canTake` uses to decide whether Battle reaches the pip menu. Unlocking an option the
+   * engine would not offer is worth exactly nothing, and without the gate the bot would buy it on an
+   * empty board.
+   *
+   * **And gated on whose turn it is, which is not a detail.** `anyBattle` is one flag on the state,
+   * not a per-faction fact: it says *the card currently in play* may battle. Scored without the
+   * `current` check every faction reads it as their own, and since `valueOf` is relative — mine
+   * minus the best rival's — the term largely cancels against itself and the feature does almost
+   * nothing. It only appeared to work because rivals usually have no battle available, so the
+   * cancellation was partial.
+   */
+  x.battleUnlocked =
+    observed.anyBattle && self === observed.current && canBattle(observed, self) ? 1 : 0
 
   /*
    * **Where a token sits, not just that you hold it.**

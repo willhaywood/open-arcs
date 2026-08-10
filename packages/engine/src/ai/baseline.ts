@@ -47,6 +47,8 @@ export const BASELINE_WEIGHTS: Weights = {
   // declares almost every marker it can and wins them at chance.
   leadZeroed: 0,
   weapons: 0.25,
+  // Off in the baseline by definition: it predates the Weapon's battle option being visible at all.
+  battleUnlocked: 0,
   cities: 2.0,
   starports: 1.2,
   shipsFresh: 0.35,
