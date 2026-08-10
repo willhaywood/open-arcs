@@ -35,6 +35,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Per-rival intent in `valueOf` | **no measurable effect** — +3 points one run, level the next, floor 2 points; the probed-state variant livelocked and measured worse | 6 |
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
+| The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
 
 ### Why they all failed, in one sentence
 
@@ -2067,3 +2068,55 @@ The ladder ships it as **brutal** (`levels.ts`); the gate this section set for i
 both protocols. Games with a v4 seat also run *much* shorter at two players (413-462 mean decisions
 against ~700) — punishment compounds fastest head-to-head, which is exactly where the group this
 was built for actually plays.
+
+## 9. The Weapon's battle option — a behavioural fix with no strength in it
+
+Reported from play: the bots hoard Weapons and rarely spend resources at all. Measured over eight
+three-player games — 705 Prelude menus, 161 spends (23%), and of the 274 menus offering a Weapon
+option, **3 taken**. One per cent.
+
+The cause was a genuine blind spot rather than a weight. Spending a Weapon grants no action; it adds
+Battle to the played card's pips for the turn (rulebook p17, `state.anyBattle`), and **no feature
+read that flag**. The evaluator saw a Weapon leave the board for nothing measurable, so it declined
+271 offers out of 274. Exactly the shape of section 2g, where leading a card scored as pure cost
+before pips were priced.
+
+`battleUnlocked` is binary — pips live on the continuation, so `valueOf` cannot scale by them — and
+doubly gated: on the engine's own `canBattle`, so it never prices an option the engine would not
+offer, and on `self === current`.
+
+**That second gate was a bug the tests caught, and it is the transferable lesson.** `anyBattle` is
+one flag on the state, not a per-faction fact: it says the card *currently in play* may battle.
+Scored without the check, every faction reads it as their own, and because `valueOf` is relative the
+term largely cancels against itself. It appeared to work — spending rose 1% → 8% — purely because
+rivals usually have no battle available, so the cancellation was partial. **Any future feature
+derived from a global flag has this failure mode**, and a behavioural measurement alone will not
+reveal it; the test that caught it asserts the weights genuinely move the value.
+
+### Measured — 999 games x2 with twin
+
+| run | weapon-option | standard | twin floor |
+| --- | --- | --- | --- |
+| vs standard x2 | 34% wins, 18.1 power, rank 1.97 | 33%, 17.8, 1.97 | — |
+| vs standard, twinned | 34% / 33% wins, 17.8 / 18.2 power | 33%, 17.4 | **1 point, 0.4 power** |
+
+One point against a one-point floor, and identical mean rank. **A null** — the fifth in a row for
+evaluator ideas (3j, 3k, 6, the overflow weights, this).
+
+### What it does buy, and the precedent for that mattering
+
+The behavioural change is large and is what was actually reported:
+
+| | standard | weapon-option |
+| --- | --- | --- |
+| Weapon spends offered → taken | 3 / 274 (1.1%) | 50 / 192 (**26%**) |
+| Prelude spending overall | 23% | 29% |
+| mean Weapons held | 0.69 | 0.32 |
+
+Section 4's `leadZeroed` shipped on exactly these terms: no measurable strength, but declarations on
+unscoreable ambitions went to zero, and "a bot burning its played card on an Empath nobody holds a
+Psionic for looks broken". A bot sitting on four Weapons it will never spend looks broken in the
+same way, and to the player who reported it, it did.
+
+So this is a **shipping decision on opponent quality, not a strength claim** — and it is only
+defensible while stated that way.
