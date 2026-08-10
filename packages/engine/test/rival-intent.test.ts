@@ -82,19 +82,18 @@ describe('valueOf with rival intent', () => {
 describe('the rival-intent bot', () => {
   it('reaches a different decision than standard on a real position', () => {
     /*
-     * Seed 1, step 522, found by sweeping full games for the first disagreement. Blue chases a
-     * declared Keeper and returns a captive: `standardBot` takes the Material, `rivalBot` takes the
-     * Relic — the resource its ambition actually scores. Pinning the step (not just "they differ
-     * somewhere") is what makes a silent `opts`-dropping regression fail here rather than pass on
-     * a different disagreement.
+     * Seed 1, step 262, found by sweeping full games for the first disagreement. Red chases a
+     * declared Tycoon: `standardBot` taxes its own city for Material, `rivalBot` taxes yellow's
+     * city instead — same pip, but it also takes a captive off a rival it can now see is building
+     * toward one. Pinning the step (not just "they differ somewhere") is what makes a silent
+     * `opts`-dropping regression fail here rather than pass on a different disagreement.
      *
-     * Re-swept three times now, and the pin moving is expected rather than alarming: it names a
-     * point in a *driven game*, so anything that changes the legal action set moves it. Both tax
-     * offers and follower passes did.
+     * Re-swept whenever the legal action set moves, which it has four times now — the pin names a
+     * point in a *driven game*, so this is maintenance rather than a surprise.
      */
     let cur: RuleResult = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 1 }, registry)
     let asked: AskedThisTurn = NO_ASKS
-    for (let i = 0; i < 522; i++) {
+    for (let i = 0; i < 262; i++) {
       const f = botToAct(cur, THREE)
       expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
       const step = stepBot(cur, standardBot, f!, registry, asked)
@@ -102,11 +101,11 @@ describe('the rival-intent bot', () => {
       asked = step.asked
     }
     const f = botToAct(cur, THREE)
-    expect(f).toBe('blue')
+    expect(f).toBe('red')
     const standard = stepBot(cur, standardBot, f!, registry, asked).decision
     const rival = stepBot(cur, rivalBot, f!, registry, asked).decision
-    expect(String(standard.action['label'])).toContain('Material')
-    expect(String(rival.action['label'])).toContain('Relic')
+    expect(String(standard.action['label'])).toContain('Tax 1-Hex')
+    expect(String(rival.action['label'])).toContain("yellow's city")
   })
 
   it('scores rivals under the RIVAL’s intent, not a recomputation of its own', () => {
@@ -115,19 +114,18 @@ describe('the rival-intent bot', () => {
      * faction's intent inside the rival lambda — a one-token mistake — moves many of the same
      * decisions, because recomputing anyone's intent moves them. What distinguishes the two is a
      * position where the rival's own goals price their board differently from ours, and seed 1
-     * step 313 is the first such divergence (found by sweeping): blue declares Tycoon under
+     * step 171 is the first such divergence (found by sweeping): blue declares Tycoon under
      * rival-aware scoring, and skips the declaration under the wrong-faction variant.
      *
-     * Re-swept twice, and the step moving is expected rather than alarming: the pin names a point
-     * in a *driven game*, so any change to the legal action set shifts it. It moved 311 -> 313 when
-     * `offerTax` stopped offering taxes that could do nothing.
+     * Re-swept whenever the legal action set moves — 311 -> 313 -> 171 so far. The pin names a
+     * point in a driven game, so this is maintenance rather than a surprise.
      */
     const wrongFaction = heuristicBotWith(STANDARD_WEIGHTS, 'wrong-faction', feasibility, {
       rivalIntent: (obs, _rival) => intentFor(obs, obs.self, feasibility),
     })
     let cur: RuleResult = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 1 }, registry)
     let asked: AskedThisTurn = NO_ASKS
-    for (let i = 0; i < 313; i++) {
+    for (let i = 0; i < 171; i++) {
       const f = botToAct(cur, THREE)
       expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
       const step = stepBot(cur, rivalBot, f!, registry, asked)

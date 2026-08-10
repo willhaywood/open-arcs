@@ -43,6 +43,13 @@ import { STANDARD_WEIGHTS } from './goal.js'
 import type { Bot } from './bot.js'
 import type { Weights } from './value.js'
 
+/**
+ * **Now identical to `standardBot`**, because the option shipped (see `STANDARD_WEIGHTS`).
+ *
+ * Kept rather than deleted so the arena can still name the configuration the measurement in docs/19
+ * section 9 was taken on, and so a future run comparing against "the bot without the Weapon option"
+ * has something to point at by editing one number here rather than reconstructing it.
+ */
 export const WEAPON_WEIGHTS: Weights = { ...STANDARD_WEIGHTS, battleUnlocked: 0.6 }
 
 export const weaponBot: Bot = heuristicBotWith(WEAPON_WEIGHTS, 'weapon-option', feasibility)

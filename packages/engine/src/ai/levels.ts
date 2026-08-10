@@ -11,8 +11,10 @@
  *
  *   - **easy** — the frozen baseline's evaluator, fumbling close calls deterministically
  *     (`easy.ts`). Sound instincts, no polish.
- *   - **normal** — `standardBot`, what the game has always shipped. The default, and what an
- *     absent `botLevel` means, so every existing save plays exactly as it did.
+ *   - **normal** — `standardBot`, what the game ships. The default, and what an absent `botLevel`
+ *     means. It now also spends Weapons for their Prelude battle option, which measured as a null
+ *     on strength and took Weapon spending from 1% to 26% (docs/19 section 9) — shipped for the
+ *     same reason `leadZeroed` was, that hoarding them looks broken.
  *   - **hard** — the tier-1 beam search (`search-v3(3x14)`): the same judgement as normal with
  *     every card play searched to the end of the turn it buys. Measured ~+3 points over normal,
  *     replicated across two configurations and 3,996 games (docs/19 section 7).

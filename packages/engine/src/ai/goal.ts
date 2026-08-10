@@ -136,7 +136,21 @@ export const declareCostBot: Bot = heuristicBotWith(DECLARE_COST_WEIGHTS, 'goal-
  * gambles less. If the striving behaviour matters more than the tidiness, `-0.2` removes the dead
  * declarations without pushing it that far.
  */
-export const STANDARD_WEIGHTS: Weights = DECLARE_COST_WEIGHTS
+/**
+ * The Weapon's battle option, shipped on **opponent quality rather than strength** — the same
+ * standing `leadZeroed` has, and stated the same way.
+ *
+ * It measured a null: 34% wins against standard's 33% on a 1-point twin floor, identical mean rank
+ * (docs/19 section 9). What it changes is behaviour a player sees. Spending a Weapon buys the Battle
+ * option on the played card and nothing else, and no feature read that flag, so the bot declined 271
+ * offers out of 274 and sat on Weapons all game. That was reported from real play, and a bot hoarding
+ * four Weapons it will never use looks broken in exactly the way a bot declaring an Empath nobody
+ * holds a Psionic for does.
+ *
+ * Weapon spending goes 1% to 26%, overall Prelude spending 23% to 29%, mean Weapons held 0.69 to
+ * 0.32. None of that is a strength claim and it must not be cited as one.
+ */
+export const STANDARD_WEIGHTS: Weights = { ...DECLARE_COST_WEIGHTS, battleUnlocked: 0.6 }
 
 export const standardBot: Bot = heuristicBotWith(STANDARD_WEIGHTS, 'standard', feasibility)
 

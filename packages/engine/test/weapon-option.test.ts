@@ -15,13 +15,16 @@ import { describe, expect, it } from 'vitest'
 
 import {
   Location,
+  STANDARD_WEIGHTS,
   WEAPON_WEIGHTS,
   WEIGHTS,
   botToAct,
   canBattle,
   contentsOf,
   defaultRegistry,
+  feasibility,
   featuresOf,
+  heuristicBotWith,
   intentFor,
   move,
   observe,
@@ -110,14 +113,23 @@ describe('the battleUnlocked feature', () => {
 })
 
 describe('the weapon-option bot', () => {
-  it('buys the battle option where standard declines it', () => {
+  it('buys the battle option where a bot without the feature declines it', () => {
     /*
      * Seed 1, step 145, found by sweeping real games for the first divergent Prelude. Yellow is
-     * offered "Fuel: add Battle option" — Loyal Marines lets any resource pay as a Weapon — and
-     * `weaponBot` takes it where `standardBot` walks straight past into its actions. Pinning the
-     * step (not just "they differ somewhere") is what makes a weight silently reverting to 0 fail
-     * here rather than pass on some other disagreement.
+     * offered "Fuel: add Battle option" — Loyal Marines lets any resource pay as a Weapon — and the
+     * option is taken where a bot blind to it walks straight past into its actions. Pinning the step
+     * (not just "they differ somewhere") is what makes the weight silently reverting to 0 fail here
+     * rather than pass on some other disagreement.
+     *
+     * Compared against a **locally built blind bot** rather than `standardBot`, because the option
+     * has since shipped into the standard set — the two are now the same bot, and comparing them
+     * would assert nothing.
      */
+    const blind = heuristicBotWith(
+      { ...STANDARD_WEIGHTS, battleUnlocked: 0 },
+      'no-weapon-option',
+      feasibility,
+    )
     let cur: RuleResult = startGame(
       { board: 'Board3Frontiers', factions: [...THREE], seed: 1 },
       registry,
@@ -133,9 +145,9 @@ describe('the weapon-option bot', () => {
     const f = botToAct(cur, THREE)
     expect(f).toBe('yellow')
     const weapon = stepBot(cur, weaponBot, f!, registry, asked).decision
-    const standard = stepBot(cur, standardBot, f!, registry, asked).decision
+    const without = stepBot(cur, blind, f!, registry, asked).decision
     expect(String(weapon.action['label'])).toContain('add Battle option')
-    expect(String(standard.action['label'])).toContain('Begin actions')
+    expect(String(without.action['label'])).toContain('Begin actions')
   })
 
   it('is deterministic: the same position decides the same way twice', () => {
