@@ -18,12 +18,17 @@
  *     on strength and took Weapon spending from 1% to 26% (docs/19 section 9) — shipped for the
  *     same reason `leadZeroed` was, that hoarding them looks broken.
  *   - **hard** — the tier-1 beam search (`search-v3(3x14)`): the same judgement as normal with
- *     every card play searched to the end of the turn it buys. Measured ~+3 points over normal,
- *     replicated across two configurations and 3,996 games (docs/19 section 7).
+ *     every card play searched to the end of the turn it buys. **Currently misnamed.** It measured
+ *     ~+3 points over normal when it shipped (docs/19 section 7), but re-baselining after the tax
+ *     filter, the follower-pass rule and the Weapon option put it 2-9 points *behind* normal against
+ *     a 1-point twin floor — the sign has flipped, and this rung is now easier than the one below it
+ *     (docs/19 section 11, which lists what to suspect). Do not describe it as stronger than normal
+ *     until that is understood.
  *   - **brutal** — tier-2 (`search-v4`): hard, plus the strongest lines re-ranked by what the
  *     position looks like after the rivals reply from sampled hands. Measured past its gate by a
  *     distance nothing else in the register approaches: 67%-33% over normal at two players
- *     against a zero twin floor, +12 mean points at three (docs/19 section 8).
+ *     against a zero twin floor, +12 mean points at three (docs/19 section 8). Re-baselined at
+ *     65%-35% on the same zero floor, so this one holds (docs/19 section 11).
  */
 
 import { easyBot } from './easy.js'

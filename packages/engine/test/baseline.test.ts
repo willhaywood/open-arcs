@@ -90,8 +90,20 @@ describe('the frozen baseline', () => {
  * right for the combination. Values before either fix, for the record:
  * [11,30,33], [27,25,16], [27,25,28].
  */
+/*
+ * Re-recorded again for a third rules fix, same exception: **the defender takes destroyed attacking
+ * pieces as Trophies** (rulebook p14, verbatim in both printings). Destroyed attacker ships were
+ * going home to reserve, so a defender who wrecked a fleet by interception got nothing at all and
+ * Warlord only ever paid the aggressor.
+ *
+ * The direction of the move is the confirmation that this is the rule and not a slip: the spread
+ * collapses on every seed — [32,6,9] to [41,37,26], [7,35,17] to [26,35,37] — because losing a
+ * battle now yields the loser's opponent something, and the runaway that trophies-for-attacking-only
+ * produced is gone. Values before this fix:
+ * [32,6,9], [55,20,17], [7,35,17].
+ */
 const GOLDEN = [
-  [32, 6, 9],
-  [55, 20, 17],
-  [7, 35, 17],
+  [41, 37, 26],
+  [15, 20, 38],
+  [26, 35, 37],
 ]

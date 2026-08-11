@@ -49,8 +49,18 @@ Tally the pool, then in order:
 2. **Enemy ships.** `hits` strike enemy ships; any that can't be placed (ships exhausted)
    overflow into building hits.
 3. **Enemy buildings.** Building hits strike Cities and Starports.
-4. **Trophies.** Every destroyed *enemy* piece becomes one of the attacker's trophies —
-   this is how the **Warlord** ambition scores. Destroyed attacker ships return to reserve.
+4. **Trophies — both directions.** Rulebook p14, verbatim: "The attacker takes destroyed
+   defending pieces as Trophies. **The defender takes destroyed attacking pieces as Trophies.**"
+   So destroyed enemy pieces go to the attacker's Trophies box, and the attacker's own ships
+   destroyed by self-damage or interception go to the *defender's*. This is how the **Warlord**
+   ambition scores, and it scores for defending as well as attacking.
+
+   This was wrong until it was reported from play: attacker losses were sent home to reserve, so a
+   defender who wrecked an attacking fleet by interception received nothing, and Warlord only ever
+   paid the aggressor. HRF was read as agreeing, which is what kept it in place; the rulebook is
+   the authority and both printings (April 2024, August 2025) carry the sentence unchanged. A
+   defender that is not a seated player has no Trophies box, and only then do the pieces go to
+   reserve.
 5. **Raid.** `keys` steal resources from the enemy, cheapest slot first, paying each slot's
    key cost (`CITY_SLOT_KEYS`), following HRF's raidable-cost model.
 
@@ -152,7 +162,7 @@ phase at a time: the attacker's own ships first (self-damage + interception), th
 ships, then enemy buildings; a phase with nothing to place, or no piece left to take a hit, is
 skipped, and ship-hits with no enemy ship left overflow into building hits exactly as before.
 Each `battle/hit` damages a fresh piece or destroys a damaged one — enemy pieces become the
-attacker's trophies, the attacker's own destroyed ships return to reserve. When every count is
+attacker's trophies, the attacker's own destroyed ships go to the defender's (p14). When every count is
 placed the loop hands off to `battle/finish`, which runs the raid, provokes outrage if a City
 was razed, and returns the turn.
 
