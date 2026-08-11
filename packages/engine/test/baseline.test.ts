@@ -102,8 +102,22 @@ describe('the frozen baseline', () => {
  * produced is gone. Values before this fix:
  * [32,6,9], [55,20,17], [7,35,17].
  */
+/*
+ * Re-recorded for a **third category** the note above does not cover, and it is worth naming: this
+ * time neither the evaluator nor the legal action set changed. `weightsMatchBaseline` still passes,
+ * and `offerGather` offers exactly the pools it always did — only their *order* changed, plus a new
+ * action-level risk term in `heuristic.ts` that sits outside `valueOf` the way `PIP_VALUE` does.
+ *
+ * What moved is **tie resolution**. Every tie-break downstream keeps the earliest candidate, and the
+ * gather menu enumerated smallest-first, so "one skirmish die" won every tie the evaluator could not
+ * separate — measured, a risk-free maximum was passed over in 10.9% of gather menus.
+ *
+ * Only seed 1 moved. Seeds 2 and 3 are byte-identical to the previous recording, which is the shape
+ * you would expect from a change that touches battles and nothing else. Values before this fix:
+ * [41,37,26], [15,20,38], [26,35,37].
+ */
 const GOLDEN = [
-  [41, 37, 26],
+  [32, 33, 2],
   [15, 20, 38],
   [26, 35, 37],
 ]

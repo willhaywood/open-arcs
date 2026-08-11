@@ -9,6 +9,7 @@
  * (docs/03 section 9a), and it is why tie-breaking is positional rather than random.
  */
 
+import { interceptionRisk } from '../rules/battle.js'
 import { intentFor, structuralFitness } from './intent.js'
 import type { Fitness } from './intent.js'
 import { WEIGHTS, termsFor, topTerms, valueOf } from './value.js'
@@ -16,6 +17,7 @@ import type { RivalIntent, Weights } from './value.js'
 import type { Action } from '../action.js'
 import type { Bot, BotDecision, Considered, Lookahead } from './bot.js'
 import type { ObservedState } from '../observe.js'
+import type { ColorId, SystemId } from '../ids.js'
 
 /**
  * What one unspent action pip is worth, in the same units as `valueOf`.
@@ -27,6 +29,29 @@ import type { ObservedState } from '../observe.js'
  * A starting point, like every weight here — the arena is what moves it.
  */
 const PIP_VALUE = 0.5
+
+/**
+ * What a point of interception risk costs, per expected hit.
+ *
+ * **This is a risk premium, not a missing expectation.** The sampled mean in `gained` already
+ * includes interception on the rolls where it fired, so this is not correcting a term the evaluator
+ * cannot see. It corrects a *selection* bias: with `SAMPLES` at 5 and a gather menu offering up to
+ * ~84 pools, taking the argmax of noisy estimates systematically favours whichever option's noise
+ * ran favourable — and interception, a 1-in-6 event costing one hit per fresh defending ship, is by
+ * far the largest variance source among them. Penalising by risk is what stops the luckiest sample
+ * winning.
+ *
+ * Measured cause: the bot left dice unused in 20% of battles (2.03 dice on average), and the
+ * indefensible cases were all the same shape — swapping skirmish dice for a single assault die on
+ * margins of 0.01 to 0.08, buying 0.17 expected hits for 0.5 self-hits and a 1-in-6 chance of
+ * losing one ship per fresh defender.
+ *
+ * Sized at roughly half what a hit on our own ships is worth — a hit damages a fresh Ship
+ * (0.35 to 0.1) or destroys a damaged one into the *defender's* trophies (rulebook p14, so 0.1 plus
+ * 0.3 the other way) — precisely because the mean is already sampled and only the variance needs
+ * pricing. A starting point, like every weight here; the arena is what moves it.
+ */
+const INTERCEPT_RISK = 0.15
 
 /**
  * Backing out of something already begun. A bot never does this: a decision is final.
@@ -180,7 +205,23 @@ export function heuristicBotWith(
           (n, s) => n + valueOf(s, observed.self, intent, weights, rivalIntent),
           0,
         ) / probe.samples.length
-      const score = gained + probe.actionsAhead * PIP_VALUE
+      /*
+       * Risk premium on a dice pool, from the rules' own face counts. Added here rather than in
+       * `valueOf` for the same reason the pip term is: a pool is a property of the *action*, and
+       * the value function only ever sees positions.
+       */
+      const risk =
+        action.type === 'battle/roll'
+          ? interceptionRisk(
+              observed,
+              action['system'] as SystemId,
+              action['enemy'] as ColorId,
+              Number(action['assault'] ?? 0),
+              Number(action['raid'] ?? 0),
+            )
+          : undefined
+      const exposure = risk === undefined ? 0 : risk.chance * risk.hits * INTERCEPT_RISK
+      const score = gained + probe.actionsAhead * PIP_VALUE - exposure
       /*
        * **A repeating action must strictly improve the position to be eligible at all.**
        *

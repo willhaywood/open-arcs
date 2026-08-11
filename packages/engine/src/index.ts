@@ -64,7 +64,7 @@ export {
   phantomHolding,
   rivalHoldings,
 } from './rules/ambitions.js'
-export { BattleModule, canBattle } from './rules/battle.js'
+export { BattleModule, canBattle, interceptionRisk } from './rules/battle.js'
 export { LeadersModule } from './rules/leaders.js'
 export { VoxModule } from './rules/vox.js'
 

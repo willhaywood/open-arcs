@@ -115,7 +115,7 @@ describe('the battleUnlocked feature', () => {
 describe('the weapon-option bot', () => {
   it('buys the battle option where a bot without the feature declines it', () => {
     /*
-     * Seed 1, step 145, found by sweeping real games for the first divergent Prelude. Yellow is
+     * Seed 1, step 164, found by sweeping real games for the first divergent Prelude. Yellow is
      * offered "Fuel: add Battle option" — Loyal Marines lets any resource pay as a Weapon — and the
      * option is taken where a bot blind to it walks straight past into its actions. Pinning the step
      * (not just "they differ somewhere") is what makes the weight silently reverting to 0 fail here
@@ -135,7 +135,7 @@ describe('the weapon-option bot', () => {
       registry,
     )
     let asked: AskedThisTurn = NO_ASKS
-    for (let i = 0; i < 145; i++) {
+    for (let i = 0; i < 164; i++) {
       const f = botToAct(cur, THREE)
       expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
       const step = stepBot(cur, standardBot, f!, registry, asked)
