@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| Ladder re-baselined after #18/#19 | **brutal unchanged** (64%-36% at 2p on a zero floor, third consistent measurement); **hard's inversion shrank to 1-3 points** — section 11's 8-9 point twinned rout was largely the dice tie-break inside the beam | 13 |
 | Per-rival intent, **re-measured** under the p14 trophy rule | **the null flipped sign** — 4 points *behind* standard on a 2-point floor, where section 6 had it 3 ahead. Does not ship | 12 |
 | Re-baselining the ladder after #15/#16/section 9 | **brutal holds** (65%-35% at 2p on a zero floor); **hard has inverted** — 2-9 points *behind* standard against a 1-point floor, where section 7 had it ahead | 11 |
 | Easy rebased on the shipped weights | **not a strength idea** — it is the ladder's bottom rung. Uncovered a livelock in easy that predated it: 49 of 240 arena games unfinished, now 0 | 10 |
@@ -2299,3 +2300,63 @@ against an engine that has since changed underneath them, and some of them are p
 true. The entries record what was measured when, which is exactly why they are not rewritten; but
 their *shelf life* is shorter than it looks, and any of them being leaned on for a decision today
 deserves a re-run first.
+
+## 13. The ladder re-baselined again — hard's inversion was mostly an artifact
+
+Section 11 was measured after the follower-pass fix but **before** the p14 trophy fix (#18) and the
+dice-selection fix (#19). The second of those is the reason to re-run rather than a general worry
+about staleness: the beam's prune keeps offer order on equal lines, which is exactly the tie-break
+#19 fixed, so `hard` and `brutal` were collecting undersized dice pools *inside every searched line*,
+not merely at the real ask. If that was distorting the beam's evaluation of its own lines, the fix
+should move the search bots more than it moves standard. It did.
+
+### Hard — still behind, but not by what section 11 reported
+
+| run | search-v3(3x14) | standard | twin gap |
+| --- | --- | --- | --- |
+| 3p, vs standard x2 | 31% wins, 19.8 power, rank 1.99 | **34%**, 19.5, 1.97 | — |
+| 3p, twinned | 33% / 33%, 21.7 / 20.8 | 34%, 21.8, 1.96 | **0 points, 0.9 power** |
+| *section 11, pre-#18/#19* | *32%, 19.0 / 31%+30%* | *34% / **39%*** | *1 point, 0.1 power* |
+
+**The damning number does not reproduce.** Section 11's twinned run had standard at 39% against
+31%/30% — an 8-9 point rout, and the strongest evidence for the inversion. It is now 34% against
+33%/33%, a **1-point** gap.
+
+**Power says nothing at all here.** The twins differ by 0.9 power, which swamps the 0.3 that
+separates the bots. Any power reading at this volume is the floor talking.
+
+**On win rate hard is still behind**, by 3 points in the head-to-head and 1 twinned, against a
+0-point twin gap. So the finding stands in direction and collapses in magnitude: hard is *marginally*
+behind normal, not the clearly-weaker rung section 11 described. Section 11's own hedge — "a modest
+claim of the opposite sign is a different thing" — was right to be modest and still overstated it.
+
+`levels.ts` is corrected accordingly: hard is **not stronger than normal**, which remains the honest
+thing to tell a player, but "misnamed" and "easier than the rung below it" go too far and are gone.
+
+### Brutal — a third measurement, in the same place
+
+| protocol | v4 (brutal) | standard | twin floor |
+| --- | --- | --- | --- |
+| 2p, head-to-head | **64%** wins, 32.1 power | 36%, 25.0 | — |
+| 2p, twinned | 50% / 50%, 30.8 / 30.7 | — | **~0 points** |
+| *section 11* | *65%, 31.6* | *35%, 24.9* | *~0* |
+| *section 8* | *67%, 31.5* | *33%, 22.3* | *~0* |
+
+Three measurements, three engine states — the follower-pass fix, the trophy fix, the dice fix — and
+the result moves by 3 points across all of it, always on a zero floor. **Brutal is the most robust
+entry in this register**, and the only idea that has ever cleared its floor by an order of magnitude.
+
+### What this says about the register
+
+Section 12 closed on the observation that two re-run measurements had both flipped sign, and
+suggested the older entries have a short shelf life. This run sharpens that into something more
+useful:
+
+- **Large effects survive engine changes.** Brutal has been re-measured three times across three
+  sets of rules changes and has not moved.
+- **Small effects do not, and their *magnitudes* are the first thing to go.** Hard's direction held
+  across the re-run; its size did not, and section 11's most quotable number turned out to be
+  measuring a bug that has since been fixed.
+
+The practical rule: a register entry near its floor should be treated as a direction, never as a
+magnitude, and re-run before it is used to justify anything.

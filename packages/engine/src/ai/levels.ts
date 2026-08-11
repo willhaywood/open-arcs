@@ -18,17 +18,22 @@
  *     on strength and took Weapon spending from 1% to 26% (docs/19 section 9) — shipped for the
  *     same reason `leadZeroed` was, that hoarding them looks broken.
  *   - **hard** — the tier-1 beam search (`search-v3(3x14)`): the same judgement as normal with
- *     every card play searched to the end of the turn it buys. **Currently misnamed.** It measured
- *     ~+3 points over normal when it shipped (docs/19 section 7), but re-baselining after the tax
- *     filter, the follower-pass rule and the Weapon option put it 2-9 points *behind* normal against
- *     a 1-point twin floor — the sign has flipped, and this rung is now easier than the one below it
- *     (docs/19 section 11, which lists what to suspect). Do not describe it as stronger than normal
- *     until that is understood.
+ *     every card play searched to the end of the turn it buys. **Not currently stronger than
+ *     normal**, which is worth knowing before describing it to a player: it measured ~+3 points when
+ *     it shipped (docs/19 section 7) and now sits 1-3 points behind on win rate, with power inside
+ *     the noise floor (docs/19 section 13).
+ *
+ *     Section 11 read this as an inversion — 8-9 points behind, "easier than the rung below it" —
+ *     and that was overstated. Most of that gap was the gather menu's tie-break operating inside the
+ *     beam's own searched lines, fixed in #19; re-measured after it, the deficit is 1-3 points. The
+ *     direction held, the magnitude did not.
  *   - **brutal** — tier-2 (`search-v4`): hard, plus the strongest lines re-ranked by what the
  *     position looks like after the rivals reply from sampled hands. Measured past its gate by a
  *     distance nothing else in the register approaches: 67%-33% over normal at two players
- *     against a zero twin floor, +12 mean points at three (docs/19 section 8). Re-baselined at
- *     65%-35% on the same zero floor, so this one holds (docs/19 section 11).
+ *     against a zero twin floor, +12 mean points at three (docs/19 section 8). Re-measured twice
+ *     since, at 65%-35% and 64%-36% on the same zero floor — three measurements across three sets of
+ *     rules changes, moving 3 points in total (docs/19 sections 11 and 13). The most robust result
+ *     in the register.
  */
 
 import { easyBot } from './easy.js'
