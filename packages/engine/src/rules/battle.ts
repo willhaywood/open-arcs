@@ -15,7 +15,8 @@
  *     ship count) are placed by the attacker on their own ships;
  *   ship hits are placed on enemy ships, overflowing to buildings once no enemy ship remains;
  *   building hits are placed on enemy buildings;
- *   destroyed enemy pieces become the attacker's trophies (this is how Warlord scores);
+ *   destroyed enemy pieces become the attacker's trophies, and destroyed attacking ships
+ *     become the *defender's* — both directions, rulebook p14 (this is how Warlord scores);
  *   raid keys steal resources from the enemy;
  *   razing a City outrages the *attacker* for that world's resource (see outrage.ts).
  *
@@ -918,14 +919,28 @@ function performHit(
   let razed = ctx.razed
 
   if (wasDamaged) {
-    // Destroyed: enemy pieces become the attacker's trophies; the attacker's own ships go
-    // back to reserve.
+    /*
+     * Destroyed pieces go to whoever's *opponent* owned them, both ways round. Rulebook p14:
+     * "The attacker takes destroyed defending pieces as Trophies. The defender takes destroyed
+     * attacking pieces as Trophies."
+     *
+     * The second sentence is the one this got wrong for a long time — attacker losses were sent
+     * home to reserve, so a defender who wrecked a fleet by interception got nothing, and Warlord
+     * only ever rewarded attacking. Both printings of the rulebook (April 2024 and August 2025)
+     * carry the sentence verbatim.
+     *
+     * A defender that is not a seated player has no Trophies box, so those pieces do return to
+     * reserve — the only case where the old routing was right.
+     */
     damaged = damaged.filter((id) => id !== target)
-    const home = phase === 'self' ? Location.reserve(ctx.faction) : Location.trophies(ctx.faction)
+    const taker = phase === 'self' ? defendingFaction(state, ctx.enemy) : ctx.faction
+    const home = taker === undefined ? Location.reserve(ctx.faction) : Location.trophies(taker)
     figures = move(figures, target, home)
     log.push(
       phase === 'self'
-        ? `${ctx.faction} lost a ${p.color} ${p.piece}`
+        ? taker === undefined
+          ? `${ctx.faction} lost a ${p.color} ${p.piece}`
+          : `${ctx.faction} lost a ${p.color} ${p.piece} (${taker} trophy)`
         : `${ctx.faction} destroyed ${p.color} ${p.piece} (trophy)`,
     )
     if (p.piece === 'City') razed = true
@@ -934,8 +949,11 @@ function performHit(
     log.push(`${ctx.faction} damaged ${p.color} ${p.piece}`)
   }
 
-  // Anything of the enemy's that is destroyed becomes a trophy; the attacker's own losses go
-  // home to reserve and are not.
+  /*
+   * Still `phase !== 'self'`, and deliberately so even though both phases now yield trophies:
+   * this flag is "the attacker destroyed something of the enemy's", which is what Beloved keys
+   * off. Losing your own ships is not that.
+   */
   const tookTrophies = ctx.tookTrophies === true || (wasDamaged && phase !== 'self')
   const next = { ...ctx, razed, tookTrophies, [phase]: ctx[phase] - 1 }
   // A destroyed piece leaves the board, so it must stop counting as a Cloud City — otherwise the

@@ -135,7 +135,15 @@ describe('player-directed hit assignment', () => {
     expect(contentsOf(destroyedState.figures, Location.system(system))).not.toContain(ship)
   })
 
-  it("a self-hit destroys the attacker's own ship back to reserve, never to trophies", () => {
+  it("a self-hit destroys the attacker's own ship into the DEFENDER's trophies", () => {
+    /*
+     * Rulebook p14, the sentence this used to have backwards: "The attacker takes destroyed
+     * defending pieces as Trophies. **The defender takes destroyed attacking pieces as Trophies.**"
+     * Verbatim in both the April 2024 and August 2025 printings.
+     *
+     * This test previously asserted the opposite — reserve, "never to trophies" — which is why a
+     * player who wrecked an attacking fleet by interception was reported as getting nothing.
+     */
     const pos = battlePosition((state, sys, atk) => ownShips(state, sys, atk).length > 0)
     if (pos === undefined) return
     const { state, system, attacker, enemy, then } = pos
@@ -143,9 +151,22 @@ describe('player-directed hit assignment', () => {
 
     const dmg = advance(state, hitAction(resolveCtx(attacker, system, enemy, { self: 2 }, then), 'self', ship), registry).state
     const gone = advance(dmg, hitAction(resolveCtx(attacker, system, enemy, { self: 1 }, then), 'self', ship), registry).state
-    expect(contentsOf(gone.figures, Location.reserve(attacker))).toContain(ship)
+    expect(contentsOf(gone.figures, Location.trophies(enemy))).toContain(ship)
+    expect(contentsOf(gone.figures, Location.reserve(attacker))).not.toContain(ship)
     expect(contentsOf(gone.figures, Location.trophies(attacker))).not.toContain(ship)
-    expect(contentsOf(gone.figures, Location.trophies(enemy))).not.toContain(ship)
+  })
+
+  it('a self-hit that only damages leaves the ship on the board, trophy to nobody', () => {
+    // The gate on the rule above: only *destroyed* pieces become trophies, never damaged ones.
+    const pos = battlePosition((state, sys, atk) => ownShips(state, sys, atk).length > 0)
+    if (pos === undefined) return
+    const { state, system, attacker, enemy, then } = pos
+    const ship = ownShips(state, system, attacker)[0]!
+
+    const dmg = advance(state, hitAction(resolveCtx(attacker, system, enemy, { self: 1 }, then), 'self', ship), registry).state
+    expect(dmg.damaged).toContain(ship)
+    expect(contentsOf(dmg.figures, Location.system(system))).toContain(ship)
+    expect(contentsOf(dmg.figures, Location.trophies(enemy))).not.toContain(ship)
   })
 
   it('razing an enemy City destroys it to trophies and outrages the attacker', () => {
