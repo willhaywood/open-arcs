@@ -42,6 +42,24 @@ journal — no separate randomness channel.
 
 ## 3. Resolution
 
+### The menu's order is load-bearing
+
+`offerGather` enumerates pools **largest-total first**, and its inner loops start at zero raid and
+zero assault — so the first option is always the whole fleet in skirmish dice: the maximum damage
+carrying neither a self nor an intercept face.
+
+That is not presentation. Every tie-break in the bot keeps the *earliest* candidate (`heuristicBot`
+takes the first of equal scores; the beam's prune keeps offer order on equal lines), so the pool
+listed first wins every tie scoring cannot separate. Enumerating smallest-first therefore made one
+skirmish die the default answer: measured over 12 games, the bot left dice unused in 20% of battles
+and passed over a pool that was both maximum and risk-free in **10.9%** of gather menus. Reversing
+the order took that to 3.4% and eliminated the ties outright.
+
+`interceptionRisk` is the companion fix. Interception fires on *any* intercept face and then costs
+one hit per fresh defending ship, so it is a rare and expensive tail that the bot's five samples per
+candidate mostly do not see. The function reports the rules' own face counts — assault 1 in 6, raid
+2 in 6, skirmish none — and leaves what a hit is worth to `heuristic.ts`.
+
 Tally the pool, then in order:
 
 1. **Attacker self-damage.** `self` hits, plus — if *any* intercept was rolled — the

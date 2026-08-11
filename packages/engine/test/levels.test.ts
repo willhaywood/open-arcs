@@ -135,12 +135,12 @@ describe('the easy bot', () => {
      * blind to rules the other three levels can see, and it showed: it declared ambitions nobody
      * could score and never once spent a Weapon.
      *
-     * Seed 1 step 145 is the position `weapon-option.test.ts` pins for the same reason. What is
+     * Seed 1 step 164 is the position `weapon-option.test.ts` pins for the same reason. What is
      * asserted is easy's *ranking*, not its pick — the pick is the fumble's business, and here the
      * fumble does shrug to a peer within `SLACK`. Under the old weights the option scores 0 and
      * cannot rank top, so reverting the rebase fails here.
      */
-    expect(ranksTop(driveTo(145))).toContain('add Battle option')
+    expect(ranksTop(driveTo(164))).toContain('add Battle option')
   })
 
   it('judges chapter goals by feasibility, the way normal does', () => {
@@ -149,15 +149,23 @@ describe('the easy bot', () => {
      * `feasibility` as the fitness, and leaving easy on `structuralFitness` would keep it blind to
      * what its position can actually *produce* — the same mistake as the weights, one layer down.
      *
-     * Seed 1 step 126 is the first divergence, found by sweeping: easy copies with Construction-5,
-     * where the same weights on structural fitness pivot with Administration-6 instead. Ranking
-     * again, not the pick.
+     * Seed 1 step 122: easy pivots with **Administration-6**, where the same bot on structural
+     * fitness pivots with Administration-3. Same move, different card — feasibility judging which
+     * one the position can actually turn into a chapter goal. Ranking again, not the pick.
      *
-     * The sweep is worth doing carefully — feasibility shifts nearly every *score* while leaving
-     * the *order* alone, so a sweep that compares anything but the chosen action finds a
-     * divergence at almost every step and pins a position where the fitness changes nothing.
+     * **Finding this position honestly took three attempts, and the failures are the lesson.**
+     * Comparing *scores* between the two fitnesses finds a divergence at nearly every step, because
+     * feasibility moves almost every score while leaving the order alone. Comparing against a
+     * locally rebuilt bot is no better — two attempts pinned steps that survived `feasibility`
+     * being deleted, i.e. tests asserting nothing — because a rebuilt bot does not reproduce
+     * `easyBot`'s call pattern.
+     *
+     * What works is to stop approximating: log `easyBot`'s own top-ranked action across a driven
+     * game, once with `feasibility` and once with it deleted, and diff. Every step in that diff
+     * diverges *because of the mutation this test defends against*, which is the only property that
+     * makes the pin worth having.
      */
-    expect(ranksTop(driveTo(126))).toContain('Copy with Construction-5')
+    expect(ranksTop(driveTo(122))).toContain('Pivot with Administration-6')
   })
 
   it('departs from its inner bot’s top choice somewhere in a real game', () => {

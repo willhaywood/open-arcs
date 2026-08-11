@@ -11,6 +11,7 @@ import {
   CourtPile,
   defaultRegistry,
   emptyTally,
+  interceptionRisk,
   parseFigureId,
   rng,
   rollDie,
@@ -372,6 +373,86 @@ type PositionPredicate = (state: GameState, system: SystemId, attacker: FactionI
  * predicate, returning the pre-roll state and the battle's coordinates. Returns undefined if
  * none is found within the budget, so tests skip rather than fail on an unlucky search.
  */
+describe('the gather menu', () => {
+  /** The dice pools the first real gather ask offers, in the order it offers them. */
+  function firstGatherPools(): { s: number; a: number; r: number; t: number }[] | undefined {
+    for (let seed = 1; seed <= 40; seed++) {
+      let step = startGame({ board: 'Board3MixUp', factions: THREE, seed }, registry)
+      for (let i = 0; i < 3000; i++) {
+        const c = step.continue
+        if (c.kind !== 'ask') break
+        const rolls = c.actions.filter((a) => a.type === 'battle/roll')
+        if (rolls.length > 1) {
+          return rolls.map((a) => {
+            const s = Number(a['skirmish']); const as = Number(a['assault']); const r = Number(a['raid'])
+            return { s, a: as, r, t: s + as + r }
+          })
+        }
+        step = advance(step.state, battlePolicy({ kind: 'ask', actions: c.actions }), registry)
+      }
+    }
+    return undefined
+  }
+
+  it('leads with the whole fleet in skirmish dice', () => {
+    /*
+     * The order is load-bearing, not cosmetic. Every tie-break downstream keeps the earliest
+     * candidate — `heuristicBot` takes the first of equal scores, and the beam's prune keeps offer
+     * order — so the pool listed first wins every tie the evaluator cannot separate. Ascending
+     * order made one skirmish die the default answer: measured over 12 games, the bot left dice
+     * unused in 20% of battles, a third of those exact ties, and a risk-free maximum was passed
+     * over in 10.9% of all gather menus.
+     *
+     * Skirmish leads because it is the only die with neither a self nor an intercept face
+     * (docs/09 section 1), so the whole fleet in skirmish is the maximum damage that carries no
+     * risk at all — the right default for a human reading the menu as well as for the bot.
+     */
+    const opts = firstGatherPools()
+    if (opts === undefined) return
+    const maxTotal = Math.max(...opts.map((o) => o.t))
+    expect(opts[0]!.t, 'the first pool is the largest legal one').toBe(maxTotal)
+    expect(opts[0]!.a, 'and carries no assault dice').toBe(0)
+    expect(opts[0]!.r, 'and no raid dice').toBe(0)
+  })
+})
+
+describe('interceptionRisk', () => {
+  /*
+   * The rules half of the dice fix. Face counts from docs/09 section 1: assault carries an intercept
+   * on 1 face of 6, raid on 2 of 6, skirmish on none. Interception fires if *any* intercept face
+   * appears, so the chance compounds over the pool rather than adding across it.
+   */
+  const fresh = () => startGame({ board: 'Board3MixUp', factions: THREE, seed: 1 }, registry).state
+  const anySystem = (s: GameState): SystemId => s.board.systems[0] as SystemId
+
+  it('is impossible with skirmish dice alone — the reason skirmish is the safe die', () => {
+    const s = fresh()
+    expect(interceptionRisk(s, anySystem(s), 'blue', 0, 0).chance).toBe(0)
+  })
+
+  it('compounds over assault dice at 1 face in 6', () => {
+    const s = fresh()
+    expect(interceptionRisk(s, anySystem(s), 'blue', 1, 0).chance).toBeCloseTo(1 / 6, 10)
+    expect(interceptionRisk(s, anySystem(s), 'blue', 3, 0).chance).toBeCloseTo(1 - (5 / 6) ** 3, 10)
+  })
+
+  it('compounds over raid dice at 2 faces in 6', () => {
+    const s = fresh()
+    expect(interceptionRisk(s, anySystem(s), 'blue', 0, 2).chance).toBeCloseTo(1 - (4 / 6) ** 2, 10)
+  })
+
+  it('costs one hit per FRESH defending ship, ignoring damaged ones', () => {
+    const pos = battlePosition((state, sys, atk, enemy) => enemyShips(state, sys, enemy, atk).length > 1)
+    if (pos === undefined) return
+    const standing = enemyShips(pos.state, pos.system, pos.enemy, pos.attacker).filter(
+      (id) => !pos.state.damaged.includes(id),
+    )
+    expect(interceptionRisk(pos.state, pos.system, pos.enemy, 1, 0).hits).toBe(standing.length)
+    const hurt: GameState = { ...pos.state, damaged: [...pos.state.damaged, standing[0]!] }
+    expect(interceptionRisk(hurt, pos.system, pos.enemy, 1, 0).hits).toBe(standing.length - 1)
+  })
+})
+
 function battlePosition(predicate: PositionPredicate, seeds = 40, limit = 3000): Position | undefined {
   for (let seed = 1; seed <= seeds; seed++) {
     let step = startGame({ board: 'Board3MixUp', factions: THREE, seed }, registry)

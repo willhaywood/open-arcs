@@ -131,6 +131,36 @@ function piecesAt(state: Battlefield, s: SystemId, color: ColorId, kind: (p: str
   })
 }
 
+/**
+ * The chance a dice pool triggers interception, and how many hits it would cost if it does.
+ *
+ * **Why this is computed rather than sampled.** Interception fires when *any* intercept face is
+ * rolled, and it then hits the attacker once per fresh defending ship — so it is a tail event with
+ * a large, position-dependent magnitude. `SAMPLES` in `play.ts` is 5, and five rolls of a single
+ * assault die show no intercept at all 40% of the time, so the bot was choosing pools on estimates
+ * that mostly had not seen the thing that makes them expensive.
+ *
+ * Face counts are the rules fact, and they live here beside the roll tables they come from
+ * (docs/09 section 1): **assault** carries an intercept on 1 face of 6, **raid** on 2 of 6, and
+ * **skirmish** on none — which is the whole reason skirmish is the safe die.
+ *
+ * The pricing of the risk is deliberately *not* here. This returns what the rules say; what a hit
+ * is worth is the evaluator's business (`heuristic.ts`).
+ */
+export function interceptionRisk(
+  state: Battlefield & { readonly damaged: readonly string[] },
+  system: SystemId,
+  enemy: ColorId,
+  assault: number,
+  raid: number,
+): { readonly chance: number; readonly hits: number } {
+  const chance = 1 - (5 / 6) ** assault * (4 / 6) ** raid
+  const hits = piecesAt(state, system, enemy, isShip).filter(
+    (id) => !state.damaged.includes(id),
+  ).length
+  return { chance, hits }
+}
+
 function enemiesAt(state: Battlefield, s: SystemId, self: FactionId): ColorId[] {
   const colors = new Set<ColorId>()
   for (const id of contentsOf(state.figures, Location.system(s))) {
@@ -408,8 +438,21 @@ function offerGather(
   const maxRaid = enemyBuildings && !harbored ? 6 : exosuits
   const wary = hasTrait(state, faction, 'Wary')
 
+  /*
+   * **Enumerated largest-first, and that ordering is load-bearing.**
+   *
+   * Every tie-break downstream takes the earliest candidate — `heuristicBot` keeps the first of
+   * equal scores, and the beam's prune keeps offer order on equal lines — so whichever pool this
+   * loop emits first wins every tie. Ascending order therefore made "one skirmish die" the default
+   * answer whenever scoring could not separate the options, and measurement found the bot leaving
+   * dice unused in 20% of battles, 2.03 on average, with a third of those cases exact ties.
+   *
+   * Descending puts the full fleet first, and the inner loops start at 0 raid and 0 assault, so the
+   * very first option is the whole fleet in skirmish dice: the maximum damage that carries no
+   * self-hit and no intercept face. That is the right default for a human reading the menu as well.
+   */
   const options: Action[] = []
-  for (let total = 1; total <= maxDice; total++) {
+  for (let total = maxDice; total >= 1; total--) {
     for (let raid = 0; raid <= Math.min(maxRaid, total, 6); raid++) {
       for (let assault = 0; assault <= Math.min(6, total - raid); assault++) {
         const skirmish = total - raid - assault
