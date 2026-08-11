@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| Re-baselining the ladder after #15/#16/section 9 | **brutal holds** (65%-35% at 2p on a zero floor); **hard has inverted** — 2-9 points *behind* standard against a 1-point floor, where section 7 had it ahead | 11 |
 | Easy rebased on the shipped weights | **not a strength idea** — it is the ladder's bottom rung. Uncovered a livelock in easy that predated it: 49 of 240 arena games unfinished, now 0 | 10 |
 
 ### Why they all failed, in one sentence
@@ -2188,3 +2189,60 @@ The lesson generalizes past this bot. Any caller that re-ranks `considered` is r
 the gate, and the gate is load-bearing for termination. That is why `eligible` is reported rather
 than the ineligible candidates being dropped: the diagnostic panel still shows everything weighed,
 and the next re-ranker has something to respect.
+
+## 11. Re-baselining the ladder — brutal holds, hard has inverted
+
+Sections 7 and 8 were measured before three engine changes landed: the tax filter (#15), the rule
+that a follower must play a card (#16), and the Weapon's battle option shipping into
+`STANDARD_WEIGHTS` (section 9). All three move the legal action set or what the shared evaluator
+prices, so every number in those sections was stale. Re-run at the same 999 games per run, same
+specs, same twin protocol.
+
+**Sections 7 and 8 are left as they were written.** They record what was true when measured, and the
+register only works if it is not rewritten in hindsight. This section supersedes them.
+
+### Brutal — unchanged, and still the largest effect in the register
+
+| protocol | v4 (brutal) | standard | twin floor |
+| --- | --- | --- | --- |
+| 2p, head-to-head | **65%** wins, 31.6 power | 35%, 24.9 | — |
+| 2p, twinned | 50% / 50%, 30.5 / 30.5 | — | **~0 points** |
+| *section 8, for comparison* | *67%, 31.5* | *33%, 22.3* | *~0* |
+
+A 30-point gap on a zero floor, within 2 points of the original. Brutal's claim survives intact.
+
+### Hard — no longer ahead, and now measurably behind
+
+| run | search-v3(3x14) | standard | twin floor |
+| --- | --- | --- | --- |
+| 3p, vs standard x2 | 32% wins, 19.0 power, rank 2.01 | **34%**, 19.8, 1.95 | — |
+| 3p, twinned | 31% / 30%, 20.5 / 20.6 | **39%**, 23.0, 1.87 | **1 point, 0.1 power** |
+| *section 7, for comparison* | *37%, 20.7, 1.92* | *32%, 20.2, 2.01* | *5 points* |
+
+The sign has flipped. Standard leads in both runs — by 2 points in the head-to-head and by 8-9 in
+the twinned run — against a twin floor of **1 point**, the tightest this arena has ever measured at
+999 games. Both gaps clear it, and the power gaps (+0.8 and +2.4) clear the 0.1 power floor by more.
+
+This is not the familiar "the edge was inside the floor all along" null of sections 3j and 6.
+Section 7's +3.2 was pooled across four runs against a ~1.2-point floor, so it was always a modest
+claim — but a modest claim of the *opposite sign* is a different thing, and **the ladder's middle
+rung is currently easier than the rung below it.**
+
+### What to suspect, in order
+
+Not yet investigated — recorded so the next session does not start from scratch.
+
+1. **The follower-pass fix (#16).** Section 7's beam has history here: it chose Pass on turn one when
+   a shared beam starved roots, and drowned in the arrange sub-flow until the per-line cycle gate
+   landed. `search.ts` treats Pass as a root that terminates at depth one, and #16 removed Pass from
+   the follow menu entirely. A beam whose root set changed shape is the first place to look.
+2. **The Weapon option inside searched lines.** Section 9 measured `battleUnlocked` as a null *for
+   the heuristic bot* and shipped it on behaviour. `search.ts` builds its delegate from
+   `STANDARD_WEIGHTS`, so it inherited the term without ever being measured with it — and a feature
+   worth nothing to a one-ply evaluator is not automatically worth nothing to a beam that spends
+   fourteen plies of budget on the lines it opens.
+3. **Depth 14 against a longer turn.** If #15 and #16 changed the mean actions in a turn, a fixed
+   depth budget buys a different fraction of it than it did when 3x14 was chosen.
+
+Until one of these is understood, **`hard` should not be described as stronger than `normal`** in
+`levels.ts` or in the UI.
