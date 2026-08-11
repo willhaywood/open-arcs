@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| Per-rival intent, **re-measured** under the p14 trophy rule | **the null flipped sign** — 4 points *behind* standard on a 2-point floor, where section 6 had it 3 ahead. Does not ship | 12 |
 | Re-baselining the ladder after #15/#16/section 9 | **brutal holds** (65%-35% at 2p on a zero floor); **hard has inverted** — 2-9 points *behind* standard against a 1-point floor, where section 7 had it ahead | 11 |
 | Easy rebased on the shipped weights | **not a strength idea** — it is the ladder's bottom rung. Uncovered a livelock in easy that predated it: 49 of 240 arena games unfinished, now 0 | 10 |
 
@@ -2246,3 +2247,55 @@ Not yet investigated — recorded so the next session does not start from scratc
 
 Until one of these is understood, **`hard` should not be described as stronger than `normal`** in
 `levels.ts` or in the UI.
+
+## 12. Per-rival intent, re-measured — the null did not survive as a null
+
+Section 6 measured per-rival intent and recorded no effect. That measurement was taken when an
+attacker's destroyed ships went home to reserve, so the only way to feed a rival's Warlord was to
+lose while **defending** — which a bot never chooses. PR #18 fixed the rule (rulebook p14: the
+defender takes destroyed attacking pieces as Trophies), so every battle the bot initiates and takes
+interception on now feeds the defender. The mechanism's surface area grew; the measurement had not
+followed it.
+
+That is the whole argument for re-testing a recorded null, and it is worth stating plainly because
+the prior was against it: section 0's register had four consecutive re-pricings measuring nothing or
+worse, and this is a re-pricing.
+
+### Measured — section 6's protocol exactly, 999 games per run
+
+| run | rival-intent | standard | twin floor |
+| --- | --- | --- | --- |
+| vs standard x2 | 31% wins, 17.4 power, rank 2.02 | **35%**, 18.0, 1.95 | — |
+| twinned | 33% / 31%, 17.8 / 17.5 | **36%**, 18.3, 1.93 | **2 points, 0.3 power** |
+| *section 6, for comparison* | *35%, 18.8* | *32%, 18.5* | *2 points, 0.4* |
+
+All 1,998 games finished, none stalled.
+
+**The sign flipped.** Standard now leads both runs — by 4 points head-to-head and 3-5 twinned —
+where section 6 had rival-intent 3 ahead.
+
+**Read against this project's own bar, not a friendlier one.** Section 6 dismissed +3 on a 2-point
+floor as "the floor talking, not a result". Consistency requires the same caution in reverse: -4 on
+a 2-point floor is roughly twice the floor, which is suggestive rather than decisive. The honest
+verdict is **still not better, and probably slightly worse**. Either way it does not ship, and the
+shipped bot keeps one intent for everyone.
+
+### Two caveats that belong with the number
+
+- **The attribution is not clean.** This sits downstream of *two* changes since section 6 — the p14
+  trophy fix and the dice-selection fix (#19) — and both act through the same channel, how often
+  ships are lost. "The trophy rule killed rival intent" would be an overclaim; all that can be said
+  is that the idea does not measure better under the current rules.
+- **`rivalIntent` stays in the tree**, as section 6 left it: an option on `heuristicBotWith` and a
+  flag on `searchBot`, off by default. It costs nothing switched off, and the next idea that wants
+  to measure *in combination* with it should not have to rebuild it.
+
+### The pattern worth more than this result
+
+Two pre-#18 measurements have now been re-run, and **both flipped sign**: `hard` went from +5 to -2
+(section 11), rival intent from +3 to -4. Two is not a trend, but the direction is consistent, and
+the implication is uncomfortable in a useful way — the register's older entries were measured
+against an engine that has since changed underneath them, and some of them are probably no longer
+true. The entries record what was measured when, which is exactly why they are not rewritten; but
+their *shelf life* is shorter than it looks, and any of them being leaned on for a decision today
+deserves a re-run first.
