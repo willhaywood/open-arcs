@@ -34,12 +34,15 @@ import { colorOf } from '../theme.js'
 import { asset } from '../assets.js'
 
 /**
- * The levels the menu offers, in play order. 'brutal' earned its slot by measurement — the gate
- * docs/19 section 8 set for it: 2:1 over normal head-to-head at two players against a zero twin
- * floor, +12 mean points at three. The engine's mapping (`botForLevel`) is the single source of
- * what each name resolves to.
+ * The levels the menu offers, in play order — every rung the engine has, since the ladder was cut
+ * to the three that measure apart (docs/19 section 14). It was four: the v3 beam held `hard` until
+ * it stopped beating the bot below it, and `brutal` is gone because the reply search it named is
+ * now `hard` itself.
+ *
+ * The engine's mapping (`botForLevel`) remains the single source of what each name resolves to, so
+ * this list is a presentation order and nothing more.
  */
-const OFFERED_LEVELS: readonly BotLevel[] = ['easy', 'normal', 'hard', 'brutal']
+const OFFERED_LEVELS: readonly BotLevel[] = ['easy', 'normal', 'hard']
 
 const ALL_FACTIONS: FactionId[] = ['red', 'yellow', 'blue', 'white']
 
