@@ -4961,12 +4961,13 @@ button {
  * **Filled rather than outlined, and that is what keeps it out of the factions' way.** The seat
  * buttons directly above are outlined chips carrying faction color, and two of the four faction
  * colors (red, yellow) sit right next to where a difficulty ramp naturally lands. Hue alone would
- * make "brutal" and "red" a guess; a solid chip with near-black text is structurally a different
+ * make "hard" and "red" a guess; a solid chip with near-black text is structurally a different
  * object from an outlined one, so the two rows never read as the same kind of control.
  *
  * The ramp itself is conventional on purpose — calm green, the house gold for the default, amber
- * for caution, red for danger — so it needs no legend, which is just as well now that the level
- * descriptions are gone.
+ * for the top rung — so it needs no legend, which is just as well now that the level descriptions
+ * are gone. It lost its red step when the ladder went to three (docs/19 section 14); amber now ends
+ * it, which is the honest signal for an opponent that is strong rather than punishing.
  */
 .ng-bot-level {
   display: inline-flex;
@@ -4999,15 +5000,6 @@ button {
 }
 .ng-level.hard {
   --level: #e08a3c;
-}
-/*
- * Lighter than the red faction's own #d94b3f, and measured rather than picked: the faction red
- * puts the chip's dark label at 4.45:1, a hair under the 4.5 AA threshold, where this clears it.
- * The divergence is useful twice over — it also stops the brutal chip reading as the red seat
- * button sitting a row above it.
- */
-.ng-level.brutal {
-  --level: #e05b4d;
 }
 
 

@@ -36,6 +36,9 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| Ladder cut to three rungs; replies at `1x1` vs `3x2` | **v3 beam dropped** — not stronger than normal. **Replies measure identical at 1x1 and 3x2** (63% vs 64%, zero floor) at *half* the wall time, so no intermediate rung exists and `hard` is now `r1x1` | 14 |
+| Ladder re-baselined after #18/#19 | **brutal unchanged** (64%-36% at 2p on a zero floor, third consistent measurement); **hard's inversion shrank to 1-3 points** — section 11's 8-9 point twinned rout was largely the dice tie-break inside the beam | 13 |
+| Per-rival intent, **re-measured** under the p14 trophy rule | **the null flipped sign** — 4 points *behind* standard on a 2-point floor, where section 6 had it 3 ahead. Does not ship | 12 |
 | Re-baselining the ladder after #15/#16/section 9 | **brutal holds** (65%-35% at 2p on a zero floor); **hard has inverted** — 2-9 points *behind* standard against a 1-point floor, where section 7 had it ahead | 11 |
 | Easy rebased on the shipped weights | **not a strength idea** — it is the ladder's bottom rung. Uncovered a livelock in easy that predated it: 49 of 240 arena games unfinished, now 0 | 10 |
 
@@ -2246,3 +2249,177 @@ Not yet investigated — recorded so the next session does not start from scratc
 
 Until one of these is understood, **`hard` should not be described as stronger than `normal`** in
 `levels.ts` or in the UI.
+
+## 12. Per-rival intent, re-measured — the null did not survive as a null
+
+Section 6 measured per-rival intent and recorded no effect. That measurement was taken when an
+attacker's destroyed ships went home to reserve, so the only way to feed a rival's Warlord was to
+lose while **defending** — which a bot never chooses. PR #18 fixed the rule (rulebook p14: the
+defender takes destroyed attacking pieces as Trophies), so every battle the bot initiates and takes
+interception on now feeds the defender. The mechanism's surface area grew; the measurement had not
+followed it.
+
+That is the whole argument for re-testing a recorded null, and it is worth stating plainly because
+the prior was against it: section 0's register had four consecutive re-pricings measuring nothing or
+worse, and this is a re-pricing.
+
+### Measured — section 6's protocol exactly, 999 games per run
+
+| run | rival-intent | standard | twin floor |
+| --- | --- | --- | --- |
+| vs standard x2 | 31% wins, 17.4 power, rank 2.02 | **35%**, 18.0, 1.95 | — |
+| twinned | 33% / 31%, 17.8 / 17.5 | **36%**, 18.3, 1.93 | **2 points, 0.3 power** |
+| *section 6, for comparison* | *35%, 18.8* | *32%, 18.5* | *2 points, 0.4* |
+
+All 1,998 games finished, none stalled.
+
+**The sign flipped.** Standard now leads both runs — by 4 points head-to-head and 3-5 twinned —
+where section 6 had rival-intent 3 ahead.
+
+**Read against this project's own bar, not a friendlier one.** Section 6 dismissed +3 on a 2-point
+floor as "the floor talking, not a result". Consistency requires the same caution in reverse: -4 on
+a 2-point floor is roughly twice the floor, which is suggestive rather than decisive. The honest
+verdict is **still not better, and probably slightly worse**. Either way it does not ship, and the
+shipped bot keeps one intent for everyone.
+
+### Two caveats that belong with the number
+
+- **The attribution is not clean.** This sits downstream of *two* changes since section 6 — the p14
+  trophy fix and the dice-selection fix (#19) — and both act through the same channel, how often
+  ships are lost. "The trophy rule killed rival intent" would be an overclaim; all that can be said
+  is that the idea does not measure better under the current rules.
+- **`rivalIntent` stays in the tree**, as section 6 left it: an option on `heuristicBotWith` and a
+  flag on `searchBot`, off by default. It costs nothing switched off, and the next idea that wants
+  to measure *in combination* with it should not have to rebuild it.
+
+### The pattern worth more than this result
+
+Two pre-#18 measurements have now been re-run, and **both flipped sign**: `hard` went from +5 to -2
+(section 11), rival intent from +3 to -4. Two is not a trend, but the direction is consistent, and
+the implication is uncomfortable in a useful way — the register's older entries were measured
+against an engine that has since changed underneath them, and some of them are probably no longer
+true. The entries record what was measured when, which is exactly why they are not rewritten; but
+their *shelf life* is shorter than it looks, and any of them being leaned on for a decision today
+deserves a re-run first.
+
+## 13. The ladder re-baselined again — hard's inversion was mostly an artifact
+
+Section 11 was measured after the follower-pass fix but **before** the p14 trophy fix (#18) and the
+dice-selection fix (#19). The second of those is the reason to re-run rather than a general worry
+about staleness: the beam's prune keeps offer order on equal lines, which is exactly the tie-break
+#19 fixed, so `hard` and `brutal` were collecting undersized dice pools *inside every searched line*,
+not merely at the real ask. If that was distorting the beam's evaluation of its own lines, the fix
+should move the search bots more than it moves standard. It did.
+
+### Hard — still behind, but not by what section 11 reported
+
+| run | search-v3(3x14) | standard | twin gap |
+| --- | --- | --- | --- |
+| 3p, vs standard x2 | 31% wins, 19.8 power, rank 1.99 | **34%**, 19.5, 1.97 | — |
+| 3p, twinned | 33% / 33%, 21.7 / 20.8 | 34%, 21.8, 1.96 | **0 points, 0.9 power** |
+| *section 11, pre-#18/#19* | *32%, 19.0 / 31%+30%* | *34% / **39%*** | *1 point, 0.1 power* |
+
+**The damning number does not reproduce.** Section 11's twinned run had standard at 39% against
+31%/30% — an 8-9 point rout, and the strongest evidence for the inversion. It is now 34% against
+33%/33%, a **1-point** gap.
+
+**Power says nothing at all here.** The twins differ by 0.9 power, which swamps the 0.3 that
+separates the bots. Any power reading at this volume is the floor talking.
+
+**On win rate hard is still behind**, by 3 points in the head-to-head and 1 twinned, against a
+0-point twin gap. So the finding stands in direction and collapses in magnitude: hard is *marginally*
+behind normal, not the clearly-weaker rung section 11 described. Section 11's own hedge — "a modest
+claim of the opposite sign is a different thing" — was right to be modest and still overstated it.
+
+`levels.ts` is corrected accordingly: hard is **not stronger than normal**, which remains the honest
+thing to tell a player, but "misnamed" and "easier than the rung below it" go too far and are gone.
+
+### Brutal — a third measurement, in the same place
+
+| protocol | v4 (brutal) | standard | twin floor |
+| --- | --- | --- | --- |
+| 2p, head-to-head | **64%** wins, 32.1 power | 36%, 25.0 | — |
+| 2p, twinned | 50% / 50%, 30.8 / 30.7 | — | **~0 points** |
+| *section 11* | *65%, 31.6* | *35%, 24.9* | *~0* |
+| *section 8* | *67%, 31.5* | *33%, 22.3* | *~0* |
+
+Three measurements, three engine states — the follower-pass fix, the trophy fix, the dice fix — and
+the result moves by 3 points across all of it, always on a zero floor. **Brutal is the most robust
+entry in this register**, and the only idea that has ever cleared its floor by an order of magnitude.
+
+### What this says about the register
+
+Section 12 closed on the observation that two re-run measurements had both flipped sign, and
+suggested the older entries have a short shelf life. This run sharpens that into something more
+useful:
+
+- **Large effects survive engine changes.** Brutal has been re-measured three times across three
+  sets of rules changes and has not moved.
+- **Small effects do not, and their *magnitudes* are the first thing to go.** Hard's direction held
+  across the re-run; its size did not, and section 11's most quotable number turned out to be
+  measuring a bug that has since been fixed.
+
+The practical rule: a register entry near its floor should be treated as a direction, never as a
+magnitude, and re-run before it is used to justify anything.
+
+## 14. The ladder cut to three — and replies are one deal, not six
+
+Section 13 left the ladder with four rungs and only three distinct strengths. This resolves that,
+and answers a second question on the way.
+
+### The v3 beam is not a rung
+
+It was `hard` for as long as it measured ~+3 points over normal (section 7). Re-measured after the
+trophy and dice fixes it sits 1-3 points *behind* normal on win rate with power inside the floor
+(section 13). A configuration that costs a beam search at every card play and does not beat the bot
+below it is not a difficulty setting, so it comes off the ladder. `searchBot` is untouched — the new
+`hard` is the same function with replies switched on — so this removes an entry, not code.
+
+### How many replies? One is as good as six
+
+The reply search shipped at `roots: 3, deals: 2`. The obvious use for that parameter was a rung
+*between* normal and the reply search, so it was measured at `1 x 1`:
+
+| config | vs standard, 2p | twin floor | wall clock, 999 games |
+| --- | --- | --- | --- |
+| `reply:1:1` | **63%** wins, 32.3 power | 50/50, 31.2/31.2 — **~0** | **11m21s** |
+| `reply:3:2` | 64% wins, 32.1 power | 50/50, 30.8/30.7 — ~0 | 23m24s |
+
+**Indistinguishable in strength, and 3 x 2 costs twice the wall time.** So there is no intermediate
+rung to be had from this dial — and the shipped configuration was paying double for nothing. `hard`
+is now `reply:1:1`.
+
+That the *sixfold* difference in sampled rival hands changes nothing is the interesting part. One
+sample of what the rivals might do is enough to fix the blind spot; refining that sample further
+only sharpens a number that was already good enough to decide on.
+
+### The pattern this completes
+
+Three independent attempts to buy strength with more search effort, three nulls:
+
+| more of what | result | section |
+| --- | --- | --- |
+| beam width and depth, 3x14 -> 6x16 | nothing | 7 |
+| determinized deals, 1x1 -> 3x2 | nothing | 14 |
+| rival intents recomputed per rival | nothing, then worse | 6, 12 |
+
+Against which every idea that *did* move strength let the evaluator see something it structurally
+could not see before: the rivals replying at all (section 8), the Weapon's battle option (section 9),
+an unscoreable declaration's cost (section 4). Section 0 has said this from the start; it now has
+three separate confirmations from the search side alone.
+
+**So there is no rung above `hard`, and that is a measured position rather than unfinished work.** A
+fourth rung needs either that kind of discovery — which the register says arrives rarely and cannot
+be scheduled — or a rule handicap in the style of SUPERCAT's optional modifiers, which is a design
+decision about what the game is rather than an engineering one.
+
+### The ladder as it stands
+
+| rung | bot | measured against normal |
+| --- | --- | --- |
+| easy | `easyBot` | 5% wins to normal's 48% |
+| normal | `standardBot` | the reference |
+| hard | `search-v4(3x14,r1x1)` | **63%-37%** at 2p, zero twin floor |
+
+Levels no longer promise a saved game keeps the opponent it started against: a game saved against
+the old `hard` now loads against the new one. That promise is worth less than a correct ladder.
