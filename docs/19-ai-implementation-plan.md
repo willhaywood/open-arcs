@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| The blunder oracle: rollout win-prob vs the bot's runner-up | **a real leak** — card plays in lost games underperform the bot's own runner-up by ~5% win-prob vs placebo (z≈4.3, game-clustered); the first low-noise training target the register has produced | 17 |
 | Loss forensics: 2x320 games, hard's losses vs a twin control | **no leak** — 24 features, none separate losing-to-standard from coin-flip twin losses; the 37% loss rate is variance. Retroactively explains the null streak | 16 |
 | The residual hand as features (`handPips`/`handTopCard`) | **measurably worse** — 5-7 points behind standard on a ~zero floor. Priced the option, not its expiry: the bot hoarded cards the chapter clock kills | 15 |
 | Ladder cut to three rungs; replies at `1x1` vs `3x2` | **v3 beam dropped** — not stronger than normal. **Replies measure identical at 1x1 and 3x2** (63% vs 64%, zero floor) at *half* the wall time, so no intermediate rung exists and `hard` is now `r1x1` | 14 |
@@ -2549,3 +2550,72 @@ levers left are the ones that never depended on a leak: behavioural quality (a n
 identically to a useful spend still reads as broken), Experiment B's over-resourcing (about winning
 *uglier*, not losing), and a rule-handicap rung for players who want a harder opponent than honest
 play can currently provide.
+
+## 17. The blunder oracle — hard's losses are not all variance after all
+
+Section 16 found no aggregate leak and named its own blind spot: decision-level mistakes that leave
+aggregates unmoved. This section hunted them with a rollout oracle, and found them.
+
+### The oracle
+
+Not a deeper search — a deeper search would still judge positions with the same `valueOf` that six
+ideas failed to improve. Instead, ground truth by rollout: at a decision where hard chose A over its
+own runner-up B, play the game to completion M=12 times from each (same shipped bots, common
+re-seeded RNG salts across the pair), and let `blunder = winRate(B) − winRate(A)`. Positive means
+the bot's own second choice was better in reality than its evaluation said.
+
+Protocol: 40 lost + 20 won (placebo) games from the section 16 corpus, every hard card-play and
+declare decision with a scoreable runner-up — 2,115 decisions, ~50,000 full-game continuations.
+Every re-driven game reproduced its corpus winner exactly, and salt independence was spot-checked
+both ways before the fleet ran.
+
+### The result
+
+| class | corpus | n | mean blunder | se |
+| --- | --- | --- | --- | --- |
+| card plays | **lost** | 1040 | **+0.022** | 0.007 |
+| card plays | placebo (won) | 525 | **−0.027** | 0.008 |
+| declares | lost | 336 | −0.004 | 0.011 |
+| declares | placebo | 214 | −0.070 | 0.015 |
+
+Cluster-robust at game level (the honest unit — decisions within a game correlate): lost games
++0.024 (se 0.007, n=40), placebo −0.026 (se 0.009, n=20), **difference +0.050 ± 0.011, z ≈ 4.3**.
+
+In the games hard wins, its card plays beat its own runner-up by ~2.6% win-probability per decision
+— the evaluator earning its keep. In the games it loses, the sign flips: the runner-up was better by
+~2.4% per decision. The effect is spread across every chapter and every margin bucket (lost-minus-
+placebo: exact ties +0.04, mid margins +0.06, confident margins +0.06) — so it is not the tie-break
+noise of section 14's residue, and not confined to desperate endgames. Declares show no effect.
+
+The win-probability trajectory of the chosen action across lost games — 0.54, 0.37, 0.33, 0.18,
+0.05 by chapter — says losses are a gradual bleed of many small mistakes, not single catastrophes,
+which is exactly why section 16's aggregate features could not see them.
+
+### A statistical trap, recorded because it nearly shipped
+
+The first cut showed a spectacular split: blunder +0.065 when the position was losing
+(winChosen < 0.3) against −0.028 otherwise — a clean "the bot misplays from behind" story. It was
+mostly artifact: **conditioning on a quantity estimated from the same rollouts that produce the
+score selects on shared noise**. Re-split on an estimate-independent conditioner (the corpus power
+gap at chapter start), the contrast shrinks to +0.034 vs +0.019 — a mild tilt, not a mechanism.
+Any future oracle analysis will meet this trap; this is the warning.
+
+### What this revises, and what it licenses
+
+**Section 16's verdict needs its statement sharpened, not retracted.** At aggregate resolution the
+losses look like variance; at rollout resolution roughly a 5% per-decision swing separates lost
+games from won ones, and the bot's own candidate list contained the better action. The 37% loss
+rate is not all luck — a recoverable fraction of it is card-play decisions the evaluator gets wrong
+and a rollout can identify.
+
+This meets section 15's bar — a loss the bot actually suffers, quantified, mechanism in hand — and
+it is the missing justification for the one big idea the register had no evidence for: **the oracle
+is a policy-improvement operator, and its output is exactly the low-noise training target that the
+fitting attempts (3f-3i) lacked**. Rollout-ranked card plays are too slow to ship (~70s per
+decision) but are precisely the AlphaZero-style improved target a learned evaluator would train
+toward. Alternatively, distilling what distinguishes rollout-preferred runner-ups into a cheap
+feature is a normal section-0-shaped experiment.
+
+An eyeball note for whoever goes next: several of the largest individual blunders decline a
+Surpass the oracle likes, and one carries an evaluator margin of 11.5 with the rollouts 12-0
+against it — worth a look as a possible search-line pathology before any grander theory.
