@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| The margin-11.5 oracle blunder, investigated | **evaluator blind spot, search exonerated** — a rival's pending declaration (undeclared standing + marker + lead remaining) is priced at zero, and power is linear through the win threshold | 18 |
 | The blunder oracle: rollout win-prob vs the bot's runner-up | **a real leak** — card plays in lost games underperform the bot's own runner-up by ~5% win-prob vs placebo (z≈4.3, game-clustered); the first low-noise training target the register has produced | 17 |
 | Loss forensics: 2x320 games, hard's losses vs a twin control | **no leak** — 24 features, none separate losing-to-standard from coin-flip twin losses; the 37% loss rate is variance. Retroactively explains the null streak | 16 |
 | The residual hand as features (`handPips`/`handTopCard`) | **measurably worse** — 5-7 points behind standard on a ~zero floor. Priced the option, not its expiry: the bot hoarded cards the chapter clock kills | 15 |
@@ -2619,3 +2620,40 @@ feature is a normal section-0-shaped experiment.
 An eyeball note for whoever goes next: several of the largest individual blunders decline a
 Surpass the oracle likes, and one carries an evaluator margin of 11.5 with the rollouts 12-0
 against it — worth a look as a possible search-line pathology before any grander theory.
+
+## 18. The margin-11.5 pathology — the evaluator cannot see a pending declaration
+
+Section 17's eyeball list flagged one decision where the evaluator's margin was 11.5 and the
+oracle's rollouts went 12-0 the other way. Investigated: game 44, step 505 — chapter 5, round 4,
+hard (red) trailing 11-29 against a threshold of 33, two ambition markers left (6/3 and 4/2),
+Empath declared at 9/4 with red dominant.
+
+The two continuations are deterministic and differ by one thing:
+
+| | chosen: Lead Administration-4 (score -0.4) | runner-up: Lead Mobilization-5 (score -11.9) |
+| --- | --- | --- |
+| the 6/3 marker | **yellow declares Keeper with it** — +6, reaches 35, wins on threshold | **red takes it re-declaring Empath** — Empath pays 20, yellow never leads again, red wins 31-29 |
+
+The winning move does double duty the evaluator cannot price: it raises red's own payout *and*
+consumes the marker and the lead that yellow's Keeper declaration needed (only the leader declares,
+and there was one lead left).
+
+**The search is exonerated.** All four configurations — v3 with no replies, r1x1, r4x2, r4x4 —
+score this position within a point of each other and all prefer the losing move, because they share
+`valueOf`. (The roots=1 scale-mixing worry raised on the way was checked against the code and is
+already guarded: when any line is reply-checked, the winner comes from the checked set alone.)
+
+Two structural blind spots, both confirmed in source:
+
+1. **Rival declaration threat.** The standing terms loop over `observed.declared` only, and
+   `declareReadiness` is guarded to self because rivals' hands are hidden. A rival's *undeclared*
+   standing — dominant public Relic holdings, a marker remaining, a lead still to come — is priced
+   at exactly zero. Here it was the entire game, and it is mostly hand-independent: any 5 or 7
+   declares Keeper.
+2. **Threshold nonlinearity.** `valueOf` is linear in power. Yellow at 29 against a threshold of 33
+   means +6 is not six points, it is the game; nothing prices distance to the threshold.
+
+This is the first section-0-shaped discovery to come from an actual lost decision rather than from
+armchair plausibility — the oracle (17) surfaced it, and any fix meets section 15's bar by
+construction, with a concrete game it must flip. The candidate feature and its experiment are the
+next entry.
