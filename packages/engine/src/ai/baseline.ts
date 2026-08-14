@@ -60,6 +60,9 @@ export const BASELINE_WEIGHTS: Weights = {
   trophies: 0.3,
   captives: 0.3,
   tempo: 0.15,
+  // Off in the baseline by definition: it predates the residual hand being visible at all.
+  handPips: 0,
+  handTopCard: 0,
 }
 
 /** True while the live weights still match the snapshot; the golden test reports when they do not. */
