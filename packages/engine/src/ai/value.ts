@@ -145,6 +145,7 @@ export const FEATURES = [
   'tempo',
   'handPips',
   'handTopCard',
+  'undeclaredThreat',
 ] as const
 
 export type Feature = (typeof FEATURES)[number]
@@ -223,6 +224,11 @@ export const WEIGHTS: Weights = {
    */
   handPips: 0,
   handTopCard: 0,
+  /*
+   * The pending declaration (docs/19 section 18), off by default like every goal-layer addition.
+   * `THREAT_WEIGHTS` in `threat.ts` turns it on.
+   */
+  undeclaredThreat: 0,
 }
 
 const zero = (): Record<Feature, number> =>
@@ -500,6 +506,39 @@ export function featuresOf(
       const card = parseCardId(id)
       x.handPips += card.pips
       if (card.strength > x.handTopCard) x.handTopCard = card.strength
+    }
+  }
+
+  /*
+   * **The pending declaration** (docs/19 section 18) — what an undeclared ambition is worth to the
+   * faction best placed to declare it.
+   *
+   * The standing terms above loop over `observed.declared`, and `declareReady` is guarded to self
+   * because rivals' hands are hidden — so a rival one lead away from declaring an ambition they
+   * dominate was priced at exactly zero. In the game that exposed this, that zero was an 11.5-point
+   * evaluator error and the whole match: yellow's undeclared Keeper plus the last 6/3 marker, where
+   * the winning move was to consume that marker.
+   *
+   * Priced from **public information only** — standings via `metric`, the marker via
+   * `ambitionable[0]` (declaring takes the top marker), a hand *count* as the gate — deliberately,
+   * because that is what lets it be computed for every faction alike: no self-guard, so a rival's
+   * threat flows into `valueOf`'s `mine - best` the same way their cities do. The hand gate is a
+   * count, not contents; holding cards is public, what they are is not, and late in a chapter any
+   * 5-or-better usually suffices to declare something.
+   *
+   * The **max** over ambitions rather than a sum is `declareReadiness`'s argument: one declaration
+   * per lead, so opportunities do not stack. No intent bias in the first pass (section 3k).
+   */
+  const nextMarker = observed.ambitionable[0]
+  if (nextMarker !== undefined && (observed.handSizes[self] ?? 0) > 0) {
+    const declared = new Set(observed.declared.map((d) => d.ambition))
+    for (const ambition of AMBITIONS) {
+      if (declared.has(ambition)) continue
+      const mine = metric(observed, self, ambition)
+      const best = Math.max(0, ...rivalHoldings(observed, self, ambition))
+      const share = mine === 0 && best === 0 ? 0 : mine > best ? 1 : mine === best ? 0.5 : 0.2
+      const worth = nextMarker.high * share
+      if (worth > x.undeclaredThreat) x.undeclaredThreat = worth
     }
   }
 
