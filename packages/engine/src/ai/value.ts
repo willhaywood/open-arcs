@@ -27,6 +27,7 @@ import {
   countResource,
   courtCard,
   courtSlots,
+  parseCardId,
   parseFigureId,
   slotKeys,
   slotsOf,
@@ -142,6 +143,8 @@ export const FEATURES = [
   'trophies',
   'captives',
   'tempo',
+  'handPips',
+  'handTopCard',
 ] as const
 
 export type Feature = (typeof FEATURES)[number]
@@ -213,6 +216,13 @@ export const WEIGHTS: Weights = {
   trophies: 0.3,
   captives: 0.3,
   tempo: 0.15,
+  /*
+   * The residual hand priced by its cards, off by default like every goal-layer addition, so the
+   * frozen baseline stays byte-identical and a bot that switches them on can be attributed the
+   * difference. `HAND_WEIGHTS` in `hand.ts` turns them on.
+   */
+  handPips: 0,
+  handTopCard: 0,
 }
 
 const zero = (): Record<Feature, number> =>
@@ -463,6 +473,35 @@ export function featuresOf(
 
   // Tempo — cards are options. Easy to over-price, and hard to justify beyond that.
   x.tempo = observed.handSizes[self] ?? 0
+
+  /*
+   * **The residual hand, priced by its cards rather than its count.**
+   *
+   * `tempo` sees only how many cards are held, so {Aggression-7, Construction-6} and
+   * {Administration-1, Mobilization-2} score identically — and with them, every pair of candidate
+   * card plays that buys the same board this turn but leaves those two different hands behind. The
+   * card play is the highest-weight decision in the game (docs/19 section 2d), and what it leaves
+   * in hand was invisible.
+   *
+   * Two features rather than one, because the deck trades them against each other (`PIPS` in
+   * cards.ts: strength 1 carries 3-4 pips, strength 7 carries 1). Pips are the hand's remaining
+   * action potential; the top card is the standing option to surpass a lead, win an initiative
+   * fight, or declare late. Pricing only pips would teach the bot to dump its high cards; only
+   * strength, to hoard 7s it never spends. `handTopCard` is a max, not a sum, for the same reason
+   * `declareReadiness` takes the best single opportunity: the option does not stack.
+   *
+   * **Guarded to self, like `declareReady`**: `observed.hand` is always the observing faction's
+   * own hand, so scoring a rival with it would price them as holding my cards. Rivals' hands are
+   * hidden; their side of this term is simply absent, which the relative `valueOf` tolerates the
+   * same way it does for `declareReady`.
+   */
+  if (observed.self === self) {
+    for (const id of observed.hand) {
+      const card = parseCardId(id)
+      x.handPips += card.pips
+      if (card.strength > x.handTopCard) x.handTopCard = card.strength
+    }
+  }
 
   return x
 }

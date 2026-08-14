@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| The residual hand as features (`handPips`/`handTopCard`) | **measurably worse** — 5-7 points behind standard on a ~zero floor. Priced the option, not its expiry: the bot hoarded cards the chapter clock kills | 15 |
 | Ladder cut to three rungs; replies at `1x1` vs `3x2` | **v3 beam dropped** — not stronger than normal. **Replies measure identical at 1x1 and 3x2** (63% vs 64%, zero floor) at *half* the wall time, so no intermediate rung exists and `hard` is now `r1x1` | 14 |
 | Ladder re-baselined after #18/#19 | **brutal unchanged** (64%-36% at 2p on a zero floor, third consistent measurement); **hard's inversion shrank to 1-3 points** — section 11's 8-9 point twinned rout was largely the dice tie-break inside the beam | 13 |
 | Per-rival intent, **re-measured** under the p14 trophy rule | **the null flipped sign** — 4 points *behind* standard on a 2-point floor, where section 6 had it 3 ahead. Does not ship | 12 |
@@ -2423,3 +2424,57 @@ decision about what the game is rather than an engineering one.
 
 Levels no longer promise a saved game keeps the opponent it started against: a game saved against
 the old `hard` now loads against the new one. That promise is worth less than a correct ladder.
+
+## 15. Hand quality — measurably worse, and the lesson is about expiry
+
+The largest piece of legal, unpriced information left: `observed.hand` carries suit, strength and
+pips, and the evaluator read only a count (`tempo`) plus a declare gate. Two features, priced as one
+idea — the residual hand priced by its cards:
+
+- `handPips` — Σ pips over the hand: remaining action potential.
+- `handTopCard` — max strength: the standing option to surpass, seize initiative, or declare late.
+
+Deliberately opposed, because the deck trades pips against strength. Guarded to self like
+`declareReady`. Weight 0 in `WEIGHTS` and `BASELINE_WEIGHTS`; `hand.ts` switches them on at
+0.1/pip and 0.08/strength, sized against measured card-play margins.
+
+The behavioural gate looked *right*: 15 divergences in ~800 driven steps, every one a Lead or
+Pivot, all in the intended direction — lead the middling card, keep the 4-pip workhorses and the
+top card.
+
+### Measured — section 6's protocol, 999 games per run
+
+| run | hand-quality | standard | twin floor |
+| --- | --- | --- | --- |
+| vs standard x2 | 30% wins, 17.1 power, rank 2.02 | **35%**, 18.2, 1.96 | — |
+| twinned | 31% / 31%, 16.9 / 17.1 | **38%**, 19.1, 1.86 | **~0 points, 0.2 power** |
+
+**Measurably worse: 5-7 points behind on a floor of zero.** The cleanest negative result in this
+register — larger than the lore result (3k) and on a tighter floor. Does not ship; the features stay
+at weight 0 and `handBot` stays in the tree so the measurement can be reproduced, as `rivalBot` did.
+
+### Why a sensible-looking idea lost points
+
+The divergences the gate showed were "hoard the good cards" in every case, and that is the bug, not
+the feature working: **a hand is not a store of value, because the chapter clock expires it.** Cards
+kept for their pips or their surpass option die worthless when the chapter ends; leading the 2 now
+is worth more than banking the 4, because "now" is the only time a card is guaranteed to have. The
+features priced the option and not its expiry, so the bot paid real tempo — the initiative fights
+and pip-turns it declined — for options it frequently never exercised.
+
+This refines section 0's dictum rather than contradicting it. The wins (goal layer, replies) let the
+evaluator see something *about the world*; this let it see an asset and mispriced the asset's decay.
+New information is not automatically neutral-or-better: attached to the wrong price, it is a bias
+with good intentions.
+
+An honest follow-up would price the hand *relative to the chapter's remaining rounds* — a card in a
+six-round chapter is an option, the same card one round from scoring is nearly dead weight. That is
+a new experiment with its own twin run, not a re-tune of this one; nothing here licenses it beyond
+noting the shape.
+
+### The register at this point
+
+Six consecutive evaluator ideas measured null or worse: guard (3j), lore (3k), rival intent (6,
+re-confirmed worse 12), the Weapon option (9, null on strength, shipped on behaviour), and now hand
+quality — against two ideas that ever cleared a floor: the goal layer and the replies. The bar for
+the next idea is not "plausible and unpriced"; it is "explains a loss the bot actually suffers".
