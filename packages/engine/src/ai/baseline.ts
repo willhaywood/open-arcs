@@ -63,6 +63,8 @@ export const BASELINE_WEIGHTS: Weights = {
   // Off in the baseline by definition: it predates the residual hand being visible at all.
   handPips: 0,
   handTopCard: 0,
+  // Off in the baseline by definition: it predates the pending declaration being visible at all.
+  undeclaredThreat: 0,
 }
 
 /** True while the live weights still match the snapshot; the golden test reports when they do not. */

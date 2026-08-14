@@ -45,6 +45,7 @@ import { STANDARD_WEIGHTS } from './goal.js'
 import { intentFor } from './intent.js'
 import { isCardPlay } from './rollout.js'
 import { valueOf } from './value.js'
+import type { Weights } from './value.js'
 import type { Action } from '../action.js'
 import type { ObservedState } from '../observe.js'
 import type { Bot, BotDecision, Considered, Explore, Foresee, Lookahead, PathProbe, Rollout } from './bot.js'
@@ -87,6 +88,12 @@ export interface SearchOptions {
    * The rest keep their tier-1 ranking; the winner is chosen among the reply-checked.
    */
   readonly replies?: { readonly roots: number; readonly deals: number }
+  /**
+   * Evaluator weights for the delegate and every line score. Defaults to `STANDARD_WEIGHTS`, which
+   * every shipped configuration uses — the option exists so an experiment bot (docs/19 section 19)
+   * can put a candidate weight set under the search without a parallel implementation.
+   */
+  readonly weights?: Weights
 }
 
 export const DEFAULT_SEARCH: SearchOptions = { width: 3, depth: 14 }
@@ -125,7 +132,8 @@ export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
    * Everything that is not the card play. Same weights, same fitness, same rival scoring — so an
    * arena gap between this bot and `rivalBot` is attributable to the search alone.
    */
-  const delegate = heuristicBotWith(STANDARD_WEIGHTS, id, feasibility, {
+  const weights = options.weights ?? STANDARD_WEIGHTS
+  const delegate = heuristicBotWith(weights, id, feasibility, {
     rivalIntent: useRival,
   })
 
@@ -163,7 +171,7 @@ export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
           })()
         : undefined
       const score = (obs: ObservedState): number =>
-        valueOf(obs, self, intent, STANDARD_WEIGHTS, rivalIntent)
+        valueOf(obs, self, intent, weights, rivalIntent)
       /** A terminal line's worth: the mean over its dice samples — odds, not one imaginary roll. */
       const settledScore = (probe: PathProbe): number =>
         probe.samples.reduce((n, s) => n + score(s), 0) / probe.samples.length
