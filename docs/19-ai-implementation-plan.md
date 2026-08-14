@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| The declaration-threat feature (`undeclaredThreat`) | **killed at its gate** — the section 18 game cannot be flipped by any end-of-turn static feature at sane weights; the loss is cross-round (initiative into the next lead), an untested search axis | 19 |
 | The margin-11.5 oracle blunder, investigated | **evaluator blind spot, search exonerated** — a rival's pending declaration (undeclared standing + marker + lead remaining) is priced at zero, and power is linear through the win threshold | 18 |
 | The blunder oracle: rollout win-prob vs the bot's runner-up | **a real leak** — card plays in lost games underperform the bot's own runner-up by ~5% win-prob vs placebo (z≈4.3, game-clustered); the first low-noise training target the register has produced | 17 |
 | Loss forensics: 2x320 games, hard's losses vs a twin control | **no leak** — 24 features, none separate losing-to-standard from coin-flip twin losses; the 37% loss rate is variance. Retroactively explains the null streak | 16 |
@@ -2657,3 +2658,56 @@ This is the first section-0-shaped discovery to come from an actual lost decisio
 armchair plausibility — the oracle (17) surfaced it, and any fix meets section 15's bar by
 construction, with a concrete game it must flip. The candidate feature and its experiment are the
 next entry.
+
+## 19. The threat feature, killed at its gate — the section 18 loss is cross-round
+
+Section 18 supplied what no feature candidate ever had: a specific lost game the fix must flip.
+The plan made that flip the gate — the smallest weight that flips game 44 step 505 is the
+experiment's weight, and no arena time is spent until it does. The gate killed it, for zero arena
+cost, and the reason is worth more than the feature.
+
+### The feature, as built
+
+`undeclaredThreat`: the top remaining marker's high x the standing share (`metric` vs
+`rivalHoldings`, the standing loop's own step function), gated on holding any cards, computed for
+**every** faction from public information — no self-guard, so a rival's pending declaration flows
+into `valueOf`'s `mine - best`. Weight 0 in the shipped sets; `threat.ts` switches it on;
+`SearchOptions` grew an optional `weights` (defaulting to `STANDARD_WEIGHTS`, behaviour-preserving)
+so an experiment set can sit under the search. All semantics pinned by tests, five mutations killed.
+
+### The gate, and how it failed
+
+| probe | result |
+| --- | --- |
+| heuristic bot, w = 0.5 / 1.0 / 1.5 | every candidate shifts by the same constant; order unchanged |
+| search bot, w = 0.5 / 1.0 / 1.5 / 2.5 | the gap moves the **wrong way** (11.5 -> 11.5 / 11.5 / 12.3 / 9.1) |
+| threshold term | cancels by inspection — yellow is at 29 in both candidate end states |
+
+The heuristic result has a mechanical cause worth remembering: the 1-ply probe resolves
+intermediate asks by *declining* them, so no probed line ever consumes a marker, and any
+marker-dependent term cancels between candidates. Only the search explores declares — and there the
+losing line's taxes feed the actor's own threat term, widening the gap.
+
+### Why nothing static can flip this game
+
+The winning move's value is **cross-round**: leading Mobilization-5 retains the initiative, so
+red's *next* lead — Aggression-6, the only card that can declare Empath — takes the last worthwhile
+marker and denies yellow's Keeper. At the end of red's current turn, the two candidate states
+differ only in which card was led; the marker, yellow's standing, yellow's power and the threshold
+distance are identical in both. The value lives in round 5, and no feature of a round-4 end state
+can see it. Both of section 18's blind spots are real *descriptions*, but as end-of-turn features
+they are inexpressible for exactly the game that exposed them.
+
+### What this buys the register
+
+- **The gate discipline worked.** Section 15's bar ("a loss the bot actually suffers") turned out
+  to double as the cheapest possible kill switch: the experiment died in a two-minute probe instead
+  of two hours of arena.
+- **The section 17 blunder mass is at least partly horizon-shaped, not feature-shaped.** The search
+  covers the own turn and one rival reply; it has never crossed into the actor's *next* round.
+  That is a different axis from section 14's null (more deals at the same horizon) and section 7's
+  null (wider beams at the same horizon) — untested, and now with a concrete game it would flip.
+  It is also exactly the value a learned evaluator trained on rollout outcomes would absorb
+  implicitly, which remains the register's standing "big idea".
+- The feature stays in the tree at weight 0 with pinned semantics — inert, and exact — so a future
+  arena run has something to switch on without re-deriving it.
