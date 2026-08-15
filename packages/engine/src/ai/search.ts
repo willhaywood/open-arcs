@@ -87,7 +87,7 @@ export interface SearchOptions {
    * opponent model), `deals` imagined worlds each, and re-ranked by the mean of where they land.
    * The rest keep their tier-1 ranking; the winner is chosen among the reply-checked.
    */
-  readonly replies?: { readonly roots: number; readonly deals: number }
+  readonly replies?: { readonly roots: number; readonly deals: number; readonly rounds?: number }
   /**
    * Evaluator weights for the delegate and every line score. Defaults to `STANDARD_WEIGHTS`, which
    * every shipped configuration uses — the option exists so an experiment bot (docs/19 section 19)
@@ -124,10 +124,13 @@ interface Line {
 export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
   const useRival = options.rivalIntent === true
   const r = options.replies
+  const rounds = r?.rounds ?? 1
   const id =
     r === undefined
       ? `search-v3(${options.width}x${options.depth}${useRival ? ',rival' : ''})`
-      : `search-v4(${options.width}x${options.depth},r${r.roots}x${r.deals}${useRival ? ',rival' : ''})`
+      : rounds > 1
+        ? `search-v5(${options.width}x${options.depth},r${r.roots}x${r.deals},${rounds}r${useRival ? ',rival' : ''})`
+        : `search-v4(${options.width}x${options.depth},r${r.roots}x${r.deals}${useRival ? ',rival' : ''})`
   /*
    * Everything that is not the card play. Same weights, same fitness, same rival scoring — so an
    * arena gap between this bot and `rivalBot` is attributable to the search alone.
@@ -282,13 +285,14 @@ export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
       const checked = new Set<number>()
       if (foresee !== undefined && options.replies !== undefined) {
         const { roots, deals } = options.replies
+        const horizon = options.replies.rounds ?? 1
         const ranked = results
           .map((res, i) => ({ res, i }))
           .filter((x): x is { res: { line: Line; value: number }; i: number } => x.res !== undefined)
           .sort((a, b) => b.res.value - a.res.value || a.i - b.i)
           .slice(0, Math.max(1, roots))
         for (const { res, i } of ranked) {
-          const landed = foresee(res.line.path, { deals })
+          const landed = foresee(res.line.path, { deals, rounds: horizon })
           if (landed.length === 0) continue
           const value = landed.reduce((n, s) => n + score(s), 0) / landed.length
           results[i] = { line: res.line, value }

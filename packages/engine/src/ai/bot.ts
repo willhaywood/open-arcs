@@ -206,6 +206,14 @@ export interface ForeseeOptions {
   readonly deals: number
   /** Step cap for the reply drive; a reply that stalls is scored where it stopped. */
   readonly maxSteps?: number
+  /**
+   * How many returns of control to this faction end the drive. The default, 1, is the reply
+   * horizon: rivals answer and the drive stops the moment the ask comes back. 2 plays **through
+   * this faction's own next turn** (by the same reply policy) and the rivals' answer to it,
+   * landing either on the turn after that or on the end of the game — the cross-round horizon
+   * docs/19 section 19 showed no end-of-turn feature can substitute for.
+   */
+  readonly rounds?: number
 }
 
 /**

@@ -705,10 +705,36 @@ export function stepBot(
         let at: RuleResult = { ...result, state: swapped }
         for (const a of path) at = advance(at.state, a, reg)
 
+        /*
+         * The drive ends at the Nth **fresh return** of control — a transition from someone
+         * else's ask (or the start) back to this faction's. Counting transitions rather than
+         * self-asks is load-bearing: during this faction's own played-through turn every ask is
+         * its own, and counting those would end a `rounds: 2` drive on the second prompt of its
+         * own prelude instead of a round later.
+         *
+         * `rounds: 1` breaks before stepping this faction at all, exactly as this loop always
+         * did. Deeper horizons step *everyone* with the same reply policy — a deliberately weaker
+         * self-model than the beam (docs/19 section 20); recursing here would multiply cost by
+         * the beam's branching for a judgement section 7 says is not the binding constraint.
+         */
+        const rounds = options.rounds ?? 1
         let asked: AskedThisTurn = NO_ASKS
+        let returns = 0
+        /*
+         * Starts false so an immediate self-ask counts as return #1 — a beam line can end
+         * mid-turn at its depth cap, and the old loop stopped on that ask without stepping;
+         * `rounds: 1` must do exactly the same.
+         */
+        let prevSelf = false
         for (let i = 0; i < cap; i++) {
           const c = at.continue
-          if (c.kind !== 'ask' || c.faction === faction) break
+          if (c.kind !== 'ask') break
+          const self = c.faction === faction
+          if (self && !prevSelf) {
+            returns++
+            if (returns >= rounds) break
+          }
+          prevSelf = self
           const step = stepBot(at, standardBot, c.faction, reg, asked)
           at = step.result
           asked = step.asked
