@@ -36,6 +36,7 @@ gains came from fixing something the evaluator could not see, never from re-tuni
 | Own-turn beam search at the card play (V3) | **small, real: ~+3 points** — five of six seats ahead across four runs and 3,996 games, past the pooled floor; wider beams add nothing | 7 |
 | Opponent replies over determinized hands (V4) | **large: +12 points at 3p, 67%-33% at 2p vs a zero floor** — the first idea since the goal layer to clear its own floor in a single run | 8 |
 | The Weapon's battle option as a feature (`battleUnlocked`) | **no measurable strength** — 1 point on a 1-point floor. Large *behavioural* effect: Weapon spending 1% → 26% | 9 |
+| Cross-round foresight (`rounds: 2` reply horizon) | **null** — corrects the section 18 game provably (oracle 12/12 over 0/12), dead level vs hard at 999 games on a zero floor, 4x the cost. The third search axis measured out | 20 |
 | The declaration-threat feature (`undeclaredThreat`) | **killed at its gate** — the section 18 game cannot be flipped by any end-of-turn static feature at sane weights; the loss is cross-round (initiative into the next lead), an untested search axis | 19 |
 | The margin-11.5 oracle blunder, investigated | **evaluator blind spot, search exonerated** — a rival's pending declaration (undeclared standing + marker + lead remaining) is priced at zero, and power is linear through the win threshold | 18 |
 | The blunder oracle: rollout win-prob vs the bot's runner-up | **a real leak** — card plays in lost games underperform the bot's own runner-up by ~5% win-prob vs placebo (z≈4.3, game-clustered); the first low-noise training target the register has produced | 17 |
@@ -2711,3 +2712,66 @@ they are inexpressible for exactly the game that exposed them.
   implicitly, which remains the register's standing "big idea".
 - The feature stays in the tree at weight 0 with pinned semantics — inert, and exact — so a future
   arena run has something to switch on without re-deriving it.
+
+## 20. Cross-round foresight — provably right in the pinned game, null in the aggregate
+
+The section 19 target, built and measured: `ForeseeOptions.rounds` lets the reply drive play
+through the actor's own next turn (same reply policy) and the rivals' answer to it, landing a round
+later or at the end of the game. Default 1, byte-identical to v4 everywhere; `search-v5(3x14,r3x2,2r)`
+is the configuration that crossed the gate.
+
+### What the gate bought before any arena time
+
+- **`roots: 1` makes any deeper horizon structurally inert.** The winner comes from the checked set
+  alone, so re-scoring the single checked root can never change the choice — v5-r1x1 watched
+  Administration-4's score fall from -0.4 to -6.9 and picked it anyway. Crossing rounds needs
+  `roots >= 2`. This also sharpens section 14 retroactively: at `roots: 1` the reply dial could
+  never have changed a decision for horizon reasons, independent of sampling.
+- **The pin's wording was over-specified, and the oracle adjudicated.** At r3x2 the bot picks
+  `Pass`, not `Lead Mobilization-5` — and rollouts score Pass **12/12**, alongside Mobilization-5's
+  12/12, against Administration-4's 0/12. The shipped pin asserts "an oracle-winning move, losing
+  move outranked": ground truth, not taste.
+
+So the horizon provably corrects the section 18 blunder. Then the arena:
+
+### Measured — 999 games per run, 2-player
+
+| run | v5(r3x2,2r) | opponent | verdict |
+| --- | --- | --- | --- |
+| vs **hard** (v4 r1x1) | **50%** wins, 31.4 power | 50%, 31.1 | dead level |
+| twin pair | 50% / 50%, 30.9 / 30.9 | — | floor ~0 |
+| vs standard | 61%, 31.5 | 39%, 25.5 | the v4 lineage number, within noise |
+
+**Null on a zero floor, at roughly four times the per-decision cost.** The configuration that
+demonstrably wins the section 18 game — and games like it — gains nothing in aggregate. Whatever
+the deeper horizon buys in marker-endgames it returns elsewhere, plausibly through the weaker
+delegate self-model and the longer playout's variance; the lineage run confirms it lost nothing
+either.
+
+### The pattern, now three axes wide
+
+| more of what | sections | result |
+| --- | --- | --- |
+| beam width and depth | 7 | null |
+| determinized deals | 14 | null |
+| **reply horizon (rounds)** | **20** | **null** |
+
+Fixing a spectacular, verified, oracle-adjudicated blunder class does not move win rate when the
+class is rare — the same lesson section 15 taught for features, now taught for horizons. And with
+this, section 17's ~5%-per-decision leak is beyond every search-side extension tried: the losses
+are real, identifiable by rollout, and not recoverable by pushing the current evaluator further
+along any measured axis.
+
+Caveat for whoever reads this later: one configuration at one rounds depth was measured, not the
+axis exhaustively. But three axes of the same shape is a pattern, and the register's rule stands —
+the next attempt must argue why it differs from all three, not just from one.
+
+### What ships, and what stands
+
+`rounds` stays in the tree at default 1 — infrastructure, a pinned correction of the section 18
+game, and the roots-interaction finding, at zero cost to any shipped bot. `hard` stays v4 r1x1:
+same strength, a quarter of the thinking time. The register's one remaining big idea is the
+**learned evaluator**, now motivated three ways: the oracle supplies the low-noise training targets
+the fitting attempts lacked (17), the value it must learn includes exactly the cross-round dynamics
+no static feature can express (19), and search cannot substitute for it on any measured axis
+(7, 14, 20).
