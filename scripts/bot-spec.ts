@@ -158,7 +158,14 @@ export function parseSpec(name: string): BotSpec {
       depth: Number(rest[1] ?? 14),
       ...(rest.includes('rival') ? { rivalIntent: true } : {}),
       ...(rest[2] === 'reply'
-        ? { replies: { roots: Number(rest[3] ?? 3), deals: Number(rest[4] ?? 2) } }
+        ? {
+            replies: {
+              roots: Number(rest[3] ?? 3),
+              deals: Number(rest[4] ?? 2),
+              // `search:3:14:reply:1:1:2` — a trailing rounds crosses into the actor's next turn.
+              ...(rest[5] !== undefined ? { rounds: Number(rest[5]) } : {}),
+            },
+          }
         : {}),
     }
     return spec
