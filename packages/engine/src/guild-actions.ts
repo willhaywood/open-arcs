@@ -48,8 +48,10 @@ const held = (state: GameState, faction: FactionId, r: Resource): number =>
  * (`game.scala:1684`). Court Enforcers is itself Weapon-suited, so holding it is always worth
  * at least 1 — which is what makes the card self-starting.
  *
- * HRF's `countableResources` also folds in the Weapon Cartel's supply, but that card is
- * campaign-only and not in the base 25.
+ * HRF's `countableResources` also folds in the Weapon Cartel's supply — campaign-only, not in
+ * the base 25. Note the base Material/Fuel Cartels print the same supply-claim mechanic for
+ * Tycoon, implemented in `metric` (rules/ambitions.ts); for a long time this comment was read as
+ * evidence the mechanic was campaign-only, and it is not.
  */
 export function weaponReach(state: GameState, faction: FactionId): number {
   const cards = securedCards(state, faction).filter(

@@ -154,7 +154,12 @@ describe('secured Guild cards score as one icon of their suit', () => {
 
   it('stacks Material and Fuel guilds together into Tycoon, on top of held resources', () => {
     const before = fresh()
-    const after = secure(before, 'red', 'bc02', 'bc03', 'bc06') // 2 Material + 1 Fuel
+    /*
+     * Deliberately non-Cartel guilds: bc03/bc06 used to sit here as plain icons, but the Cartels'
+     * printed supply claim now adds the whole token supply on top (docs/13), which is not what
+     * this test is about. Icon stacking is asserted on cards that are only icons.
+     */
+    const after = secure(before, 'red', 'bc02', 'bc04', 'bc09') // 2 Material + 1 Fuel
 
     expect(metric(after, 'red', 'Tycoon')).toBe(metric(before, 'red', 'Tycoon') + 3)
   })
