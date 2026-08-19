@@ -78,6 +78,7 @@ import {
   SWORN_GUARDIANS,
   courtCard,
   courtSlots,
+  GATEKEEPERS,
   hasGuild,
   securedCards,
 } from '../court.js'
@@ -417,7 +418,15 @@ function offerGather(
   // Committed (Rebel) raises the *limit*, not the fleet: HRF adds it to the same total the
   // ships feed (game-battle.scala:148), so you may roll two dice more than you have ships.
   const committed = hasTrait(state, faction, 'Committed') ? 2 : 0
-  const maxDice = Math.min(ships + committed, 18)
+  /*
+   * Gatekeepers (bc08): "When you battle in a gate, you may collect 2 more dice." The same
+   * shape as Committed — a raise to the limit, not the fleet — gated on the battle system being
+   * a gate. Found by the court audit (docs/20 A1): only the card's Prelude clause was
+   * implemented, so a held Gatekeepers never changed a single battle.
+   */
+  const gatekept =
+    systemInfo(system).isGate && hasGuild(state, faction, GATEKEEPERS) ? 2 : 0
+  const maxDice = Math.min(ships + committed + gatekept, 18)
   const enemyBuildings = piecesAt(state, system, enemy, isBuilding).length > 0
   // Hidden Harbors (lore05) shuts the raid dice off entirely while the defender still has an
   // undamaged starport here (game-battle.scala:159). Buildings alone are no longer enough.

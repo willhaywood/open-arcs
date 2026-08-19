@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  move,
   DICE,
   Location,
   advance,
@@ -18,6 +19,7 @@ import {
   rollPool,
   startGame,
 } from '../src/index.js'
+import { system as systemInfo } from '../src/index.js'
 import type { Action, Continue, FactionId, GameState, RuleResult, SystemId } from '../src/index.js'
 
 const THREE = ['red', 'yellow', 'blue'] as const
@@ -413,6 +415,79 @@ describe('the gather menu', () => {
     expect(opts[0]!.t, 'the first pool is the largest legal one').toBe(maxTotal)
     expect(opts[0]!.a, 'and carries no assault dice').toBe(0)
     expect(opts[0]!.r, 'and no raid dice').toBe(0)
+  })
+})
+
+describe('Gatekeepers in a gate battle (bc08, docs/20 A1)', () => {
+  /*
+   * "When you battle in a gate, you may collect 2 more dice." A raise to the dice limit like
+   * Committed's, live only when the battle system is a gate. The court audit found only the
+   * card's Prelude clause implemented, so holding Gatekeepers never changed a single battle.
+   */
+  const STOP = { type: 'turn/lead-main', faction: 'red' } as const
+
+  function withCard(state: GameState, faction: FactionId, id: string): GameState {
+    const contents = new Map(state.courtCards.contents)
+    const at = new Map(state.courtCards.at)
+    const pile = CourtPile.secured(faction)
+    const from = at.get(id)
+    if (from !== undefined) contents.set(from, (contents.get(from) ?? []).filter((x) => x !== id))
+    contents.set(pile, [...(contents.get(pile) ?? []), id])
+    at.set(id, pile)
+    return { ...state, courtCards: { ...state.courtCards, contents, at } }
+  }
+
+  /** Ships for red and yellow placed into `system`, everything else cleared out of it. */
+  function stage(base: GameState, system: SystemId, redShips: number): GameState {
+    let figures = base.figures
+    for (const id of contentsOf(figures, Location.system(system))) {
+      const owner = parseFigureId(id).color as FactionId
+      figures = move(figures, id, Location.reserve(owner))
+    }
+    const red = contentsOf(figures, Location.reserve('red'))
+      .filter((i) => parseFigureId(i).piece === 'Ship')
+      .slice(0, redShips)
+    for (const id of red) figures = move(figures, id, Location.system(system))
+    const yellow = contentsOf(figures, Location.reserve('yellow'))
+      .filter((i) => parseFigureId(i).piece === 'Ship')
+      .slice(0, 2)
+    for (const id of yellow) figures = move(figures, id, Location.system(system))
+    return { ...base, figures }
+  }
+
+  function maxDice(state: GameState, system: SystemId): number {
+    const c = advance(
+      state,
+      { type: 'battle/target', faction: 'red', system, enemy: 'yellow', then: STOP },
+      registry,
+    ).continue
+    if (c.kind !== 'ask') throw new Error('expected the gather ask')
+    const totals = c.actions
+      .filter((a) => a.type === 'battle/roll')
+      .map((a) => (a['skirmish'] as number) + (a['assault'] as number) + (a['raid'] as number))
+    return Math.max(...totals)
+  }
+
+  it('raises the cap by exactly 2 in a gate, and not on a planet', () => {
+    const base = startGame({ board: 'Board3MixUp', factions: THREE, seed: 1 }, registry).state
+    const gate = base.board.systems.find((s) => systemInfo(s).isGate)!
+    const planet = base.board.systems.find((s) => !systemInfo(s).isGate)!
+
+    const inGate = stage(base, gate, 3)
+    expect(maxDice(inGate, gate)).toBe(3)
+    expect(maxDice(withCard(inGate, 'red', 'bc08'), gate)).toBe(5)
+
+    const onPlanet = stage(base, planet, 3)
+    expect(maxDice(onPlanet, planet)).toBe(3)
+    // The bonus is the gate's, not the card's alone: on a planet the cap must not move.
+    expect(maxDice(withCard(onPlanet, 'red', 'bc08'), planet)).toBe(3)
+  })
+
+  it("a defender's Gatekeepers does nothing — the clause is the attacker's", () => {
+    const base = startGame({ board: 'Board3MixUp', factions: THREE, seed: 1 }, registry).state
+    const gate = base.board.systems.find((s) => systemInfo(s).isGate)!
+    const staged = stage(base, gate, 3)
+    expect(maxDice(withCard(staged, 'yellow', 'bc08'), gate)).toBe(3)
   })
 })
 
