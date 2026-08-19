@@ -57,6 +57,7 @@ function performStartSetup(state: GameState): RuleResult {
   for (const faction of state.factions) {
     cards = register(cards, CardLocation.hand(faction))
     cards = register(cards, CardLocation.played(faction))
+    cards = register(cards, CardLocation.pending(faction))
   }
 
   // Resource supply and per-faction slots.

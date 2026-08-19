@@ -1013,7 +1013,7 @@ describe('Prelude discard abilities', () => {
     ).toBe(1)
   })
 
-  it('a Union takes a played card of its suit into your hand', () => {
+  it('a Union sets the taken card aside, and the round end delivers it (docs/20 B1)', () => {
     // Pick the Union to match a card yellow actually holds, so this never silently skips.
     const base = fresh()
     const card = contentsOf(base.cards, CardLocation.hand('yellow'))[0]!
@@ -1034,8 +1034,19 @@ describe('Prelude discard abilities', () => {
       taken: card,
       from: 'yellow',
     })
-    expect(contentsOf(step.state.cards, CardLocation.hand('red'))).toContain(card)
+    /*
+     * "When the round ends, draw that card into your hand" — officially ruled to mean after all
+     * players have finished their turns. This test used to assert straight-to-hand, the docs/20
+     * B1 divergence: a card in hand this round can fund a seize and counts publicly.
+     */
+    expect(contentsOf(step.state.cards, CardLocation.hand('red'))).not.toContain(card)
+    expect(contentsOf(step.state.cards, CardLocation.pending('red'))).toContain(card)
     expect(contentsOf(step.state.cards, CardLocation.played('yellow'))).not.toContain(card)
+
+    const delivered = advance(step.state, { type: 'round/end' }, registry)
+    expect(contentsOf(delivered.state.cards, CardLocation.hand('red'))).toContain(card)
+    expect(contentsOf(delivered.state.cards, CardLocation.pending('red'))).toHaveLength(0)
+    expect(delivered.state.log.some((l) => /held by a Union/.test(l))).toBe(true)
   })
 
   it('Gatekeepers puts a ship on every gate', () => {

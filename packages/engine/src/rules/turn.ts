@@ -1041,18 +1041,24 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
     }
 
     /**
-     * The Unions take a card out of a played pile. HRF holds it until end of round
-     * (`discardAfterRound`); taking it straight to hand is equivalent here, because the
-     * Prelude runs *after* you have played, so you cannot replay it this round either way.
+     * The Unions take a card out of a played pile — **held until the round ends** (docs/20 B1).
+     * The card says "When the round ends, draw that card into your hand", and the official FAQ
+     * confirms: "at the end of the round, after all players have finished their turns." This file
+     * used to take it straight to hand with an equivalence argument about replays; the argument
+     * missed that a card in hand this round can fund a seize-by-discard, counts in the public
+     * hand sizes, and is swept by whole-hand effects. `performEndRound` delivers.
      */
     case 'take-played': {
       const taken = action['taken'] as string
       const from = action['from'] as FactionId
       const next: GameState = {
         ...state,
-        cards: move(state.cards, taken, CardLocation.hand(faction)),
+        cards: move(state.cards, taken, CardLocation.pending(faction)),
       }
-      return { state: spent(next, `took ${taken} from ${from}'s played cards`), continue: back }
+      return {
+        state: spent(next, `set aside ${taken} from ${from}'s played cards until the round ends`),
+        continue: back,
+      }
     }
 
     case 'gates': {
@@ -1521,6 +1527,19 @@ function nextInitiative(state: GameState): FactionId {
 }
 
 function performEndRound(state: GameState): RuleResult {
+  // The Unions' held cards arrive now — "when the round ends" (docs/20 B1).
+  let cards = state.cards
+  const delivered: string[] = []
+  for (const f of state.factions) {
+    for (const id of contentsOf(cards, CardLocation.pending(f))) {
+      cards = move(cards, id, CardLocation.hand(f))
+      delivered.push(`${f} drew ${id} (held by a Union)`)
+    }
+  }
+  if (delivered.length > 0) {
+    state = { ...state, cards, log: [...state.log, ...delivered] }
+  }
+
   const holder = nextInitiative(state)
   const order = rotateTo(state.factions, holder)
 
