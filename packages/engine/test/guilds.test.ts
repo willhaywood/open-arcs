@@ -1353,15 +1353,16 @@ describe("usedThisTurn resets at end of turn (the Bards' once-per-game bug, docs
   })
 })
 
-describe("the Interests' Build riders (bc02/bc09, docs/20 A2)", () => {
+describe('the Interests do NOT ride on Build (bc02/bc09)', () => {
   /*
-   * "Manufacture (Build): Gain 1 Material." / "Synthesize (Build): Gain 1 Fuel." Keyed to taking
-   * the Build action from ANY card play — the cards print no Copy/Pivot gate like Insatiable's.
-   * The audit found neither rider implemented.
+   * "Manufacture (Build): Gain 1 Material." is rulebook §8.2 New Actions grammar — an action
+   * taken INSTEAD of Build, already offered by the alt-action hook and pinned above ("Mining
+   * Interest adds Manufacture to the Build menu"). docs/20 A2 briefly misread it as a modifier
+   * and granted the resource on every ordinary Build as well; §8.3 reserves modifiers for bold
+   * text, and HRF carries no such rider. These tests pin the reversion: an ordinary Build with
+   * an Interest held banks nothing.
    */
   function buildInControlled(state: GameState, faction: 'red'): GameState {
-    // Find a system red controls with a ship to build from is overkill: performBuild is reached
-    // directly — build a City anywhere red has presence via the action itself.
     const system = state.board.systems.find((s) =>
       contentsOf(state.figures, Location.system(s)).some((id) => id.startsWith('red/')),
     )!
@@ -1372,24 +1373,19 @@ describe("the Interests' Build riders (bc02/bc09, docs/20 A2)", () => {
     ).state
   }
 
-  it('a held Mining Interest banks 1 Material on every Build', () => {
+  it('a held Mining Interest banks nothing on an ordinary Build', () => {
     let state = withCard2(fresh(), 'red', 'bc02')
     state = stripSlots(state, 'red')
     const after = buildInControlled(state, 'red')
-    expect(countResource(after.resources, slotsOf(after, 'red'), 'Material')).toBe(1)
-    expect(after.log.some((l) => /red gained 1 Material \(Mining Interest\)/.test(l))).toBe(true)
+    expect(countResource(after.resources, slotsOf(after, 'red'), 'Material')).toBe(0)
+    expect(after.log.some((l) => /gained 1 Material \(Mining Interest\)/.test(l))).toBe(false)
   })
 
-  it('Shipping Interest banks Fuel; without a card nothing banks', () => {
+  it('a held Shipping Interest banks nothing on an ordinary Build', () => {
     let armed = withCard2(fresh(), 'red', 'bc09')
     armed = stripSlots(armed, 'red')
     const after = buildInControlled(armed, 'red')
-    expect(countResource(after.resources, slotsOf(after, 'red'), 'Fuel')).toBe(1)
-
-    const bare = stripSlots(fresh(), 'red')
-    const nothing = buildInControlled(bare, 'red')
-    expect(countResource(nothing.resources, slotsOf(nothing, 'red'), 'Material')).toBe(0)
-    expect(countResource(nothing.resources, slotsOf(nothing, 'red'), 'Fuel')).toBe(0)
+    expect(countResource(after.resources, slotsOf(after, 'red'), 'Fuel')).toBe(0)
   })
 })
 
