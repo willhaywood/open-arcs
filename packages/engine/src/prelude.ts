@@ -104,7 +104,7 @@ export type GuildPrelude =
   /** Gatekeepers: a ship at every gate. */
   | { kind: 'gates'; card: string }
   /** Prison Wardens / Skirmishers / Court Enforcers / Loyal Marines: 3 ships in a ruled system. */
-  | { kind: 'ships'; card: string; system: string }
+  | { kind: 'ships'; card: string }
   /** Elder Broker: one Material, one Fuel, one Weapon. */
   | { kind: 'gain-three'; card: string }
 
@@ -297,12 +297,14 @@ export function guildPreludes(state: GameState, faction: FactionId): GuildPrelud
     out.push({ kind: 'gates', card: GATEKEEPERS })
   }
 
-  // Three ships into one system you rule.
+  /*
+   * Three ships into one system you control. One offer per card, not per card × system — the
+   * system is a spot on the map, so it is asked there once the ability is chosen (the docs/20 B3
+   * pattern), and the pane list no longer multiplies by however many systems you rule.
+   */
   for (const card of SHIP_PLACERS) {
     if (!cards.includes(card) || shipsInReserve(state, faction) === 0) continue
-    for (const s of state.board.systems) {
-      if (rules(state, faction, s)) out.push({ kind: 'ships', card, system: s })
-    }
+    if (state.board.systems.some((s) => rules(state, faction, s))) out.push({ kind: 'ships', card })
   }
 
   // Elder Broker — one each of Material, Fuel and Weapon.

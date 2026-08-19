@@ -28,7 +28,7 @@ import {
 } from '../cards.js'
 import type { Continue } from '../continue.js'
 import { Continue as C } from '../continue.js'
-import { citiesInReserve, slotsOf } from '../control.js'
+import { citiesInReserve, rules, slotsOf } from '../control.js'
 import { system as systemInfo } from '../board.js'
 import {
   CourtPile,
@@ -846,7 +846,7 @@ function guildPreludeLabel(g: GuildPrelude): string {
     case 'gates':
       return `${name} — a ship at every gate`
     case 'ships':
-      return `${name} — 3 ships in ${g.system}`
+      return `${name} — 3 ships in a system you control`
     case 'gain-three':
       return `${name} — gain Material, Fuel and Weapon`
   }
@@ -1089,16 +1089,30 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
     }
 
     case 'ships': {
-      const system = action['system'] as SystemId
+      /*
+       * "Place 3 ships in a system you control." The system is picked on the map: choosing the
+       * ability spends the card, then a `turn/ships-place` ask lights the controlled systems up
+       * (the docs/20 B3 pattern). Old journals carry the system inside this action — that shape
+       * still places directly, so existing saves replay unchanged.
+       */
+      const chosen = action['system'] as SystemId | undefined
+      if (chosen === undefined) {
+        const ships = contentsOf(state.figures, Location.reserve(faction)).filter(
+          (id) => parseFigureId(id).piece === 'Ship',
+        ).length
+        const n = Math.min(3, ships)
+        const paid = spent(state, `placing ${n} ship${n === 1 ? '' : 's'} in a system they control`)
+        return { state: paid, continue: shipsPlacement(paid, faction, suit, pips) }
+      }
       let next = state
       let placed = 0
       for (let i = 0; i < 3; i++) {
         const ship = shipFromReserve(next, faction)
         if (ship === undefined) break
-        next = { ...next, figures: move(next.figures, ship, Location.system(system)) }
+        next = { ...next, figures: move(next.figures, ship, Location.system(chosen)) }
         placed++
       }
-      return { state: spent(next, `placed ${placed} ship(s) in ${system}`), continue: back }
+      return { state: spent(next, `placed ${placed} ship(s) in ${chosen}`), continue: back }
     }
 
     case 'gain-three': {
@@ -1422,6 +1436,59 @@ function gatesPlacement(
     label: `Place a ship in ${s} (${ships} left, one per gate)`,
   }))
   return C.ask(faction, options, `Gatekeepers — choose gates for the last ${ships} ship(s)`)
+}
+
+/**
+ * The 3-ships placement: which controlled system takes the group (bc12/13/14/15).
+ *
+ * One click places the whole group — "3 ships in a system you control" is a single system, so
+ * unlike Gatekeepers' shortage there is no loop and no exclusion list. Controlled systems can
+ * exist at ability-choice time and all be gone here only if `rules` changed in between, which
+ * nothing on this path does — the empty guard is belt-and-braces for the replay of a stale
+ * journal, where the ability is already paid and the Prelude simply resumes.
+ */
+function shipsPlacement(state: GameState, faction: FactionId, suit: Suit, pips: number): Continue {
+  const ships = contentsOf(state.figures, Location.reserve(faction)).filter(
+    (id) => parseFigureId(id).piece === 'Ship',
+  ).length
+  const n = Math.min(3, ships)
+  const options: Action[] = state.board.systems
+    .filter((s) => rules(state, faction, s))
+    .map((s) => ({
+      type: 'turn/ships-place',
+      faction,
+      system: s,
+      suit,
+      pips,
+      label: `Place ${n} ship${n === 1 ? '' : 's'} in ${s}`,
+    }))
+  if (n === 0 || options.length === 0) return C.then(Prelude(faction, suit, pips))
+  return C.ask(faction, options, `Place ${n} ship${n === 1 ? '' : 's'} in a system you control`)
+}
+
+/** Put the group down in the chosen system, then return to the Prelude. */
+function performShipsPlace(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  suit: Suit,
+  pips: number,
+): RuleResult {
+  let next = state
+  let placed = 0
+  for (let i = 0; i < 3; i++) {
+    const ship = shipFromReserve(next, faction)
+    if (ship === undefined) break
+    next = { ...next, figures: move(next.figures, ship, Location.system(system)) }
+    placed++
+  }
+  return {
+    state: {
+      ...next,
+      log: [...next.log, `${faction} placed ${placed} ship${placed === 1 ? '' : 's'} in ${system}`],
+    },
+    continue: C.then(Prelude(faction, suit, pips)),
+  }
 }
 
 /** Place one Gatekeepers ship in the chosen gate, then re-ask until the reserve runs out. */
@@ -1858,6 +1925,14 @@ export const TurnModule: RuleModule = {
           state,
           action['faction'] as FactionId,
           action['system'] as SystemId,
+        )
+      case 'turn/ships-place':
+        return performShipsPlace(
+          state,
+          action['faction'] as FactionId,
+          action['system'] as SystemId,
+          action['suit'] as Suit,
+          action['pips'] as number,
         )
       case 'turn/gates-place':
         return performGatesPlace(

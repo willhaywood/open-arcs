@@ -98,11 +98,17 @@ function uprisingSystems(
   }
   for (const a of cont.actions) {
     /*
-     * All three are "choose a system to place pieces in", so they read as the same gesture on the
-     * map. `turn/reinforce` is the no-elimination rule (rulebook p22) offering every gate;
-     * `turn/gates-place` is Gatekeepers' shortage picker (docs/20 B3), also offering gates.
+     * All of these are "choose a system to place pieces in", so they read as the same gesture on
+     * the map. `turn/reinforce` is the no-elimination rule (rulebook p22) offering every gate;
+     * `turn/gates-place` is Gatekeepers' shortage picker (docs/20 B3), also offering gates;
+     * `turn/ships-place` is the 3-ships Prelude cards' system pick, offering controlled systems.
      */
-    if (a.type === 'vox/uprising-place' || a.type === 'turn/reinforce' || a.type === 'turn/gates-place') {
+    if (
+      a.type === 'vox/uprising-place' ||
+      a.type === 'turn/reinforce' ||
+      a.type === 'turn/gates-place' ||
+      a.type === 'turn/ships-place'
+    ) {
       map.set(a['system'] as string, a)
     }
   }
@@ -558,7 +564,9 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
               ? 'Gatekeepers — click a gate to place a ship'
               : placeType === 'turn/reinforce'
                 ? 'Swept from the map — click a gate to place your ships'
-                : 'Mass Uprising — click a system to place a ship'}
+                : placeType === 'turn/ships-place'
+                  ? 'Place your ships — click a system you control'
+                  : 'Mass Uprising — click a system to place a ship'}
           {voxOut !== undefined ? (
             <button className="hint-out" onClick={() => store.apply(voxOut)}>
               {String(voxOut['label'] ?? 'Skip')}

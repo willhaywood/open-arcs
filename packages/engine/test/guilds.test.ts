@@ -25,6 +25,7 @@ import {
   UNION_SUITS,
   guildPreludes,
   parseCardId,
+  rules,
   rivalAgentsOn,
   securedCards,
   slotCapacity,
@@ -1118,7 +1119,11 @@ describe('Prelude discard abilities', () => {
     for (const g of gates.slice(1, -1)) expect(shipsAt(placedTwo.state, g)).toBe(before.get(g)!)
   })
 
-  it('a ship-placer puts three ships in one system', () => {
+  it('a ship-placer with the system inside the action still places directly (old journals)', () => {
+    /*
+     * The offer no longer carries a system — it is picked on the map — but journals recorded
+     * before that change do. The dispatch keeps the direct path so those saves replay unchanged.
+     */
     const state = withCard2(fresh(), 'red', 'bc13')
     const system = state.board.systems[0]!
     const before = contentsOf(state.figures, Location.system(system)).filter((id) =>
@@ -1129,6 +1134,68 @@ describe('Prelude discard abilities', () => {
     expect(
       contentsOf(step.state.figures, Location.system(system)).filter((id) => id.startsWith('red/Ship/')),
     ).toHaveLength(before + 3)
+  })
+
+  it('a ship-placer asks for the system on the map, controlled systems only', () => {
+    /*
+     * "Place 3 ships in a system you control" — the offer is one per card, and the system is a
+     * `turn/ships-place` ask over exactly the controlled systems (the docs/20 B3 pattern),
+     * replacing a pane button per card × system.
+     */
+    const state = withCard2(fresh(), 'red', 'bc13')
+    const offers = guildPreludes(state, 'red').filter((g) => g.kind === 'ships')
+    expect(offers).toHaveLength(1)
+    expect('system' in offers[0]!).toBe(false)
+
+    const ruled = state.board.systems.filter((s) => rules(state, 'red', s))
+    expect(ruled.length).toBeGreaterThan(0)
+    const shipsAt = (s: GameState, sys: string) =>
+      contentsOf(s.figures, Location.system(sys)).filter((id) => id.startsWith('red/Ship/')).length
+
+    const step = preludeGuild(state, { ability: 'ships', card: 'bc13' })
+    const ask = step.continue
+    if (ask.kind !== 'ask') throw new Error('expected the placement ask')
+    expect(ask.actions.every((a) => a.type === 'turn/ships-place')).toBe(true)
+    expect(ask.actions.map((a) => a['system'])).toEqual(ruled)
+    // The card is already spent — the ask decides placement, it is not a way out.
+    expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc13')
+
+    // Choose the LAST controlled system: board order must not decide.
+    const target = ruled.at(-1)!
+    const before = shipsAt(step.state, target)
+    const placed = advance(step.state, ask.actions.at(-1)!, terminal)
+    expect(shipsAt(placed.state, target)).toBe(before + 3)
+    expect(placed.state.log.some((l) => l === `red placed 3 ships in ${target}`)).toBe(true)
+    // One click placed the whole group, so no further placement ask.
+    expect(
+      placed.continue.kind === 'ask' &&
+        placed.continue.actions.some((a) => a.type === 'turn/ships-place'),
+    ).toBe(false)
+  })
+
+  it('a ship-placer on a short reserve places what remains', () => {
+    let state = withCard2(fresh(), 'red', 'bc13')
+    const reserve = contentsOf(state.figures, Location.reserve('red')).filter((id) =>
+      id.startsWith('red/Ship/'),
+    )
+    let figures = state.figures
+    for (const id of reserve.slice(2)) figures = move(figures, id, Location.trophies('blue'))
+    state = { ...state, figures }
+
+    const step = preludeGuild(state, { ability: 'ships', card: 'bc13' })
+    const ask = step.continue
+    if (ask.kind !== 'ask') throw new Error('expected the placement ask')
+    expect(String(ask.actions[0]!['label'])).toContain('Place 2 ships')
+    const target = String(ask.actions[0]!['system'])
+    const before = contentsOf(step.state.figures, Location.system(target)).filter((id) =>
+      id.startsWith('red/Ship/'),
+    ).length
+    const placed = advance(step.state, ask.actions[0]!, terminal)
+    expect(
+      contentsOf(placed.state.figures, Location.system(target)).filter((id) =>
+        id.startsWith('red/Ship/'),
+      ),
+    ).toHaveLength(before + 2)
   })
 
   it('Elder Broker gains one each of Material, Fuel and Weapon', () => {
