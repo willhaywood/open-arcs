@@ -444,7 +444,21 @@ function offerGather(
    * a building, so the two conditions are mutually exclusive by construction.
    */
   const exosuits = !enemyBuildings && hasLore(state, faction, RAIDER_EXOSUITS) ? 1 : 0
-  const maxRaid = enemyBuildings && !harbored ? 6 : exosuits
+  /*
+   * The raid limit's second opening — rulebook 7.6 step 3: "You can only collect raid dice if
+   * there are defending buildings **or if the defender has no Loyal buildings in any systems on
+   * the map**." A homeless defender is raidable everywhere (docs/21 A3) — the rule the
+   * Anarchist's own card reminds players of, and an Anarchist *starts* with no buildings. HRF:
+   * game-battle.scala:177. Hidden Harbors cannot collide: its shield needs a fresh defending
+   * starport, which is a building.
+   */
+  const defenderFaction = defendingFaction(state, enemy)
+  const homeless =
+    defenderFaction !== undefined &&
+    state.board.systems.every(
+      (s) => piecesAt(state, s, defenderFaction, isBuilding).length === 0,
+    )
+  const maxRaid = (enemyBuildings && !harbored) || homeless ? 6 : exosuits
   const wary = hasTrait(state, faction, 'Wary')
 
   /*
