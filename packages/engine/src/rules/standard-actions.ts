@@ -51,7 +51,7 @@ import {
 } from '../resources.js'
 import type { GameState } from '../state.js'
 import { contentsOf, move } from '../tracker.js'
-import { CourtPile, courtCard, courtSlots } from '../court.js'
+import { CourtPile, MINING_INTEREST, SHIPPING_INTEREST, courtCard, courtSlots, hasGuild } from '../court.js'
 import { prunable } from '../guild-actions.js'
 import { hasTrait } from '../leaders.js'
 import {
@@ -1374,6 +1374,23 @@ function performBuild(
   figures = move(figures, id, Location.system(system))
 
   /*
+   * The Interests' Build riders (docs/20 A2): "Manufacture (Build): Gain 1 Material." /
+   * "Synthesize (Build): Gain 1 Fuel." Keyed to taking the Build action itself — any Build, from
+   * any card play, unlike Insatiable's Copy/Pivot gate, because these cards print no such gate.
+   * The gain lands like a tax does: into an open slot, overflow if full.
+   */
+  const riderLog: string[] = []
+  for (const [guildCard, r] of [
+    [MINING_INTEREST, 'Material'],
+    [SHIPPING_INTEREST, 'Fuel'],
+  ] as const) {
+    if (!hasGuild(state, faction, guildCard)) continue
+    const got = gain(resources, slotsOf(state, faction), r, ResourceSlot.overflow(faction))
+    resources = got.tracker
+    riderLog.push(`${faction} gained 1 ${r} (${courtCard(guildCard).name})`)
+  }
+
+  /*
    * "Build ships damaged in Rival-controlled systems." Scoped to the Bond, because it is the
    * parenthetical on the Bond's own grant — an ordinary build at your own starport is unaffected.
    */
@@ -1395,6 +1412,7 @@ function performBuild(
       log: [
         ...state.log,
         ...annexLog,
+        ...riderLog,
         cloud === true
           ? `${faction} built a Cloud City in ${system} (paid ${String(pay)})`
           : `${faction} built a ${piece} in ${system}${contested ? ' (damaged — Rival-controlled)' : ''}`,
