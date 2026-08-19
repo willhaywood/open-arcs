@@ -98,10 +98,11 @@ function uprisingSystems(
   }
   for (const a of cont.actions) {
     /*
-     * Both are "choose a system to place pieces in", so both read as the same gesture on the map.
-     * `turn/reinforce` is the no-elimination rule (rulebook p22) offering every gate.
+     * All three are "choose a system to place pieces in", so they read as the same gesture on the
+     * map. `turn/reinforce` is the no-elimination rule (rulebook p22) offering every gate;
+     * `turn/gates-place` is Gatekeepers' shortage picker (docs/20 B3), also offering gates.
      */
-    if (a.type === 'vox/uprising-place' || a.type === 'turn/reinforce') {
+    if (a.type === 'vox/uprising-place' || a.type === 'turn/reinforce' || a.type === 'turn/gates-place') {
       map.set(a['system'] as string, a)
     }
   }
@@ -325,6 +326,8 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
   const battleSys = battleSystems(cont)
   const rifles = riflesSystems(cont)
   const uprising = uprisingSystems(state, cont)
+  // The place bucket serves three cards' asks, so the hint names whichever is actually up.
+  const placeType = [...uprising.map.values()][0]?.type
   const voxOut =
     cont.kind === 'ask' && uprising.map.size > 0
       ? cont.actions.find((a) => a.type === 'vox/done' || a.type === 'action/skip')
@@ -551,7 +554,11 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
         <div className="board-hint battle">
           {uprising.kind === 'cluster'
             ? 'Mass Uprising — click any system in the cluster you want'
-            : 'Mass Uprising — click a system to place a ship'}
+            : placeType === 'turn/gates-place'
+              ? 'Gatekeepers — click a gate to place a ship'
+              : placeType === 'turn/reinforce'
+                ? 'Swept from the map — click a gate to place your ships'
+                : 'Mass Uprising — click a system to place a ship'}
           {voxOut !== undefined ? (
             <button className="hint-out" onClick={() => store.apply(voxOut)}>
               {String(voxOut['label'] ?? 'Skip')}

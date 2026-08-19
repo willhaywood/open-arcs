@@ -1061,6 +1061,61 @@ describe('Prelude discard abilities', () => {
         g,
       ).toBeGreaterThan(0)
     }
+    // With a ship for every gate there is nothing to decide, so no gates picker appears.
+    expect(
+      step.continue.kind === 'ask' &&
+        step.continue.actions.some((a) => a.type === 'turn/gates-place'),
+    ).toBe(false)
+  })
+
+  it('Gatekeepers on a short reserve asks which gates get the ships (docs/20 B3)', () => {
+    /*
+     * "Place 1 ship in each gate" does not cover a reserve smaller than the gate count. The
+     * engine used to fill gates in board-definition order — an accident of data layout — while
+     * its own Mass Uprising docblock reasons the identical shortage out to "the player's
+     * choice". The picker is that choice; the card is spent before it, not by it.
+     */
+    let state = withCard2(fresh(), 'red', 'bc08')
+    const gates = state.board.systems.filter((s) => systemInfo(s).isGate)
+    expect(gates.length).toBeGreaterThan(2)
+    // Leave exactly two ships in reserve — fewer than the gates.
+    const reserve = contentsOf(state.figures, Location.reserve('red')).filter((id) =>
+      id.startsWith('red/Ship/'),
+    )
+    let figures = state.figures
+    for (const id of reserve.slice(2)) figures = move(figures, id, Location.trophies('blue'))
+    state = { ...state, figures }
+    const shipsAt = (s: GameState, g: string) =>
+      contentsOf(s.figures, Location.system(g)).filter((id) => id.startsWith('red/Ship/')).length
+    const before = new Map(gates.map((g) => [g, shipsAt(state, g)]))
+
+    const step = preludeGuild(state, { ability: 'gates', card: 'bc08' })
+    const ask1 = step.continue
+    if (ask1.kind !== 'ask') throw new Error('expected the gates picker')
+    expect(ask1.actions.every((a) => a.type === 'turn/gates-place')).toBe(true)
+    expect(ask1.actions.map((a) => a['system'])).toEqual(gates)
+    // The card is already spent — the picker decides placement, it is not a way out.
+    expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc08')
+
+    // Choose the LAST gate first: board order must not decide.
+    const last = gates.at(-1)!
+    const placedOne = advance(step.state, ask1.actions.at(-1)!, terminal)
+    expect(shipsAt(placedOne.state, last)).toBe(before.get(last)! + 1)
+
+    // The second ask excludes the gate already given a ship — "1 ship in EACH gate".
+    const ask2 = placedOne.continue
+    if (ask2.kind !== 'ask') throw new Error('expected the picker to re-ask')
+    expect(ask2.actions.map((a) => a['system'])).toEqual(gates.slice(0, -1))
+
+    const first = gates[0]!
+    const placedTwo = advance(placedOne.state, ask2.actions[0]!, terminal)
+    expect(shipsAt(placedTwo.state, first)).toBe(before.get(first)! + 1)
+    // Reserve empty: the picker ends, and the middle gate got nothing.
+    expect(
+      placedTwo.continue.kind === 'ask' &&
+        placedTwo.continue.actions.some((a) => a.type === 'turn/gates-place'),
+    ).toBe(false)
+    for (const g of gates.slice(1, -1)) expect(shipsAt(placedTwo.state, g)).toBe(before.get(g)!)
   })
 
   it('a ship-placer puts three ships in one system', () => {

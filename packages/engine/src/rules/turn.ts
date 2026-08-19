@@ -1062,10 +1062,24 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
     }
 
     case 'gates': {
+      /*
+       * "Place 1 ship in each gate (unless out of play)." The card does not say what happens when
+       * the reserve cannot reach every gate — the same silence Mass Uprising resolves by making
+       * the systems that get a ship the player's choice (vox.ts, docs/20 B3). This used to fill
+       * gates in board-definition order, an accident of data layout; now the shortage prompts,
+       * and only the shortage: with a ship for every gate there is nothing to decide.
+       */
+      const gates = state.board.systems.filter((s) => systemInfo(s).isGate)
+      const ships = contentsOf(state.figures, Location.reserve(faction)).filter(
+        (id) => parseFigureId(id).piece === 'Ship',
+      ).length
+      if (ships > 0 && ships < gates.length) {
+        const paid = spent(state, `placing ${ships} ship(s) at gates of their choice`)
+        return { state: paid, continue: gatesPlacement(paid, faction, [], suit, pips) }
+      }
       let next = state
       let placed = 0
-      for (const s of state.board.systems) {
-        if (!systemInfo(s).isGate) continue
+      for (const s of gates) {
         const ship = shipFromReserve(next, faction)
         if (ship === undefined) break
         next = { ...next, figures: move(next.figures, ship, Location.system(s)) }
@@ -1375,6 +1389,59 @@ function performReinforce(state: GameState, faction: FactionId, target: SystemId
 
 /** How many ships a swept faction returns with. */
 const REINFORCEMENTS = 3
+
+/**
+ * Gatekeepers' shortage picker: which gates get the remaining ships (docs/20 B3).
+ *
+ * Only reached when the reserve holds fewer ships than there are gates in play — the case the
+ * card does not cover, resolved as the player's choice by the same reasoning as Mass Uprising's
+ * shortage (vox.ts). `placed` excludes gates already given a ship, which is what enforces
+ * "1 ship in **each** gate"; the loop ends when the reserve or the gates run out.
+ */
+function gatesPlacement(
+  state: GameState,
+  faction: FactionId,
+  placed: readonly string[],
+  suit: Suit,
+  pips: number,
+): Continue {
+  const remaining = state.board.systems.filter(
+    (s) => systemInfo(s).isGate && !placed.includes(s),
+  )
+  const ships = contentsOf(state.figures, Location.reserve(faction)).filter(
+    (id) => parseFigureId(id).piece === 'Ship',
+  ).length
+  if (ships === 0 || remaining.length === 0) return C.then(Prelude(faction, suit, pips))
+  const options: Action[] = remaining.map((s) => ({
+    type: 'turn/gates-place',
+    faction,
+    system: s,
+    placed: [...placed],
+    suit,
+    pips,
+    label: `Place a ship in ${s} (${ships} left, one per gate)`,
+  }))
+  return C.ask(faction, options, `Gatekeepers — choose gates for the last ${ships} ship(s)`)
+}
+
+/** Place one Gatekeepers ship in the chosen gate, then re-ask until the reserve runs out. */
+function performGatesPlace(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  placed: readonly string[],
+  suit: Suit,
+  pips: number,
+): RuleResult {
+  const ship = shipFromReserve(state, faction)
+  if (ship === undefined) return { state, continue: C.then(Prelude(faction, suit, pips)) }
+  const next: GameState = {
+    ...state,
+    figures: move(state.figures, ship, Location.system(system)),
+    log: [...state.log, `${faction} placed a ship in ${system} (Gatekeepers)`],
+  }
+  return { state: next, continue: gatesPlacement(next, faction, [...placed, system], suit, pips) }
+}
 
 /**
  * Farseers' picker: which hand cards join the discard. Carried in the actions themselves —
@@ -1791,6 +1858,15 @@ export const TurnModule: RuleModule = {
           state,
           action['faction'] as FactionId,
           action['system'] as SystemId,
+        )
+      case 'turn/gates-place':
+        return performGatesPlace(
+          state,
+          action['faction'] as FactionId,
+          action['system'] as SystemId,
+          action['placed'] as string[],
+          action['suit'] as Suit,
+          action['pips'] as number,
         )
       case 'turn/farseers-pick':
         return {

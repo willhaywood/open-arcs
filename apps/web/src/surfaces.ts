@@ -135,9 +135,10 @@ const BATTLE = [
  * Move and Battle already worked this way. Galactic Rifles joins them — both of its steps name
  * systems — and so does Mass Uprising, whose first step names a **cluster**: a set of systems with
  * no drawn representation at all, which made "Rise up in cluster 3" the least answerable prompt in
- * the game. Every system in the cluster lights up instead.
+ * the game. Every system in the cluster lights up instead. `turn/gates-place` is Gatekeepers'
+ * shortage picker (docs/20 B3) — the same place-a-ship gesture, so the gates light up too.
  */
-const MAP = ['rifles/target', 'rifles/roll', 'vox/uprising', 'vox/uprising-place']
+const MAP = ['rifles/target', 'rifles/roll', 'vox/uprising', 'vox/uprising-place', 'turn/gates-place']
 
 /** The action phase, grouped by the card or pip each option comes from. */
 /** Declaring an ambition is done to the ambition track, which draws the five rows. */

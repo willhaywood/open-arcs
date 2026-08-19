@@ -72,6 +72,17 @@ Silver Tongues offer likewise skips SG holders entirely. And "bury it" (bottom o
 has no implementation on the steal path. Self-consistent, and wrong at the edge the card writes
 out longhand.
 
+### B3. Gatekeepers (bc08) — the Prelude's shortage case gives the player no choice
+Found after the audit, while answering "who picks the gates when the reserve runs short?".
+Card: "Prelude: You may discard this to place 1 ship in each gate (unless out of play)." The card
+does not say what happens when the reserve holds fewer ships than there are gates, and the FAQ is
+silent. Engine (rules/turn.ts `case 'gates'`): filled gates in **board-definition order** and
+stopped when the reserve emptied — which gates got ships was an accident of data layout. The
+engine's own Mass Uprising docblock (rules/vox.ts) reasons the identical shortage out the other
+way: "the card does not say what happens then, so the systems that get one are the player's
+choice", implemented as a placement prompt. Fixed to match: the shortage (and only the shortage)
+asks, offered on the map as lit-up gates like Mass Uprising's placement step.
+
 ## Findings — confirmed correct (with the citation that proves it)
 
 | card(s) | verdict |
@@ -109,3 +120,6 @@ Build riders**, **A3 Farseers** (largest, four sub-fixes), **A5 Call to Action**
 Unions** and **B2 Sworn Guardians**. Each is its own branch with the card text as its test's
 docstring, per the Cartel precedent. The golden baseline will move for any fix the baseline games
 touch — the documented rules-fix exception applies.
+
+**B3** (the Gatekeepers shortage prompt) was found and fixed after this list was triaged; it rides
+the same fix branch as A1–B2.
