@@ -139,12 +139,14 @@ export function AmbitionTrack({
             <span
               key={`phantom-${a}`}
               className="amb-phantom"
-              style={{ top: ROW_Y[a] }}
-              title={
-                held === 1
-                  ? `1 out-of-play resource counts toward ${a}`
-                  : `${held} out-of-play resources count toward ${a}`
-              }
+              /*
+               * Hoverable for the tooltip except while a declare ask is live — the chips sit on
+               * the Populist Demands claim rows, and a click must win over a hover explanation.
+               */
+              style={{ top: ROW_Y[a], pointerEvents: declarable.size > 0 ? 'none' : 'auto' }}
+              title={`Two-player rule (rulebook p19): the ${held} out-of-play ${
+                held === 1 ? 'resource counts' : 'resources count'
+              } toward ${a} as if a third player held them — they can place but never score`}
             >
               {held}
             </span>
@@ -171,8 +173,14 @@ export function AmbitionTrack({
             <span
               key={`cartel-${card}`}
               className="amb-cartel"
-              style={{ top: ROW_Y.Tycoon, left: i === 0 ? '48%' : '62%', borderColor: colorOf(holder) }}
-              title={`${holder}'s ${courtCard(card).name} counts the ${resource} supply (${n}) toward Tycoon`}
+              style={{
+                top: ROW_Y.Tycoon,
+                left: i === 0 ? '48%' : '62%',
+                borderColor: colorOf(holder),
+                // Same hover-vs-claim-click rule as the phantom chip below.
+                pointerEvents: declarable.size > 0 ? 'none' : 'auto',
+              }}
+              title={`${holder}'s ${courtCard(card).name}: the ${n} ${resource} in the supply count toward ${holder}'s Tycoon — held on the card, and ${holder} can't spend them`}
             >
               {n}
             </span>
