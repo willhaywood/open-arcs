@@ -3606,6 +3606,31 @@ button {
   text-align: center;
 }
 
+/*
+ * The chip tooltip: fixed-position and rendered by the page, because native `title` bubbles are
+ * drawn by the browser chrome (invisible in an embedded/streamed view) and a pseudo-element
+ * cannot escape the track's overflow clipping. `translateX(-100%)` hangs it leftward from the
+ * chip's right edge, over the map, where a sentence fits.
+ */
+.amb-tip {
+  position: fixed;
+  transform: translateX(-100%);
+  width: max-content;
+  max-width: 260px;
+  padding: 6px 8px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 4px;
+  background: rgba(8, 10, 16, 0.96);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  z-index: 40;
+  pointer-events: none;
+}
+
 .amb-phantom {
   position: absolute;
   left: 76%;

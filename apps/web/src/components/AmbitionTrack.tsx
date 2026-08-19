@@ -47,6 +47,22 @@ export function AmbitionTrack({
   cont?: Continue
 }): JSX.Element {
   const [artBroken, setArtBroken] = useState(false)
+  /*
+   * The chip tooltips are a fixed-position element rather than CSS `::after`, for two reasons
+   * found the hard way: native `title` bubbles are drawn by the browser chrome and never appear
+   * in an embedded/streamed view, and a pseudo-element cannot escape the track's `overflow`
+   * clipping — the panel is far narrower than a readable sentence. Fixed positioning anchors to
+   * the chip's rect and grows leftward over the map, where the room is.
+   */
+  const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null)
+  const showTip = (e: React.MouseEvent<HTMLElement>): void => {
+    const el = e.currentTarget
+    const text = el.dataset['tip']
+    if (text === undefined) return
+    const r = el.getBoundingClientRect()
+    setTip({ text, x: r.right, y: r.bottom + 6 })
+  }
+  const hideTip = (): void => setTip(null)
   const threshold = 39 - state.factions.length * 3
 
   /*
@@ -106,6 +122,11 @@ export function AmbitionTrack({
 
   return (
     <div className="ambition-track">
+      {tip !== null && (
+        <div className="amb-tip" style={{ left: tip.x, top: tip.y }}>
+          {tip.text}
+        </div>
+      )}
       <div className="ambition-panel">
         <img
           className="ambition-art"
@@ -144,7 +165,9 @@ export function AmbitionTrack({
                * the Populist Demands claim rows, and a click must win over a hover explanation.
                */
               style={{ top: ROW_Y[a], pointerEvents: declarable.size > 0 ? 'none' : 'auto' }}
-              title={`Two-player rule (rulebook p19): the ${held} out-of-play ${
+              onMouseEnter={showTip}
+              onMouseLeave={hideTip}
+              data-tip={`Two-player rule (rulebook p19): the ${held} out-of-play ${
                 held === 1 ? 'resource counts' : 'resources count'
               } toward ${a} as if a third player held them — they can place but never score`}
             >
@@ -180,7 +203,9 @@ export function AmbitionTrack({
                 // Same hover-vs-claim-click rule as the phantom chip below.
                 pointerEvents: declarable.size > 0 ? 'none' : 'auto',
               }}
-              title={`${holder}'s ${courtCard(card).name}: the ${n} ${resource} in the supply count toward ${holder}'s Tycoon — held on the card, and ${holder} can't spend them`}
+              onMouseEnter={showTip}
+              onMouseLeave={hideTip}
+              data-tip={`${holder}'s ${courtCard(card).name}: the ${n} ${resource} in the supply count toward ${holder}'s Tycoon — held on the card, and ${holder} can't spend them`}
             >
               {n}
             </span>
