@@ -188,6 +188,17 @@ const PANEL = [
   'turn/mulligan',
   'turn/keep-hand',
   'turn/bards-declare',
+  /*
+   * The Farseers flows (docs/20 A3): the discard picker and the declare-time peek. Lists of
+   * labelled options, which is exactly what the action panel renders; the peek's swap options
+   * carry the rival's card names in their labels, so the panel is the "look".
+   */
+  'turn/farseers-pick',
+  'turn/farseers-done',
+  'ambition/farseers-look',
+  'ambition/farseers-take',
+  'ambition/farseers-give',
+  'ambition/farseers-skip',
   'turn/prelude',
   'turn/pips',
   'turn/lead-main',

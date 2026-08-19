@@ -35,7 +35,7 @@ import {
   supplyOf,
 } from '../src/index.js'
 import { system as systemInfo } from '../src/index.js'
-import type { Continue, GameState, Resource } from '../src/index.js'
+import type { Continue, FactionId, GameState, Resource } from '../src/index.js'
 
 const THREE = ['red', 'yellow', 'blue'] as const
 const registry = defaultRegistry()
@@ -800,32 +800,72 @@ describe('Guild Prelude abilities — the card is the cost', () => {
     ).toBe(false)
   })
 
-  it('Farseers throws the hand back and draws as many again', () => {
-    const state = withCard2(fresh(), 'red', 'bc17')
+  it('Farseers opens a picker: any number of discards, drawn +1 from the discard bottom', () => {
+    /*
+     * "Discard this and any number of cards from your hand. Draw the same number (including
+     * Farseers) from the bottom of the action discard pile." This test used to pin the docs/20
+     * A3 defect — forced whole-hand, deck-top draws, one too few. The FAQ example is the spec:
+     * discarded 2 plus Farseers, draw 3. Discarded picks are shuffled before placing (the FAQ's
+     * discard-order ruling), and the draws come off the same pile's bottom.
+     */
+    let state = withCard2(fresh(), 'red', 'bc17')
+    // Seed a known discard bottom so the first draw is predictable.
+    const yHand = contentsOf(state.cards, CardLocation.hand('yellow'))
+    const seedBottom = yHand[0]!
+    state = { ...state, cards: move(state.cards, seedBottom, CardLocation.discard()) }
     const before = contentsOf(state.cards, CardLocation.hand('red'))
-    expect(before.length).toBeGreaterThan(0)
 
-    const step = advance(
+    const opened = advance(
       stoppable(state),
-      {
-        type: 'turn/prelude-guild',
-        faction: 'red',
-        ability: 'farseers',
-        card: 'bc17',
-        suit: 'Aggression',
-        pips: 1,
-      },
+      { type: 'turn/prelude-guild', faction: 'red', ability: 'farseers', card: 'bc17', suit: 'Aggression', pips: 1 },
       terminal,
     )
-    const after = contentsOf(step.state.cards, CardLocation.hand('red'))
-    // Draws up to the hand size, but the deck is the limit — at three players setup deals
-    // 18 of 20 cards, so a full redraw is simply not available and the log says so.
-    const deckBefore = contentsOf(state.cards, CardLocation.deck()).length
-    expect(after).toHaveLength(Math.min(before.length, deckBefore))
-    expect(after).not.toEqual(before) // a genuinely different hand
-    expect(contentsOf(step.state.cards, CardLocation.deck())).toHaveLength(0)
-    expect(step.state.log.at(-1)).toMatch(/redrew \d+ of \d+ card/)
-    expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc17')
+    // The card is spent, and a picker is asked rather than the hand being swept.
+    expect(contentsOf(opened.state.courtCards, CourtPile.discard())).toContain('bc17')
+    expect(contentsOf(opened.state.cards, CardLocation.hand('red'))).toEqual(before)
+    const ask1 = opened.continue
+    if (ask1.kind !== 'ask') throw new Error('expected the picker')
+    expect(ask1.actions.some((a) => a.type === 'turn/farseers-done')).toBe(true)
+
+    // Pick two cards, then Done: the FAQ example — draw 2 + 1 = 3.
+    const pickA = ask1.actions.find((a) => a.type === 'turn/farseers-pick')!
+    const step2 = advance(opened.state, pickA, registry)
+    const ask2 = step2.continue
+    if (ask2.kind !== 'ask') throw new Error('expected the second pick')
+    const pickB = ask2.actions.find((a) => a.type === 'turn/farseers-pick')!
+    const step3 = advance(step2.state, pickB, registry)
+    const ask3 = step3.continue
+    if (ask3.kind !== 'ask') throw new Error('expected the done ask')
+    const done = ask3.actions.find((a) => a.type === 'turn/farseers-done')!
+    expect(String(done['label'])).toContain('draw 3')
+    const final = advance(step3.state, done, registry)
+
+    const after = contentsOf(final.state.cards, CardLocation.hand('red'))
+    // Two out, three in: net +1 — and the seeded bottom card must be among the draws.
+    expect(after).toHaveLength(before.length + 1)
+    expect(after).toContain(seedBottom)
+    expect(final.state.log.some((l) => /discarded 2 card\(s\) and drew 3 from the bottom/.test(l))).toBe(true)
+  })
+
+  it('Farseers with zero discards still draws 1 — the FAQ boundary', () => {
+    let state = withCard2(fresh(), 'red', 'bc17')
+    const yHand = contentsOf(state.cards, CardLocation.hand('yellow'))
+    const seedBottom = yHand[0]!
+    state = { ...state, cards: move(state.cards, seedBottom, CardLocation.discard()) }
+    const before = contentsOf(state.cards, CardLocation.hand('red')).length
+
+    const opened = advance(
+      stoppable(state),
+      { type: 'turn/prelude-guild', faction: 'red', ability: 'farseers', card: 'bc17', suit: 'Aggression', pips: 1 },
+      terminal,
+    )
+    const ask1 = opened.continue
+    if (ask1.kind !== 'ask') throw new Error('expected the picker')
+    const done = ask1.actions.find((a) => a.type === 'turn/farseers-done')!
+    expect(String(done['label'])).toContain('draw 1')
+    const final = advance(opened.state, done, registry)
+    expect(contentsOf(final.state.cards, CardLocation.hand('red'))).toHaveLength(before + 1)
+    expect(contentsOf(final.state.cards, CardLocation.hand('red'))).toContain(seedBottom)
   })
 })
 
@@ -1149,5 +1189,55 @@ describe("the Interests' Build riders (bc02/bc09, docs/20 A2)", () => {
     const nothing = buildInControlled(bare, 'red')
     expect(countResource(nothing.resources, slotsOf(nothing, 'red'), 'Material')).toBe(0)
     expect(countResource(nothing.resources, slotsOf(nothing, 'red'), 'Fuel')).toBe(0)
+  })
+})
+
+describe("Farseers' declare-time peek (bc17, docs/20 A3)", () => {
+  /*
+   * "When you declare an ambition, look at a Rival's hand. You may swap 1 card with them." The
+   * audit found this clause entirely absent. The look IS the ask — its options carry the rival's
+   * cards — and the swap moves one card each way.
+   */
+  function declared(state: GameState) {
+    return advance(
+      { ...state, ambitionable: [{ high: 5, low: 3 }] },
+      { type: 'ambition/declare', faction: 'red', ambition: 'Tycoon', suit: 'Aggression', pips: 2 },
+      registry,
+    )
+  }
+
+  it('offers the look after declaring, and the swap moves one card each way', () => {
+    const state = withCard2(fresh(), 'red', 'bc17')
+    const step = declared(state)
+    const c = step.continue
+    if (c.kind !== 'ask') throw new Error('expected the peek ask')
+    const look = c.actions.find((a) => a.type === 'ambition/farseers-look')!
+    expect(look).toBeDefined()
+
+    const swapAsk = advance(step.state, look, registry)
+    const c2 = swapAsk.continue
+    if (c2.kind !== 'ask') throw new Error('expected the swap ask')
+    const take = c2.actions.find((a) => a.type === 'ambition/farseers-take')!
+    const their = take['their'] as string
+    const rival = take['rival'] as FactionId
+
+    const giveAsk = advance(swapAsk.state, take, registry)
+    const c3 = giveAsk.continue
+    if (c3.kind !== 'ask') throw new Error('expected the give ask')
+    const give = c3.actions.find((a) => a.type === 'ambition/farseers-give')!
+    const mine = give['mine'] as string
+
+    const done = advance(giveAsk.state, give, registry)
+    expect(contentsOf(done.state.cards, CardLocation.hand('red'))).toContain(their)
+    expect(contentsOf(done.state.cards, CardLocation.hand(rival))).toContain(mine)
+    expect(done.state.log.some((l) => /swapped a card with/.test(l))).toBe(true)
+  })
+
+  it('declaring without the card goes straight on — no peek', () => {
+    const step = declared(fresh())
+    // The continue resolves onward (Prelude et al.), never a farseers ask.
+    const c = step.continue
+    const types = c.kind === 'ask' ? c.actions.map((a) => a.type) : []
+    expect(types.some((x) => String(x).startsWith('ambition/farseers'))).toBe(false)
   })
 })

@@ -66,6 +66,7 @@ import {
   ScoreAmbitions,
   ambitionsForStrength,
   chapterAmbitionable,
+  afterDeclarePeek,
   takeAmbitionMarker,
 } from './ambitions.js'
 import { TakeAction, arrangeThen, canTake, overflowThen } from './standard-actions.js'
@@ -593,7 +594,8 @@ function performBardsDeclare(
   // Free, and like Populist Demands it does not zero the played card.
   const taken = takeAmbitionMarker(state, faction, ambition)
   const next: GameState = { ...taken, usedThisTurn: [...taken.usedThisTurn, GALACTIC_BARDS] }
-  return { state: next, continue: C.then(CheckSeize(faction, pips, suit)) }
+  // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3).
+  return { state: next, continue: afterDeclarePeek(next, faction, CheckSeize(faction, pips, suit)) }
 }
 
 function performSeize(
@@ -966,19 +968,17 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
     }
 
     case 'farseers': {
-      const held = contentsOf(state.cards, CardLocation.hand(faction))
-      let cards = moveAll(state.cards, held, CardLocation.discard())
-      let drawn = 0
-      for (let i = 0; i < held.length; i++) {
-        const top = contentsOf(cards, CardLocation.deck())[0]
-        if (top === undefined) break
-        cards = move(cards, top, CardLocation.hand(faction))
-        drawn++
-      }
-      return {
-        state: spent({ ...state, cards }, `redrew ${drawn} of ${held.length} card(s)`),
-        continue: back,
-      }
+      /*
+       * "You may discard this and **any number** of cards from your hand. Draw the same number of
+       * cards **(including Farseers)** from the **bottom of the action discard pile**."
+       *
+       * The audit (docs/20 A3) found this wrong three ways — forced whole-hand, drawing the deck
+       * top, and drawing one too few — all three confirmed by the official FAQ ("discarded 2
+       * cards plus Farseers → draw 3"). The card is spent the moment the ability is chosen; the
+       * picker below asks which hand cards join it, zero included ("discard zero → draw 1").
+       */
+      const paid = spent(state, 'chose cards to send with it')
+      return { state: paid, continue: farseersPick(paid, faction, [], suit, pips) }
     }
 
     /**
@@ -1355,6 +1355,79 @@ function performReinforce(state: GameState, faction: FactionId, target: SystemId
 /** How many ships a swept faction returns with. */
 const REINFORCEMENTS = 3
 
+/**
+ * Farseers' picker: which hand cards join the discard. Carried in the actions themselves —
+ * journal-safe plain ids — and rebuilt after every pick, so the journal replays the exact
+ * sequence and Done always announces the true draw count.
+ */
+function farseersPick(
+  state: GameState,
+  faction: FactionId,
+  picked: readonly string[],
+  suit: Suit,
+  pips: number,
+): Continue {
+  const hand = contentsOf(state.cards, CardLocation.hand(faction)).filter(
+    (c) => !picked.includes(c),
+  )
+  const options: Action[] = hand.map((c) => ({
+    type: 'turn/farseers-pick',
+    faction,
+    card: c,
+    picked: [...picked],
+    suit,
+    pips,
+    label: `Discard ${c}`,
+  }))
+  options.push({
+    type: 'turn/farseers-done',
+    faction,
+    picked: [...picked],
+    suit,
+    pips,
+    label: `Done — draw ${picked.length + 1} from the discard's bottom`,
+  })
+  return C.ask(faction, options, `${faction} — Farseers: discard any number of cards`)
+}
+
+/**
+ * The resolution: shuffle the picked cards **before** placing them (the official FAQ's ruling —
+ * "one of the few situations where discard order matters", because the draws come off the same
+ * pile's bottom and a small pile can hand your own discards back), then draw picked + 1, the +1
+ * being Farseers itself.
+ */
+function performFarseersDone(
+  state: GameState,
+  faction: FactionId,
+  picked: readonly string[],
+  suit: Suit,
+  pips: number,
+): RuleResult {
+  const [shuffled, rng] = shuffle(state.rng, picked)
+  let cards = state.cards
+  for (const c of shuffled) cards = move(cards, c, CardLocation.discard())
+  const want = picked.length + 1
+  let drawn = 0
+  for (let i = 0; i < want; i++) {
+    const bottom = contentsOf(cards, CardLocation.discard())[0]
+    if (bottom === undefined) break
+    cards = move(cards, bottom, CardLocation.hand(faction))
+    drawn++
+  }
+  return {
+    state: {
+      ...state,
+      cards,
+      rng,
+      log: [
+        ...state.log,
+        `${faction} discarded ${picked.length} card(s) and drew ${drawn} from the bottom of the discard (Farseers)`,
+      ],
+    },
+    continue: C.then(Prelude(faction, suit, pips)),
+  }
+}
+
 function performEndTurn(state: GameState, faction: FactionId): RuleResult {
   // Per-turn resets: cities become taxable and starports buildable again next turn.
   // `usedThisTurn` joined this list late (docs/20 A4): without it, Galactic Bards' and Relic
@@ -1684,6 +1757,25 @@ export const TurnModule: RuleModule = {
           state,
           action['faction'] as FactionId,
           action['system'] as SystemId,
+        )
+      case 'turn/farseers-pick':
+        return {
+          state,
+          continue: farseersPick(
+            state,
+            action['faction'] as FactionId,
+            [...(action['picked'] as string[]), action['card'] as string],
+            action['suit'] as Suit,
+            action['pips'] as number,
+          ),
+        }
+      case 'turn/farseers-done':
+        return performFarseersDone(
+          state,
+          action['faction'] as FactionId,
+          action['picked'] as string[],
+          action['suit'] as Suit,
+          action['pips'] as number,
         )
       case 'turn/end':
         return performEndTurn(state, action['faction'] as FactionId)

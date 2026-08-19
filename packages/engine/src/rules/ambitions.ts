@@ -18,14 +18,15 @@ import { allSystems } from '../board.js'
 import type { BoardVariant } from '../board.js'
 import type { Suit } from '../cards.js'
 import { Continue as C } from '../continue.js'
+import type { Continue } from '../continue.js'
 import { citiesInReserve, slotsOf } from '../control.js'
 import type { Resource } from '../resources.js'
 import type { SlotView } from '../control.js'
-import { CourtPile, FUEL_CARTEL, MATERIAL_CARTEL, SECRET_ORDER, courtCard, hasGuild, securedCards } from '../court.js'
+import { CourtPile, FARSEERS, FUEL_CARTEL, MATERIAL_CARTEL, SECRET_ORDER, courtCard, hasGuild, securedCards } from '../court.js'
 import { Prelude } from '../prelude.js'
 import type { RuleModule, RuleResult } from '../dispatch.js'
 import { unhandled } from '../dispatch.js'
-import { Location, parseFigureId } from '../ids.js'
+import { CardLocation, Location, parseFigureId } from '../ids.js'
 import type { FactionId, LocationId } from '../ids.js'
 import { hasTrait } from '../leaders.js'
 import {
@@ -323,6 +324,79 @@ function connected(state: GameState, faction: FactionId): GameState {
   }
 }
 
+/**
+ * Farseers' declare rider (docs/20 A3): "When you declare an ambition, look at a Rival's hand.
+ * You may swap 1 card with them."
+ *
+ * The look **is** the ask: its options list the rival's cards, which is exactly what a player
+ * peeking at a hand learns, and Skip is the "may". Multiplayer leaks nothing new — every client
+ * already replays full state, and hiding is presentational (`viewFor`), the same as every other
+ * ask that names hidden cards. The swap itself is public the moment it happens, as at a table.
+ *
+ * `then` carries whatever the declare was going to do next, so the rider slots into any declare
+ * path. Wired into the standard declare, Galactic Bards and Populist Demands; the expansion's
+ * Tycoon's Ambition declare is left unwired with this note rather than silently.
+ */
+export function afterDeclarePeek(
+  state: GameState,
+  faction: FactionId,
+  then: Action,
+): Continue {
+  if (!hasGuild(state, faction, FARSEERS)) return C.then(then)
+  const rivals = state.factions.filter(
+    (f) => f !== faction && contentsOf(state.cards, CardLocation.hand(f)).length > 0,
+  )
+  if (rivals.length === 0) return C.then(then)
+  const options: Action[] = rivals.map((rival) => ({
+    type: 'ambition/farseers-look',
+    faction,
+    rival,
+    then,
+    label: `Look at ${rival}'s hand`,
+  }))
+  options.push({ type: 'ambition/farseers-skip', faction, then, label: 'Skip' })
+  return C.ask(faction, options, `${faction} — Farseers: look at a Rival's hand`)
+}
+
+function farseersSwapAsk(
+  state: GameState,
+  faction: FactionId,
+  rival: FactionId,
+  then: Action,
+): Continue {
+  const theirs = contentsOf(state.cards, CardLocation.hand(rival))
+  const options: Action[] = theirs.map((card) => ({
+    type: 'ambition/farseers-take',
+    faction,
+    rival,
+    their: card,
+    then,
+    label: `Swap for ${card}`,
+  }))
+  options.push({ type: 'ambition/farseers-skip', faction, then, label: 'Keep your hand' })
+  return C.ask(faction, options, `${faction} — ${rival}'s hand; you may swap 1 card`)
+}
+
+function farseersGiveAsk(
+  state: GameState,
+  faction: FactionId,
+  rival: FactionId,
+  their: string,
+  then: Action,
+): Continue {
+  const mine = contentsOf(state.cards, CardLocation.hand(faction))
+  const options: Action[] = mine.map((card) => ({
+    type: 'ambition/farseers-give',
+    faction,
+    rival,
+    their,
+    mine: card,
+    then,
+    label: `Give ${card}`,
+  }))
+  return C.ask(faction, options, `${faction} — give a card back to ${rival}`)
+}
+
 function performDeclare(
   state: GameState,
   faction: FactionId,
@@ -345,7 +419,8 @@ function performDeclare(
   const next = bonus
     ? AfterDeclare(faction, suit as Suit, pips)
     : Prelude(faction, suit as Suit, pips)
-  return { state: { ...taken, lead }, continue: C.then(next) }
+  const declared = { ...taken, lead }
+  return { state: declared, continue: afterDeclarePeek(declared, faction, next) }
 }
 
 const AfterDeclare = (faction: FactionId, suit: Suit, pips: number): Action => ({
@@ -638,6 +713,45 @@ export const AmbitionsModule: RuleModule = {
           action['strength'] as number,
           action['pips'] as number,
         )
+      case 'ambition/farseers-look':
+        return {
+          state,
+          continue: farseersSwapAsk(
+            state,
+            action['faction'] as FactionId,
+            action['rival'] as FactionId,
+            action['then'] as Action,
+          ),
+        }
+      case 'ambition/farseers-take':
+        return {
+          state,
+          continue: farseersGiveAsk(
+            state,
+            action['faction'] as FactionId,
+            action['rival'] as FactionId,
+            action['their'] as string,
+            action['then'] as Action,
+          ),
+        }
+      case 'ambition/farseers-give': {
+        const faction = action['faction'] as FactionId
+        const rival = action['rival'] as FactionId
+        const their = action['their'] as string
+        const mine = action['mine'] as string
+        let cards = move(state.cards, their, CardLocation.hand(faction))
+        cards = move(cards, mine, CardLocation.hand(rival))
+        return {
+          state: {
+            ...state,
+            cards,
+            log: [...state.log, `${faction} swapped a card with ${rival} (Farseers)`],
+          },
+          continue: C.then(action['then'] as Action),
+        }
+      }
+      case 'ambition/farseers-skip':
+        return { state, continue: C.then(action['then'] as Action) }
       case 'ambition/declare':
         return performDeclare(
           state,

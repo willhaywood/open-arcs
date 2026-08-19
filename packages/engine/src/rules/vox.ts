@@ -31,7 +31,7 @@ import type { Resource } from '../resources.js'
 import { shuffle } from '../rng.js'
 import type { Ambition, GameState } from '../state.js'
 import { contentsOf, move, moveAll } from '../tracker.js'
-import { takeAmbitionMarker } from './ambitions.js'
+import { afterDeclarePeek, takeAmbitionMarker } from './ambitions.js'
 
 /** Entry point: fire the Vox card `card` just secured by `faction`, then continue to `then`. */
 export const VoxTrigger = (faction: FactionId, card: string, then: unknown): Action => ({
@@ -347,7 +347,8 @@ export const VoxModule: RuleModule = {
 
       case 'vox/populist': {
         const taken = takeAmbitionMarker(state, faction, action['ambition'] as Ambition)
-        return { state: taken, continue: C.then(Done(faction, card, then)) }
+        // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3).
+        return { state: taken, continue: afterDeclarePeek(taken, faction, Done(faction, card, then)) }
       }
 
       case 'vox/uprising':
