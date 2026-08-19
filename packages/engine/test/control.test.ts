@@ -148,18 +148,43 @@ describe('what ruling gates, now that damage counts against it', () => {
     expect(taxOffers(wrecked, system)).toBe(0)
   })
 
-  it('a wrecked fleet can no longer build there', () => {
+  it('a wrecked fleet can STILL build there — presence is the test, and the piece arrives damaged', () => {
+    /*
+     * Inverted by docs/21 A1+A2. This test used to assert the build option vanished once red no
+     * longer ruled — but rulebook 7.2.1 needs only "a system with a Loyal piece", and 7.2.2 makes
+     * the contested build pay by arriving damaged. Red's four wrecked ships are still presence;
+     * yellow's fresh ship now rules, so the City lands damaged.
+     */
     const { state, system } = field(4, 1)
-    const buildable = (st: GameState): boolean => {
+    const buildOffer = (st: GameState) => {
       const c = advance(
         st,
         { type: 'action/take', faction: 'red', action: 'Build', then: STOP },
         registry,
       ).continue
-      return c.kind === 'ask' && c.actions.some((a) => a['system'] === system && a.type === 'action/build')
+      if (c.kind !== 'ask') return undefined
+      return c.actions.find(
+        (a) => a['system'] === system && a.type === 'action/build' && a['piece'] === 'City',
+      )
     }
-    expect(buildable(state)).toBe(true)
-    expect(buildable(damage(state, 'red', system, 'Ship', 4))).toBe(false)
+    expect(buildOffer(state)).toBeDefined()
+
+    const wrecked = damage(state, 'red', system, 'Ship', 4)
+    expect(rules(wrecked, 'red', system)).toBe(false)
+    const offer = buildOffer(wrecked)
+    expect(offer).toBeDefined()
+    const built = advance(wrecked, offer!, registry).state
+    const city = contentsOf(built.figures, Location.system(system)).find((id) =>
+      id.startsWith('red/City/'),
+    )!
+    expect(built.damaged).toContain(city)
+
+    // The uncontested build stays fresh — 7.2.2 keys on someone ELSE ruling.
+    const calm = advance(state, buildOffer(state)!, registry).state
+    const freshCity = contentsOf(calm.figures, Location.system(system)).find((id) =>
+      id.startsWith('red/City/'),
+    )!
+    expect(calm.damaged).not.toContain(freshCity)
   })
 })
 

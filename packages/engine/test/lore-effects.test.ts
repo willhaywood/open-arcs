@@ -179,6 +179,57 @@ describe('Hidden Harbors (lore05) — no raid dice against a fresh defending sta
   })
 })
 
+describe("Hidden Harbors (lore05) — 'You always build ships fresh' (docs/21 A1)", () => {
+  /*
+   * The card's first clause, long recorded as a no-op because rulebook 7.2.2 was missing: "When
+   * you build anything in a system that is controlled by anyone other than you, place the piece
+   * damaged." The clause is the ship-only exemption — the holder's ships arrive fresh where
+   * anyone else's would be damaged, and the holder's BUILDINGS still arrive damaged.
+   */
+  const contestedYard = (holder: boolean) => {
+    const base = holder ? withLore(fresh(), 'red', 'lore05') : fresh()
+    const system = base.board.systems[0]!
+    // Red's starport plus a yellow fleet that rules the system.
+    let s = clearSystem(base, system)
+    s = place(s, 'red', system, 'Starport', 1)
+    s = place(s, 'yellow', system, 'Ship', 4)
+    return { s, system }
+  }
+  const build = (s: GameState, piece: string, system: SystemId): GameState => {
+    const c = advance(s, { type: 'action/take', faction: 'red', action: 'Build', then: STOP }, registry)
+    const act = ask(c.continue).actions.find(
+      (a) => a.type === 'action/build' && a['piece'] === piece && a['system'] === system,
+    )!
+    return advance(s, act, registry).state
+  }
+  const builtPiece = (s: GameState, piece: string, system: SystemId): string =>
+    contentsOf(s.figures, Location.system(system)).find((id) => id.startsWith(`red/${piece}/`))!
+
+  it('a ship built under rival control arrives damaged without the card (rulebook 7.2.2)', () => {
+    const { s, system } = contestedYard(false)
+    const after = build(s, 'Ship', system)
+    expect(after.damaged).toContain(builtPiece(after, 'Ship', system))
+    expect(after.log.some((l) => /damaged — Rival-controlled/.test(l))).toBe(true)
+  })
+
+  it('the holder builds that same ship fresh', () => {
+    const { s, system } = contestedYard(true)
+    const after = build(s, 'Ship', system)
+    expect(after.damaged).not.toContain(builtPiece(after, 'Ship', system))
+  })
+
+  it("the holder's buildings still arrive damaged — ships only", () => {
+    // Presence by ship rather than starport, so the building slot stays free for the City.
+    const base = withLore(fresh(), 'red', 'lore05')
+    const system = base.board.systems[0]!
+    let s = clearSystem(base, system)
+    s = place(s, 'red', system, 'Ship', 1)
+    s = place(s, 'yellow', system, 'Ship', 4)
+    const after = build(s, 'City', system)
+    expect(after.damaged).toContain(builtPiece(after, 'City', system))
+  })
+})
+
 describe('Mirror Plating (lore04) — an extra Intercept against assault dice', () => {
   it('adds one when the attacker rolled assault dice', () => {
     const { state, system } = field(withLore(fresh(), 'yellow', 'lore04'))

@@ -58,6 +58,7 @@ import {
   ANCIENT_HOLDINGS,
   CLOUD_CITIES,
   EMPATHS_BOND,
+  HIDDEN_HARBORS,
   TYRANTS_AUTHORITY,
   WARLORDS_CRUELTY,
   GATE_PORTS,
@@ -1133,11 +1134,10 @@ const BuildPiece = (
 ): Action => ({ type: 'action/build', faction, piece, system, then })
 
 /**
- * Build a City or Starport into an open building slot of a system the faction rules, or a
- * Ship at one of its starports. Phase 1 requires *ruling* the system for a building (the
- * base rule is presence with an open slot for cities/starports at a starport you rule —
- * simplified here to ruled-and-open-slot). Upgrades, gate stations and bunkers are
- * deferred.
+ * Build a City or Starport into an open building slot of a system the faction is **present** in
+ * (rulebook 7.2.1), or a Ship at one of its starports. Building where someone else rules is
+ * legal and the piece arrives damaged (7.2.2, in `performBuild`) — docs/21 A1+A2 retired the
+ * ruled-only simplification this comment used to record.
  */
 function offerBuild(state: GameState, faction: FactionId, then: PipReturn): Continue {
   const options: Action[] = []
@@ -1147,11 +1147,16 @@ function offerBuild(state: GameState, faction: FactionId, then: PipReturn): Cont
 
   for (const s of systemsWherePresent(state, faction)) {
     const slotFree = freeSlots(state, s) > 0
-    const ruled = rules(state, faction, s)
-    if (slotFree && ruled && hasCityPiece) {
+    /*
+     * Presence is the whole eligibility test — rulebook 7.2.1: "Place 1 starport or city in an
+     * empty building slot in a system **with a Loyal piece**." This used to require *ruling* the
+     * system, a phase-1 simplification docs/21 A2 retired: the contested build is a real play,
+     * and the piece pays for the ground it lands on by arriving damaged (7.2.2, below).
+     */
+    if (slotFree && hasCityPiece) {
       options.push({ ...BuildPiece(faction, 'City', s, then), faction, label: `Build City in ${s}` })
     }
-    if (slotFree && ruled && hasPortPiece) {
+    if (slotFree && hasPortPiece) {
       options.push({
         ...BuildPiece(faction, 'Starport', s, then),
         faction,
@@ -1382,13 +1387,19 @@ function performBuild(
    */
 
   /*
-   * "Build ships damaged in Rival-controlled systems." Scoped to the Bond, because it is the
-   * parenthetical on the Bond's own grant — an ordinary build at your own starport is unaffected.
+   * Rulebook 7.2.2 Control: "When you build **anything** in a system that is controlled by anyone
+   * other than you, place the piece damaged." Judged on the state *before* the piece lands, as
+   * HRF does (game-common.scala:1012 flags before `u --> s`) — a city that would flip control
+   * still arrives damaged. This used to be scoped to Empath's Bond ships (docs/21 A1): the Bond's
+   * parenthetical is a reminder of this rule, not its source, per the card's own FAQ errata.
+   *
+   * Hidden Harbors (lore05), first clause: "You always **build** ships fresh." The ship-only
+   * exemption from 7.2.2 — the holder's buildings still arrive damaged. docs/14 once recorded
+   * this clause as a no-op; it was only ever a no-op because 7.2.2 was missing.
    */
   const contested =
-    piece === 'Ship' &&
-    loreActive(state, faction, EMPATHS_BOND) &&
-    state.factions.some((f) => f !== faction && rules(state, f, system))
+    state.factions.some((f) => f !== faction && rules(state, f, system)) &&
+    !(piece === 'Ship' && hasLore(state, faction, HIDDEN_HARBORS))
   // The Starport that produced this Ship is spent for the rest of the turn.
   const workedThisTurn =
     starport === undefined ? state.workedThisTurn : [...state.workedThisTurn, starport]
@@ -1404,7 +1415,7 @@ function performBuild(
         ...state.log,
         ...annexLog,
         cloud === true
-          ? `${faction} built a Cloud City in ${system} (paid ${String(pay)})`
+          ? `${faction} built a Cloud City in ${system} (paid ${String(pay)})${contested ? ' (damaged — Rival-controlled)' : ''}`
           : `${faction} built a ${piece} in ${system}${contested ? ' (damaged — Rival-controlled)' : ''}`,
       ],
     },
