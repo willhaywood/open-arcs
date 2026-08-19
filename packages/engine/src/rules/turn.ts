@@ -33,6 +33,7 @@ import { system as systemInfo } from '../board.js'
 import {
   CourtPile,
   GALACTIC_BARDS,
+  RELIC_FENCE,
   LATTICE_SPIES,
   SWORN_GUARDIANS,
   courtCard,
@@ -916,15 +917,25 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
 
   switch (action['ability'] as string) {
     case 'relic-fence': {
+      /*
+       * The one guild Prelude that does NOT pay with the card (docs/20 A4): "Once per turn, you
+       * may discard 1 resource to gain 1 Relic" — the resource is the whole cost, the card stays
+       * secured, and `usedThisTurn` is the printed limit. Deliberately not `spent`.
+       */
       const give = action['spend'] as Resource
       let next = paying(state, faction, give)
       const capacity = slotsOf(next, faction)
       const got = gain(next.resources, capacity, 'Relic', ResourceSlot.overflow(faction))
-      next = { ...next, resources: got.tracker }
-      return {
-        state: spent(next, `traded ${give} for a Relic${got.gained ? '' : ' (no open slot)'}`),
-        continue: back,
+      next = {
+        ...next,
+        resources: got.tracker,
+        usedThisTurn: [...next.usedThisTurn, RELIC_FENCE],
+        log: [
+          ...next.log,
+          `${faction} traded ${give} for a Relic (Relic Fence)${got.gained ? '' : ' (no open slot)'}`,
+        ],
       }
+      return { state: next, continue: back }
     }
 
     case 'silver-tongues-resource': {
@@ -1346,7 +1357,16 @@ const REINFORCEMENTS = 3
 
 function performEndTurn(state: GameState, faction: FactionId): RuleResult {
   // Per-turn resets: cities become taxable and starports buildable again next turn.
-  state = { ...state, taxedThisTurn: [], workedThisTurn: [], loreUsedThisTurn: [], anyBattle: false }
+  // `usedThisTurn` joined this list late (docs/20 A4): without it, Galactic Bards' and Relic
+  // Fence's "once per turn" was actually once per game.
+  state = {
+    ...state,
+    taxedThisTurn: [],
+    workedThisTurn: [],
+    loreUsedThisTurn: [],
+    usedThisTurn: [],
+    anyBattle: false,
+  }
   /*
    * Checked before the hand-off, because the rule is "at the end of *their* turn" — the pieces have
    * to be back before the next faction acts into the space they left.

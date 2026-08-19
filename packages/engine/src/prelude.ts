@@ -218,7 +218,16 @@ export function guildPreludes(state: GameState, faction: FactionId): GuildPrelud
   const mine = spendable(state, faction)
 
   // Relic Fence — trade any resource for a Relic, if one is left in the supply.
-  if (cards.includes(RELIC_FENCE) && supplyOf(state.resources, 'Relic').length > 0) {
+  /*
+   * Relic Fence (bc24): "Once per turn, you may discard 1 resource to gain 1 Relic." Unlike the
+   * other Prelude abilities the card itself is NOT the cost — it stays secured and works every
+   * turn, limited by `usedThisTurn` (docs/20 A4; the audit found it wrongly burning itself).
+   */
+  if (
+    cards.includes(RELIC_FENCE) &&
+    !state.usedThisTurn.includes(RELIC_FENCE) &&
+    supplyOf(state.resources, 'Relic').length > 0
+  ) {
     for (const spend of mine) out.push({ kind: 'relic-fence', card: RELIC_FENCE, spend })
   }
 

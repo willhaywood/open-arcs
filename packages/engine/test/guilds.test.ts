@@ -763,7 +763,10 @@ describe('Galactic Bards (bc25) — a free declaration before the seize', () => 
 })
 
 describe('Guild Prelude abilities — the card is the cost', () => {
-  it('Relic Fence trades a resource for a Relic and discards itself', () => {
+  it('Relic Fence trades a resource for a Relic and KEEPS itself', () => {
+    // This test used to assert the card discarded itself — the docs/20 A4 defect, pinned as if
+    // it were the rule. The card reads "Once per turn, you may discard 1 resource": the resource
+    // is the whole cost.
     const state = onlyHolding(withCard2(fresh(), 'red', 'bc24'), 'red', 'Fuel', 1)
     const cap = slotsOf(state, 'red')
     const step = advance(
@@ -781,7 +784,8 @@ describe('Guild Prelude abilities — the card is the cost', () => {
     )
     expect(countResource(step.state.resources, cap, 'Relic')).toBe(1)
     expect(countResource(step.state.resources, cap, 'Fuel')).toBe(0)
-    expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc24')
+    expect(securedCards(step.state, 'red')).toContain('bc24')
+    expect(contentsOf(step.state.courtCards, CourtPile.discard())).not.toContain('bc24')
   })
 
   it('Silver Tongues steals a resource, and Sworn Guardians blocks it', () => {
@@ -1060,5 +1064,50 @@ describe("the Cartels' supply clauses (bc03 / bc06)", () => {
     // Yellow holds the Material Cartel: keeps Material, loses Fuel to red's Fuel Cartel.
     expect(count('yellow', 'Material')).toBe(1)
     expect(count('yellow', 'Fuel')).toBe(0)
+  })
+})
+
+describe('Relic Fence keeps itself (bc24, docs/20 A4)', () => {
+  /*
+   * "Prelude: Once per turn, you may discard 1 resource to gain 1 Relic." The resource is the
+   * whole cost — the audit found the generic guild-prelude `spent` helper burning the card, which
+   * turned a reusable once-per-turn engine into a one-shot.
+   */
+  function fenced(): GameState {
+    let state = withCard2(fresh(), 'red', 'bc24')
+    state = stripSlots(state, 'red')
+    state = { ...state, resources: gain(state.resources, slotsOf(state, 'red'), 'Material').tracker }
+    return state
+  }
+
+  it('gains the Relic, keeps the card, and marks the turn', () => {
+    const state = fenced()
+    const step = preludeGuild(state, { ability: 'relic-fence', card: 'bc24', spend: 'Material' })
+    expect(countResource(step.state.resources, slotsOf(step.state, 'red'), 'Relic')).toBe(1)
+    expect(securedCards(step.state, 'red')).toContain('bc24')
+    expect(step.state.usedThisTurn).toContain('bc24')
+    expect(step.state.log.at(-1)).toMatch(/traded Material for a Relic \(Relic Fence\)/)
+  })
+
+  it('is not offered again in the same turn, and returns next turn', () => {
+    const state = { ...fenced(), usedThisTurn: ['bc24'] }
+    const offers = guildPreludes(state, 'red')
+    expect(offers.some((o) => o.kind === 'relic-fence')).toBe(false)
+    const nextTurn = { ...state, usedThisTurn: [] }
+    expect(guildPreludes(nextTurn, 'red').some((o) => o.kind === 'relic-fence')).toBe(true)
+  })
+})
+
+describe("usedThisTurn resets at end of turn (the Bards' once-per-game bug, docs/20 A4)", () => {
+  it('performEndTurn clears the per-turn card uses', () => {
+    /*
+     * Found while fixing Relic Fence: the per-turn reset list in performEndTurn never included
+     * usedThisTurn, so Galactic Bards' "once per turn" was once per game. Pinned via the reset
+     * itself: a state carrying uses must leave turn/end without them.
+     */
+    const base = fresh()
+    const marked: GameState = { ...base, usedThisTurn: ['bc25', 'bc24'] }
+    const after = advance(marked, { type: 'turn/end', faction: 'red' }, registry)
+    expect(after.state.usedThisTurn).toEqual([])
   })
 })

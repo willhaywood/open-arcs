@@ -85,7 +85,7 @@ out longhand.
 | Silver Tongues (bc20) | both steal modes (card and resource) offered |
 | Secret Order (bc18) | Keeper/Empath declare without zeroing (ambitions.ts:337) |
 | Lattice Spies (bc16) | burn-instead-of-card seize (turn.ts:545), discarded on use |
-| Galactic Bards (bc25) | Surpass/Pivot declare with `usedThisTurn` limiter, no zero marker |
+| Galactic Bards (bc25) | Surpass/Pivot declare, no zero marker — **correction found during the fixes**: the `usedThisTurn` limiter existed but nothing ever reset it, so "once per turn" was once per game; the reset landed with the A4 fix |
 | Mass Uprising (bc26) | one-per-system reading, with a documented deliberate divergence *from HRF toward the card text* (vox.ts) — the direction this audit exists to enforce |
 | Populist Demands (bc27), Outrage Spreads (bc28), Song of Freedom (bc29, bury + reshuffle), Guild Struggle (bc30, steal + discard-recycle), | vox.ts, each matching its text |
 | Interests' Prelude (bc02/09) | fill-open-slots with steal-on-empty-supply — the *Prelude* half is right; only the Build riders (A2) are missing |
