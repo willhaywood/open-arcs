@@ -625,16 +625,84 @@ describe('Sworn Guardians (bc22) — nothing of yours is stealable', () => {
     return out
   }
 
-  it('is never raided in a driven game, though it would be without the card', () => {
+  it('a raid against an SG holder offers exactly the Guardians, then the shop opens', () => {
+    /*
+     * The card's parenthetical, tested directly at the raid ask (the driven test below cannot
+     * catch an over-block restored, because with no raids happening its conditional assertions
+     * are vacuous): while the victim holds SG the only purchasable thing is SG itself; buying it
+     * buries it to the court deck's bottom and the SAME raid re-offers everything else.
+     */
+    let state = withCard2(fresh(), 'yellow', 'bc22')
+    state = withCard2(state, 'yellow', 'bc02')
+    state = { ...state, resources: gain(state.resources, slotsOf(state, 'yellow'), 'Fuel').tracker }
+    const ctx = {
+      faction: 'red',
+      system: state.board.systems[0],
+      enemy: 'yellow',
+      self: 0,
+      intercepted: 0,
+      ships: 0,
+      buildings: 0,
+      keys: 4,
+      razed: false,
+      then: { type: 'turn/lead-main', faction: 'red' },
+    }
+    // Through the real path: finishing a battle with keys produces the raid offer.
+    const offer = advance(stoppable(state), { type: 'battle/finish', ctx } as never, terminal)
+    const ask1 = offer.continue
+    if (ask1.kind !== 'ask') throw new Error('expected the raid ask')
+    const takes = ask1.actions.filter((a) => a.type === 'battle/raid-take')
+    expect(takes).toHaveLength(1)
+    expect(String(takes[0]!['label'])).toContain('Sworn Guardians')
+
+    const first = advance(offer.state, takes[0]!, terminal)
+    expect(contentsOf(first.state.courtCards, CourtPile.deck()).at(-1)).toBe('bc22')
+    expect(securedCards(first.state, 'red')).not.toContain('bc22')
+    expect(first.state.log.some((l) => /stole Sworn Guardians from yellow — buried/.test(l))).toBe(true)
+    // The re-entered offer now shops normally: yellow's other card and resources appear.
+    const c = first.continue
+    if (c.kind !== 'ask') throw new Error('expected the re-entered raid ask')
+    const labels2 = c.actions.map((a) => String(a['label'] ?? ''))
+    expect(labels2.some((l) => /Mining Interest/.test(l))).toBe(true)
+  })
+
+  it('shields a driven game until the card itself is stolen and buried', () => {
+    /*
+     * This used to assert an SG holder is NEVER raided — the docs/20 B2 over-block pinned as the
+     * rule. The card's own parenthetical says rivals can steal SG itself first; after that the
+     * raid continues normally. So the assertion is now conditional: any raid line against the
+     * protected victim must be preceded, somewhere earlier in the game, by the steal-and-bury of
+     * their Sworn Guardians.
+     */
     const control = raidVictims()
     const entries = Object.entries(control).sort((a, b) => b[1] - a[1])
     expect(entries.length, 'the policy must raid somebody').toBeGreaterThan(0)
-
     const [victim, losses] = entries[0]!
     expect(losses).toBeGreaterThan(0)
 
-    // Same seeds, same policy, with the card on the faction that was being raided.
-    expect(raidVictims(victim)[victim] ?? 0).toBe(0)
+    for (let seed = 1; seed <= 25; seed++) {
+      const opts = { board: 'Board4MixUp1', factions: ['red', 'yellow', 'blue', 'white'] as const, seed }
+      let step = startGame(opts, registry)
+      step = { ...step, state: withCard2(step.state as GameState, victim as 'red', 'bc22') }
+      for (let i = 0; i < 12000; i++) {
+        const c = step.continue
+        if (c.kind !== 'ask') break
+        step = advance(step.state, raidPolicy(c), registry)
+      }
+      const log = step.state.log
+      let buriedAt = -1
+      for (let i = 0; i < log.length; i++) {
+        if (new RegExp(`stole Sworn Guardians from ${victim}`).test(log[i]!)) buriedAt = i
+        if (/ raided .+ from /.test(log[i]!)) {
+          const prior = log.slice(0, i).reverse().find((l) => / attacks /.test(l)) ?? ''
+          const atk = / attacks (\w+) in/.exec(prior)
+          if (atk && atk[1] === victim) {
+            expect(buriedAt, `seed ${seed}: ${victim} raided before SG was buried`).toBeGreaterThanOrEqual(0)
+            expect(buriedAt).toBeLessThan(i)
+          }
+        }
+      }
+    }
   })
 
   it('shields the holder’s other guild cards from Guild Struggle, but not itself', () => {
@@ -1239,5 +1307,28 @@ describe("Farseers' declare-time peek (bc17, docs/20 A3)", () => {
     const c = step.continue
     const types = c.kind === 'ask' ? c.actions.map((a) => a.type) : []
     expect(types.some((x) => String(x).startsWith('ambition/farseers'))).toBe(false)
+  })
+})
+
+describe('Sworn Guardians is itself stealable, then buried (bc22, docs/20 B2)', () => {
+  /*
+   * "Rivals cannot steal your resources and OTHER Guild cards. If this card is stolen, bury it.
+   * (In battle, rivals can steal this card first before spending keys.)" The audit found the
+   * engine over-blocking: the whole raid menu vanished, Silver Tongues skipped SG holders
+   * entirely, and bury had no implementation.
+   */
+  it('Silver Tongues can take exactly SG from a guarded rival — and it goes to the deck bottom', () => {
+    let state = withCard2(withCard2(fresh(), 'red', 'bc20'), 'yellow', 'bc22')
+    state = withCard2(state, 'yellow', 'bc24') // another guild card that must stay unstealable
+    const offers = guildPreludes(state, 'red').filter((o) => o.kind === 'silver-tongues-card')
+    expect(offers).toHaveLength(1)
+    expect((offers[0] as { stolen: string }).stolen).toBe('bc22')
+
+    const o = offers[0] as { kind: string; card: string; rival: string; stolen: string }
+    const step = preludeGuild(state, { ability: o.kind, card: o.card, rival: o.rival, stolen: o.stolen })
+    // Buried: bottom of the court deck, not red's pile.
+    expect(securedCards(step.state, 'red')).not.toContain('bc22')
+    expect(contentsOf(step.state.courtCards, CourtPile.deck()).at(-1)).toBe('bc22')
+    expect(step.state.log.some((l) => /stole Sworn Guardians from yellow — buried/.test(l))).toBe(true)
   })
 })

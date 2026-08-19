@@ -231,12 +231,19 @@ export function guildPreludes(state: GameState, faction: FactionId): GuildPrelud
     for (const spend of mine) out.push({ kind: 'relic-fence', card: RELIC_FENCE, spend })
   }
 
-  // Silver Tongues — steal a resource or a guild card from a rival. Sworn Guardians blocks
-  // both, exactly as it blocks a battle raid.
+  /*
+   * Silver Tongues — steal a resource or a guild card from a rival. Sworn Guardians blocks the
+   * resources and every OTHER guild card, but Sworn Guardians itself is stealable — "Rivals
+   * cannot steal your resources and other Guild cards. If this card is stolen, bury it." — and
+   * the thief gets a buried card, not a kept one (docs/20 B2).
+   */
   if (cards.includes(SILVER_TONGUES)) {
     for (const rival of state.factions) {
       if (rival === faction) continue
-      if (securedCards(state, rival).includes(SWORN_GUARDIANS)) continue
+      if (securedCards(state, rival).includes(SWORN_GUARDIANS)) {
+        out.push({ kind: 'silver-tongues-card', card: SILVER_TONGUES, rival, stolen: SWORN_GUARDIANS })
+        continue
+      }
       for (const resource of spendable(state, rival)) {
         out.push({ kind: 'silver-tongues-resource', card: SILVER_TONGUES, rival, resource })
       }

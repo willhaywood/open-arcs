@@ -957,12 +957,27 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
     case 'silver-tongues-card': {
       const rival = action['rival'] as FactionId
       const stolen = action['stolen'] as string
+      /*
+       * "If this card is stolen, bury it" — stealing Sworn Guardians costs the theft and yields a
+       * buried card (bottom of the court deck), not a kept one (docs/20 B2). Every other guild
+       * card is kept as before.
+       */
+      const buried = stolen === SWORN_GUARDIANS
       const next: GameState = {
         ...state,
-        courtCards: move(state.courtCards, stolen, CourtPile.secured(faction)),
+        courtCards: move(
+          state.courtCards,
+          stolen,
+          buried ? CourtPile.deck() : CourtPile.secured(faction),
+        ),
       }
       return {
-        state: spent(next, `stole ${courtCard(stolen).name} from ${rival}`),
+        state: spent(
+          next,
+          buried
+            ? `stole ${courtCard(stolen).name} from ${rival} — buried`
+            : `stole ${courtCard(stolen).name} from ${rival}`,
+        ),
         continue: back,
       }
     }

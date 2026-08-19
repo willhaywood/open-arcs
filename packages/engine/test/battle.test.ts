@@ -784,7 +784,16 @@ describe('the raid spends keys on a choice', () => {
     expect(takes).toHaveLength(0)
   })
 
-  it('Sworn Guardians stops the whole raid, cards included', () => {
-    expect(raidMenu(6, { guardians: true })).toHaveLength(0)
+  it('Sworn Guardians narrows the raid to exactly itself (docs/20 B2)', () => {
+    /*
+     * This used to assert the whole menu vanished — the over-block the audit found. The card's
+     * parenthetical: rivals can steal SG itself first, then spend the rest of their keys.
+     */
+    const menu = raidMenu(6, { guardians: true })
+    // Exactly one purchase — the Guardians — plus the ever-present stop.
+    expect(menu).toHaveLength(2)
+    expect(menu.some((l) => l.includes('Sworn Guardians'))).toBe(true)
+    expect(menu.some((l) => l.startsWith('Stop raiding'))).toBe(true)
+    expect(menu.some((l) => l.includes('Mining Interest') || l.startsWith('Take Fuel'))).toBe(false)
   })
 })

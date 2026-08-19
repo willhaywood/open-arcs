@@ -120,10 +120,11 @@ describe('the frozen baseline', () => {
  * Re-recorded for the court-audit rules fixes (docs/20 A1-A5, B1-B2): Gatekeepers' gate dice,
  * Relic Fence keeping itself, the Interests' Build riders, Farseers rebuilt, Call to Action's
  * draw source — the usual rules-fix exception; `weightsMatchBaseline` still passes. Only seed 3
- * moved this time. Values before: [32,33,2], [15,20,38], [26,35,37].
+ * moved this time. Values before: [32,33,2], [15,20,38], [26,35,37]; after the B2 Sworn
+ * Guardians fix landed on the same branch, seed 3 moved again: [13,43,35] -> [13,43,23].
  */
 const GOLDEN = [
   [32, 33, 2],
   [15, 20, 38],
-  [13, 43, 35],
+  [13, 43, 23],
 ]
