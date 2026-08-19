@@ -788,23 +788,21 @@ function performPrelude(
    */
   const tycoon: Action[] = []
   if (loreActive(state, faction, TYCOONS_AMBITION) && state.ambitionable.length > 0) {
-    const slots = slotsOf(state, faction)
-    const fuelish = (['Material', 'Fuel'] as const).reduce(
-      (n, r) => n + countResource(state.resources, slots, r),
-      0,
-    )
-    if (fuelish > 0) {
-      for (const a of state.ambitions) {
-        if (state.declared.some((d) => d.ambition === a)) continue
-        tycoon.push({
-          type: 'turn/prelude-tycoon',
-          faction,
-          ambition: a,
-          suit,
-          pips,
-          label: `Tycoon's Ambition — discard all Material and Fuel to declare ${a}`,
-        })
-      }
+    /*
+     * No resource gate — the official FAQ: "You can use its ability even if you have zero
+     * Material and Fuel" (docs/21 A4). Discarding all of nothing is a legal cost, so the offer
+     * stands whenever Tycoon is declared and an undeclared ambition remains.
+     */
+    for (const a of state.ambitions) {
+      if (state.declared.some((d) => d.ambition === a)) continue
+      tycoon.push({
+        type: 'turn/prelude-tycoon',
+        faction,
+        ambition: a,
+        suit,
+        pips,
+        label: `Tycoon's Ambition — discard all Material and Fuel to declare ${a}`,
+      })
     }
   }
 

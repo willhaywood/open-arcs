@@ -407,9 +407,21 @@ describe("Tycoon's Ambition (lore27)", () => {
     expect(labels(prelude(noCard)).some((l) => l.startsWith("Tycoon's"))).toBe(false)
   })
 
-  it('is not offered holding neither Material nor Fuel', () => {
+  it('IS offered holding neither Material nor Fuel — the FAQ allows a zero-cost use (docs/21 A4)', () => {
+    /*
+     * Inverted: this test used to pin a `fuelish > 0` gate, but the official FAQ is explicit —
+     * "You can use its ability even if you have zero Material and Fuel." Discarding all of
+     * nothing is a legal cost, and the free declaration is the whole prize.
+     */
     const empty = give(declared(withLore(fresh(), 'red', 'lore27'), 'Tycoon'), 'red', 'Relic', 2)
-    expect(labels(prelude(empty)).some((l) => l.startsWith("Tycoon's Ambition"))).toBe(false)
+    const act = ask(prelude(empty)).actions.find((a) =>
+      String(a['label']).startsWith("Tycoon's Ambition"),
+    )
+    expect(act).toBeDefined()
+    const after = advance(empty, act!, registry).state
+    expect(after.declared.length).toBeGreaterThan(1)
+    // The Relics are untouched — only Material and Fuel are named by the cost.
+    expect(countResource(after.resources, slotsOf(after, 'red'), 'Relic')).toBe(2)
   })
 
   it('discards ALL Material and Fuel, not just one, and declares the ambition', () => {
@@ -465,8 +477,11 @@ describe("Tycoon's Ambition (lore27)", () => {
     expect(ask(back.continue).actions.some((a) => a.type === 'turn/prelude-done')).toBe(true)
     const still = labels(back.continue)
     expect(still).not.toContain(String(first['label']))
-    // And no Tycoon offer at all now, since the Material that paid for it is gone.
-    expect(still.some((l) => l.startsWith("Tycoon's Ambition"))).toBe(false)
+    /*
+     * Other undeclared ambitions are STILL offered, even with the Material gone — the FAQ's
+     * zero-cost ruling (docs/21 A4). Only the one just declared has left the menu.
+     */
+    expect(still.some((l) => l.startsWith("Tycoon's Ambition"))).toBe(true)
   })
 })
 
