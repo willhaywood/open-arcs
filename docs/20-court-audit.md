@@ -27,10 +27,17 @@ A held Gatekeepers changes every gate battle's ceiling from `ships` to `ships + 
 never offers those pools. Repro: secure bc08, battle in any gate with a full fleet — the menu caps
 at ship count.
 
-### A2. Mining Interest (bc02) / Shipping Interest (bc09) — the Build riders are missing
-Cards: "Manufacture (Build): Gain 1 Material." / "Synthesize (Build): Gain 1 Fuel." Engine: no
-implementation anywhere (the Prelude fill-and-steal clause is correct, including stealing once the
-supply empties). Every Build action taken while holding an Interest should bank a resource.
+### A2. Mining Interest (bc02) / Shipping Interest (bc09) — ~~the Build riders are missing~~ RETRACTED: the audit was wrong, twice
+Cards: "Manufacture (Build): Gain 1 Material." / "Synthesize (Build): Gain 1 Fuel."
+**This finding was a false positive.** The grammar is rulebook §8.2 New Actions — "a new action
+followed by the name of a standard action in parentheses… When you would take the standard action
+by spending an action pip or resource, you may **instead** take the new action" — not a §8.3
+modifier (those are printed bold). Manufacture/Synthesize were already correctly implemented as
+Build-menu alternatives in `GUILD_ALTS` (guild-actions.ts), present since the initial commit and
+covered by the alt-action-hook tests; the audit swept the rules/ files and missed the registry.
+HRF agrees (ManufactureMainAction in the Build group; no rider), and the FAQ is silent. The "fix"
+(PR #29) added a wrong rider — +1 resource on every ordinary Build — reverted on
+`fix/interest-build-rider`. The Prelude fill-and-steal clause remains correct as audited.
 
 ### A3. Farseers (bc17) — the Prelude is wrong three ways, and a whole clause is missing
 Card: "When you declare an ambition, look at a Rival's hand. You may swap 1 card with them.
@@ -123,3 +130,6 @@ touch — the documented rules-fix exception applies.
 
 **B3** (the Gatekeepers shortage prompt) was found and fixed after this list was triaged; it rides
 the same fix branch as A1–B2.
+
+**A2 was retracted after the fix branch merged** — see the finding above. The rider it added was
+reverted on `fix/interest-build-rider`; the pre-existing alt-action implementation stands.
