@@ -21,7 +21,7 @@ import { Continue as C } from '../continue.js'
 import { citiesInReserve, slotsOf } from '../control.js'
 import type { Resource } from '../resources.js'
 import type { SlotView } from '../control.js'
-import { CourtPile, SECRET_ORDER, courtCard, hasGuild, securedCards } from '../court.js'
+import { CourtPile, FUEL_CARTEL, MATERIAL_CARTEL, SECRET_ORDER, courtCard, hasGuild, securedCards } from '../court.js'
 import { Prelude } from '../prelude.js'
 import type { RuleModule, RuleResult } from '../dispatch.js'
 import { unhandled } from '../dispatch.js'
@@ -34,6 +34,7 @@ import {
   parseResourceToken,
   slotCapacity,
   spendToken,
+  supplyOf,
 } from '../resources.js'
 import { AMBITIONS } from '../state.js'
 import type { Ambition, AmbitionMarker, GameState } from '../state.js'
@@ -109,9 +110,27 @@ export function metric(state: MetricView, faction: FactionId, ambition: Ambition
   const guilds = (r: Resource): number =>
     securedCards(state, faction).filter((id) => courtCard(id).suit === r).length
   const held = (r: Resource): number => res(r) + guilds(r)
+  /*
+   * The Cartels' supply claim. Both cards print it identically: "You keep the <resource> supply on
+   * here. (You add it to Tycoon but can't spend it.)" — so the holder counts the entire token
+   * supply of that resource toward Tycoon, on top of the card's ordinary suit icon. "Can't spend
+   * it" needs no code: spending draws from the faction's slots, and supply tokens are not in them.
+   *
+   * This was missing for a long time. The comment in guild-actions.ts read HRF's supply-folding
+   * (`countableResources`) as campaign-only because HRF names the Weapon Cartel there — but the
+   * base Material and Fuel Cartels carry the same mechanic in print, and the printed card is the
+   * authority (the docs/09 p14 trophy fix, again).
+   */
+  const cartel = (card: string, r: Resource): number =>
+    securedCards(state, faction).includes(card) ? supplyOf(state.resources, r).length : 0
   switch (ambition) {
     case 'Tycoon':
-      return held('Material') + held('Fuel')
+      return (
+        held('Material') +
+        held('Fuel') +
+        cartel(MATERIAL_CARTEL, 'Material') +
+        cartel(FUEL_CARTEL, 'Fuel')
+      )
     case 'Keeper':
       return held('Relic')
     case 'Empath':
@@ -389,6 +408,42 @@ function applyLavish(state: GameState): GameState {
 }
 
 /**
+ * The Cartels' scoring clause: "After **scoring**, Rivals discard all <Fuel/Material>."
+ *
+ * **Unconditional** — the sentence carries no Tycoon gate, and the timing decision (docs/13) is
+ * the verbatim reading: every chapter scoring while the card is held, whether or not Tycoon was
+ * declared. The tokens go to the supply via `spendToken`, which is the physical card's "onto the
+ * card": the supply then counts for the holder through `metric`'s claim, so a held Cartel
+ * snowballs — rivals' discards feed next chapter's Tycoon count.
+ *
+ * Runs after `applyLavish` — the leader discards its own holder's Fuel first, the Cartel then
+ * strips the rivals. The two only overlap on log order; the destination zone is the same supply
+ * either way.
+ */
+function applyCartels(state: GameState): GameState {
+  let resources = state.resources
+  const log = [...state.log]
+  for (const [card, resource] of [
+    [MATERIAL_CARTEL, 'Material'],
+    [FUEL_CARTEL, 'Fuel'],
+  ] as const) {
+    const holder = state.factions.find((f) => securedCards(state, f).includes(card))
+    if (holder === undefined) continue
+    for (const faction of state.factions) {
+      if (faction === holder) continue
+      const tokens = heldTokens(resources, slotsOf(state, faction)).filter(
+        (t) => parseResourceToken(t).resource === resource,
+      )
+      if (tokens.length === 0) continue
+      for (const token of tokens) resources = spendToken(resources, token)
+      log.push(`${faction} discarded ${tokens.length} ${resource} (${courtCard(card).name})`)
+    }
+  }
+  if (resources === state.resources) return state
+  return { ...state, resources, log }
+}
+
+/**
  * Empty every faction's `pile`, sending each figure home to its **own** colour's reserve.
  *
  * Trophies and captives are Rival pieces, so the holder is not the owner — the figure id carries
@@ -543,7 +598,7 @@ function performScore(state: GameState): RuleResult {
   }
 
   return {
-    state: applyLavish({ ...state, power, winners, log, figures }),
+    state: applyCartels(applyLavish({ ...state, power, winners, log, figures })),
     continue: C.then(CheckWin()),
   }
 }

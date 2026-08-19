@@ -14,11 +14,12 @@
  * If the artwork is missing the panel falls back to a plain readable list.
  */
 
-import { AMBITIONS, RESOURCES, ResourceSlot, contentsOf, phantomHolding } from '@arcs/engine'
+import { AMBITIONS, FUEL_CARTEL, MATERIAL_CARTEL, RESOURCES, ResourceSlot, contentsOf, courtCard, phantomHolding, securedCards, supplyOf } from '@arcs/engine'
 import type { Action, Ambition, AmbitionMarker, Continue, GameState } from '@arcs/engine'
 import { useState } from 'react'
 
 import { store } from '../store.js'
+import { colorOf } from '../theme.js'
 import { asset } from '../assets.js'
 
 /** Vertical centre of each ambition box, as a fraction of the panel height. */
@@ -46,6 +47,22 @@ export function AmbitionTrack({
   cont?: Continue
 }): JSX.Element {
   const [artBroken, setArtBroken] = useState(false)
+  /*
+   * The chip tooltips are a fixed-position element rather than CSS `::after`, for two reasons
+   * found the hard way: native `title` bubbles are drawn by the browser chrome and never appear
+   * in an embedded/streamed view, and a pseudo-element cannot escape the track's `overflow`
+   * clipping — the panel is far narrower than a readable sentence. Fixed positioning anchors to
+   * the chip's rect and grows leftward over the map, where the room is.
+   */
+  const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null)
+  const showTip = (e: React.MouseEvent<HTMLElement>): void => {
+    const el = e.currentTarget
+    const text = el.dataset['tip']
+    if (text === undefined) return
+    const r = el.getBoundingClientRect()
+    setTip({ text, x: r.right, y: r.bottom + 6 })
+  }
+  const hideTip = (): void => setTip(null)
   const threshold = 39 - state.factions.length * 3
 
   /*
@@ -105,6 +122,11 @@ export function AmbitionTrack({
 
   return (
     <div className="ambition-track">
+      {tip !== null && (
+        <div className="amb-tip" style={{ left: tip.x, top: tip.y }}>
+          {tip.text}
+        </div>
+      )}
       <div className="ambition-panel">
         <img
           className="ambition-art"
@@ -138,14 +160,54 @@ export function AmbitionTrack({
             <span
               key={`phantom-${a}`}
               className="amb-phantom"
-              style={{ top: ROW_Y[a] }}
-              title={
-                held === 1
-                  ? `1 out-of-play resource counts toward ${a}`
-                  : `${held} out-of-play resources count toward ${a}`
-              }
+              /*
+               * Hoverable for the tooltip except while a declare ask is live — the chips sit on
+               * the Populist Demands claim rows, and a click must win over a hover explanation.
+               */
+              style={{ top: ROW_Y[a], pointerEvents: declarable.size > 0 ? 'none' : 'auto' }}
+              onMouseEnter={showTip}
+              onMouseLeave={hideTip}
+              data-tip={`Two-player rule (rulebook p19): the ${held} out-of-play ${
+                held === 1 ? 'resource counts' : 'resources count'
+              } toward ${a} as if a third player held them — they can place but never score`}
             >
               {held}
+            </span>
+          )
+        })}
+
+        {/*
+          * The Cartels' supply claim (docs/13): while secured, the holder counts the entire token
+          * supply of that resource toward Tycoon. On a table the tokens sit on the card; here the
+          * claim would be invisible, so it gets the phantom's treatment — a count on the row.
+          *
+          * Shown whenever the card is held, **including at zero**, unlike the phantom: a phantom
+          * at 0 is no phantom, but a held Cartel at 0 supply is still the standing claim that
+          * rivals' scoring discards will land on.
+          */}
+        {([
+          [MATERIAL_CARTEL, 'Material'],
+          [FUEL_CARTEL, 'Fuel'],
+        ] as const).map(([card, resource], i) => {
+          const holder = state.factions.find((f) => securedCards(state, f).includes(card))
+          if (holder === undefined) return null
+          const n = supplyOf(state.resources, resource).length
+          return (
+            <span
+              key={`cartel-${card}`}
+              className="amb-cartel"
+              style={{
+                top: ROW_Y.Tycoon,
+                left: i === 0 ? '48%' : '62%',
+                borderColor: colorOf(holder),
+                // Same hover-vs-claim-click rule as the phantom chip below.
+                pointerEvents: declarable.size > 0 ? 'none' : 'auto',
+              }}
+              onMouseEnter={showTip}
+              onMouseLeave={hideTip}
+              data-tip={`${holder}'s ${courtCard(card).name}: the ${n} ${resource} in the supply count toward ${holder}'s Tycoon — held on the card, and ${holder} can't spend them`}
+            >
+              {n}
             </span>
           )
         })}

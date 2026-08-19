@@ -188,10 +188,35 @@ Points worth keeping:
 Thirteen guild cards carry one. They all share a cost — **the card itself** — which is why
 none needs a once-per-turn marker: using it puts it in the court discard.
 
+## The Cartels' passive clauses
+
+The two Cartels print more than their Prelude line. Verbatim (Fuel Cartel; Material identical for
+Material):
+
+> "You keep the Fuel supply on here. *(You add it to Tycoon but can't spend it.)* After
+> **scoring**, Rivals discard all Fuel. **Prelude:** You may discard this to steal 1 Fuel."
+
+Three clauses, implemented in two places:
+
+- **The supply claim** (`metric`, rules/ambitions.ts): while secured, the holder counts the entire
+  token supply of that resource toward Tycoon, on top of the card's ordinary suit icon. "Can't
+  spend it" needs no code — spending draws from a faction's slots, and supply tokens are not in
+  them.
+- **The scoring discard** (`applyCartels`, rules/ambitions.ts): after every chapter scoring while
+  the card is held, each rival discards all their tokens of that resource to the supply — which
+  the holder then counts, so a held Cartel snowballs. **Timing decision, recorded:** the card says
+  "After scoring" with no Tycoon gate, and the verbatim reading was chosen — it fires whether or
+  not Tycoon was declared that chapter.
+- **The Prelude steal** (the table above) — the one clause implemented from the start.
+
+These were missing for a long time because HRF's supply-folding (`countableResources`) names only
+the campaign's Weapon Cartel, and was read as campaign-only — but the base cards print the same
+mechanic, and the printed card is the authority (the same lesson as the p14 trophy fix, docs/09).
+
 | Cards | Ability |
 | --- | --- |
 | Mining Interest, Shipping Interest | fill every open resource slot with Material / Fuel |
-| Material Cartel, Fuel Cartel | take that one resource off a rival |
+| Material Cartel, Fuel Cartel | take that one resource off a rival (their Prelude line; the supply claim and the scoring discard below are passive) |
 | Admin / Construction / Spacing / Arms Union | take a played card of that suit into your hand |
 | Gatekeepers | a ship at every gate |
 | Prison Wardens, Skirmishers, Court Enforcers, Loyal Marines | 3 ships into one system you rule |

@@ -32,6 +32,7 @@ import {
   tradeTargets,
   weaponReach,
   startGame,
+  supplyOf,
 } from '../src/index.js'
 import { system as systemInfo } from '../src/index.js'
 import type { Continue, GameState, Resource } from '../src/index.js'
@@ -974,5 +975,90 @@ describe('Prelude discard abilities', () => {
       expect(contentsOf(step.state.courtCards, CourtPile.discard()), card).toContain(card)
       expect(contentsOf(step.state.courtCards, CourtPile.secured('red')), card).not.toContain(card)
     }
+  })
+})
+
+describe("the Cartels' supply clauses (bc03 / bc06)", () => {
+  /*
+   * The printed cards: "You keep the <Fuel/Material> supply on here. (You add it to Tycoon but
+   * can't spend it.) After scoring, Rivals discard all <Fuel/Material>." — docs/13. Only the
+   * Prelude steal was implemented for a long time; these pin the other two clauses.
+   */
+
+  it("the holder counts the entire supply toward Tycoon; a rival doesn't", () => {
+    let state = withCard2(fresh(), 'red', 'bc06')
+    state = stripSlots(state, 'red')
+    const supply = supplyOf(state.resources, 'Fuel').length
+    expect(supply).toBeGreaterThan(0)
+    // Red holds no tokens: its Tycoon count is the card's own Fuel-suit icon plus the whole supply.
+    expect(metric(state, 'red', 'Tycoon')).toBe(1 + supply)
+    // Blue's count is whatever it holds — the supply claim is the holder's alone.
+    const blueBefore = metric(stripSlots(fresh(), 'blue'), 'blue', 'Tycoon')
+    expect(metric(stripSlots(state, 'blue'), 'blue', 'Tycoon')).toBe(blueBefore)
+  })
+
+  it('holding both Cartels claims both supplies', () => {
+    let state = withCard2(withCard2(fresh(), 'red', 'bc06'), 'red', 'bc03')
+    state = stripSlots(state, 'red')
+    const fuel = supplyOf(state.resources, 'Fuel').length
+    const material = supplyOf(state.resources, 'Material').length
+    // Two suit icons (one per card) plus both supplies.
+    expect(metric(state, 'red', 'Tycoon')).toBe(2 + fuel + material)
+  })
+
+  it('after ANY scoring, rivals discard that resource — Tycoon undeclared', () => {
+    /*
+     * The timing pin. The card says "After scoring", with no Tycoon gate, and the recorded
+     * decision (docs/13) is the verbatim reading: every chapter scoring while held. This stages a
+     * KEEPER-only scoring, so a future "only when Tycoon scored" gate fails here by name.
+     */
+    let state = withCard2(fresh(), 'red', 'bc06')
+    for (const f of ['red', 'yellow', 'blue'] as const) {
+      state = stripSlots(state, f)
+      state = { ...state, resources: gain(state.resources, slotsOf(state, f), 'Fuel').tracker }
+    }
+    const staged: GameState = {
+      ...state,
+      power: { red: 0, yellow: 0, blue: 0 },
+      ambitions: ['Keeper'],
+      declared: [{ ambition: 'Keeper', marker: { high: 6, low: 3 } }],
+    }
+    const after = advance(staged, { type: 'ambition/score' }, registry).state
+    const fuelOf = (s: GameState, f: 'red' | 'yellow' | 'blue') =>
+      countResource(s.resources, slotsOf(s, f), 'Fuel')
+    expect(fuelOf(after, 'yellow')).toBe(0)
+    expect(fuelOf(after, 'blue')).toBe(0)
+    // The holder keeps its own Fuel — the card strips Rivals only.
+    expect(fuelOf(after, 'red')).toBe(1)
+    expect(after.log.filter((l) => /discarded 1 Fuel \(Fuel Cartel\)/.test(l))).toHaveLength(2)
+    // The snowball: the discards land in the supply, which the holder counts from now on.
+    expect(metric(after, 'red', 'Tycoon')).toBe(
+      1 /* held token */ + 1 /* suit icon */ + supplyOf(after.resources, 'Fuel').length,
+    )
+  })
+
+  it('two Cartels under two holders strip along their own resource only', () => {
+    let state = withCard2(withCard2(fresh(), 'red', 'bc06'), 'yellow', 'bc03')
+    for (const f of ['red', 'yellow'] as const) {
+      state = stripSlots(state, f)
+      let tracker = gain(state.resources, slotsOf(state, f), 'Fuel').tracker
+      tracker = gain(tracker, slotsOf(state, f), 'Material').tracker
+      state = { ...state, resources: tracker }
+    }
+    const staged: GameState = {
+      ...state,
+      power: { red: 0, yellow: 0, blue: 0 },
+      ambitions: ['Keeper'],
+      declared: [{ ambition: 'Keeper', marker: { high: 6, low: 3 } }],
+    }
+    const after = advance(staged, { type: 'ambition/score' }, registry).state
+    const count = (f: 'red' | 'yellow', r: Resource) =>
+      countResource(after.resources, slotsOf(after, f), r)
+    // Red holds the Fuel Cartel: keeps Fuel, loses Material to yellow's Material Cartel.
+    expect(count('red', 'Fuel')).toBe(1)
+    expect(count('red', 'Material')).toBe(0)
+    // Yellow holds the Material Cartel: keeps Material, loses Fuel to red's Fuel Cartel.
+    expect(count('yellow', 'Material')).toBe(1)
+    expect(count('yellow', 'Fuel')).toBe(0)
   })
 })
