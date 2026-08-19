@@ -14,11 +14,12 @@
  * If the artwork is missing the panel falls back to a plain readable list.
  */
 
-import { AMBITIONS, RESOURCES, ResourceSlot, contentsOf, phantomHolding } from '@arcs/engine'
+import { AMBITIONS, FUEL_CARTEL, MATERIAL_CARTEL, RESOURCES, ResourceSlot, contentsOf, courtCard, phantomHolding, securedCards, supplyOf } from '@arcs/engine'
 import type { Action, Ambition, AmbitionMarker, Continue, GameState } from '@arcs/engine'
 import { useState } from 'react'
 
 import { store } from '../store.js'
+import { colorOf } from '../theme.js'
 import { asset } from '../assets.js'
 
 /** Vertical centre of each ambition box, as a fraction of the panel height. */
@@ -146,6 +147,34 @@ export function AmbitionTrack({
               }
             >
               {held}
+            </span>
+          )
+        })}
+
+        {/*
+          * The Cartels' supply claim (docs/13): while secured, the holder counts the entire token
+          * supply of that resource toward Tycoon. On a table the tokens sit on the card; here the
+          * claim would be invisible, so it gets the phantom's treatment — a count on the row.
+          *
+          * Shown whenever the card is held, **including at zero**, unlike the phantom: a phantom
+          * at 0 is no phantom, but a held Cartel at 0 supply is still the standing claim that
+          * rivals' scoring discards will land on.
+          */}
+        {([
+          [MATERIAL_CARTEL, 'Material'],
+          [FUEL_CARTEL, 'Fuel'],
+        ] as const).map(([card, resource], i) => {
+          const holder = state.factions.find((f) => securedCards(state, f).includes(card))
+          if (holder === undefined) return null
+          const n = supplyOf(state.resources, resource).length
+          return (
+            <span
+              key={`cartel-${card}`}
+              className="amb-cartel"
+              style={{ top: ROW_Y.Tycoon, left: i === 0 ? '48%' : '62%', borderColor: colorOf(holder) }}
+              title={`${holder}'s ${courtCard(card).name} counts the ${resource} supply (${n}) toward Tycoon`}
+            >
+              {n}
             </span>
           )
         })}

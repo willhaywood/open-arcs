@@ -3584,6 +3584,28 @@ button {
  * count reads as something already in the box rather than as another marker. Gold-on-dark like
  * the printed values it sits beside; not `--accent`, which is reserved for what is clickable.
  */
+/*
+ * The Cartel supply-claim chip: the phantom's look with the holder's faction colour on the border
+ * (set inline), so whose claim it is reads at a glance. Same row as the phantom can share —
+ * left offsets keep 48% / 62% / 76% clear of each other.
+ */
+.amb-cartel {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  min-width: 17px;
+  padding: 1px 4px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 3px;
+  background: rgba(8, 10, 16, 0.86);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: center;
+}
+
 .amb-phantom {
   position: absolute;
   left: 76%;
