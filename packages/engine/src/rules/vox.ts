@@ -64,19 +64,25 @@ function shipsInReserve(state: GameState, faction: FactionId): string[] {
 
 // --- the six ---------------------------------------------------------------
 
-/** Call to Action (bc31): draw one action card. */
+/**
+ * Call to Action (bc31): "Draw 1 action card from the **bottom of the action discard pile**."
+ *
+ * The discard's bottom, not the deck (docs/20 A5 — the audit found it drawing the deck top). The
+ * tracker keeps insertion order and discards land on top, so the bottom is the oldest entry:
+ * index 0. The difference is strategic — the discard's bottom is knowable, the deck is random.
+ */
 function callToAction(state: GameState, faction: FactionId, card: string, then: unknown): RuleResult {
-  const top = contentsOf(state.cards, CardLocation.deck())[0]
-  if (top === undefined) {
+  const bottom = contentsOf(state.cards, CardLocation.discard())[0]
+  if (bottom === undefined) {
     return {
-      state: { ...state, log: [...state.log, `${faction} drew nothing — the deck is empty`] },
+      state: { ...state, log: [...state.log, `${faction} drew nothing — the discard is empty`] },
       continue: C.then(Done(faction, card, then)),
     }
   }
   return {
     state: {
       ...state,
-      cards: move(state.cards, top, CardLocation.hand(faction)),
+      cards: move(state.cards, bottom, CardLocation.hand(faction)),
       log: [...state.log, `${faction} drew a card with Call to Action`],
     },
     continue: C.then(Done(faction, card, then)),
