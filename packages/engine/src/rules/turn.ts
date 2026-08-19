@@ -28,11 +28,12 @@ import {
 } from '../cards.js'
 import type { Continue } from '../continue.js'
 import { Continue as C } from '../continue.js'
-import { citiesInReserve, slotsOf } from '../control.js'
+import { citiesInReserve, rules, slotsOf } from '../control.js'
 import { system as systemInfo } from '../board.js'
 import {
   CourtPile,
   GALACTIC_BARDS,
+  RELIC_FENCE,
   LATTICE_SPIES,
   SWORN_GUARDIANS,
   courtCard,
@@ -65,6 +66,7 @@ import {
   ScoreAmbitions,
   ambitionsForStrength,
   chapterAmbitionable,
+  afterDeclarePeek,
   takeAmbitionMarker,
 } from './ambitions.js'
 import { TakeAction, arrangeThen, canTake, overflowThen } from './standard-actions.js'
@@ -592,7 +594,8 @@ function performBardsDeclare(
   // Free, and like Populist Demands it does not zero the played card.
   const taken = takeAmbitionMarker(state, faction, ambition)
   const next: GameState = { ...taken, usedThisTurn: [...taken.usedThisTurn, GALACTIC_BARDS] }
-  return { state: next, continue: C.then(CheckSeize(faction, pips, suit)) }
+  // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3).
+  return { state: next, continue: afterDeclarePeek(next, faction, CheckSeize(faction, pips, suit)) }
 }
 
 function performSeize(
@@ -843,7 +846,7 @@ function guildPreludeLabel(g: GuildPrelude): string {
     case 'gates':
       return `${name} — a ship at every gate`
     case 'ships':
-      return `${name} — 3 ships in ${g.system}`
+      return `${name} — 3 ships in a system you control`
     case 'gain-three':
       return `${name} — gain Material, Fuel and Weapon`
   }
@@ -916,15 +919,25 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
 
   switch (action['ability'] as string) {
     case 'relic-fence': {
+      /*
+       * The one guild Prelude that does NOT pay with the card (docs/20 A4): "Once per turn, you
+       * may discard 1 resource to gain 1 Relic" — the resource is the whole cost, the card stays
+       * secured, and `usedThisTurn` is the printed limit. Deliberately not `spent`.
+       */
       const give = action['spend'] as Resource
       let next = paying(state, faction, give)
       const capacity = slotsOf(next, faction)
       const got = gain(next.resources, capacity, 'Relic', ResourceSlot.overflow(faction))
-      next = { ...next, resources: got.tracker }
-      return {
-        state: spent(next, `traded ${give} for a Relic${got.gained ? '' : ' (no open slot)'}`),
-        continue: back,
+      next = {
+        ...next,
+        resources: got.tracker,
+        usedThisTurn: [...next.usedThisTurn, RELIC_FENCE],
+        log: [
+          ...next.log,
+          `${faction} traded ${give} for a Relic (Relic Fence)${got.gained ? '' : ' (no open slot)'}`,
+        ],
       }
+      return { state: next, continue: back }
     }
 
     case 'silver-tongues-resource': {
@@ -944,30 +957,43 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
     case 'silver-tongues-card': {
       const rival = action['rival'] as FactionId
       const stolen = action['stolen'] as string
+      /*
+       * "If this card is stolen, bury it" — stealing Sworn Guardians costs the theft and yields a
+       * buried card (bottom of the court deck), not a kept one (docs/20 B2). Every other guild
+       * card is kept as before.
+       */
+      const buried = stolen === SWORN_GUARDIANS
       const next: GameState = {
         ...state,
-        courtCards: move(state.courtCards, stolen, CourtPile.secured(faction)),
+        courtCards: move(
+          state.courtCards,
+          stolen,
+          buried ? CourtPile.deck() : CourtPile.secured(faction),
+        ),
       }
       return {
-        state: spent(next, `stole ${courtCard(stolen).name} from ${rival}`),
+        state: spent(
+          next,
+          buried
+            ? `stole ${courtCard(stolen).name} from ${rival} — buried`
+            : `stole ${courtCard(stolen).name} from ${rival}`,
+        ),
         continue: back,
       }
     }
 
     case 'farseers': {
-      const held = contentsOf(state.cards, CardLocation.hand(faction))
-      let cards = moveAll(state.cards, held, CardLocation.discard())
-      let drawn = 0
-      for (let i = 0; i < held.length; i++) {
-        const top = contentsOf(cards, CardLocation.deck())[0]
-        if (top === undefined) break
-        cards = move(cards, top, CardLocation.hand(faction))
-        drawn++
-      }
-      return {
-        state: spent({ ...state, cards }, `redrew ${drawn} of ${held.length} card(s)`),
-        continue: back,
-      }
+      /*
+       * "You may discard this and **any number** of cards from your hand. Draw the same number of
+       * cards **(including Farseers)** from the **bottom of the action discard pile**."
+       *
+       * The audit (docs/20 A3) found this wrong three ways — forced whole-hand, drawing the deck
+       * top, and drawing one too few — all three confirmed by the official FAQ ("discarded 2
+       * cards plus Farseers → draw 3"). The card is spent the moment the ability is chosen; the
+       * picker below asks which hand cards join it, zero included ("discard zero → draw 1").
+       */
+      const paid = spent(state, 'chose cards to send with it')
+      return { state: paid, continue: farseersPick(paid, faction, [], suit, pips) }
     }
 
     /**
@@ -1015,25 +1041,45 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
     }
 
     /**
-     * The Unions take a card out of a played pile. HRF holds it until end of round
-     * (`discardAfterRound`); taking it straight to hand is equivalent here, because the
-     * Prelude runs *after* you have played, so you cannot replay it this round either way.
+     * The Unions take a card out of a played pile — **held until the round ends** (docs/20 B1).
+     * The card says "When the round ends, draw that card into your hand", and the official FAQ
+     * confirms: "at the end of the round, after all players have finished their turns." This file
+     * used to take it straight to hand with an equivalence argument about replays; the argument
+     * missed that a card in hand this round can fund a seize-by-discard, counts in the public
+     * hand sizes, and is swept by whole-hand effects. `performEndRound` delivers.
      */
     case 'take-played': {
       const taken = action['taken'] as string
       const from = action['from'] as FactionId
       const next: GameState = {
         ...state,
-        cards: move(state.cards, taken, CardLocation.hand(faction)),
+        cards: move(state.cards, taken, CardLocation.pending(faction)),
       }
-      return { state: spent(next, `took ${taken} from ${from}'s played cards`), continue: back }
+      return {
+        state: spent(next, `set aside ${taken} from ${from}'s played cards until the round ends`),
+        continue: back,
+      }
     }
 
     case 'gates': {
+      /*
+       * "Place 1 ship in each gate (unless out of play)." The card does not say what happens when
+       * the reserve cannot reach every gate — the same silence Mass Uprising resolves by making
+       * the systems that get a ship the player's choice (vox.ts, docs/20 B3). This used to fill
+       * gates in board-definition order, an accident of data layout; now the shortage prompts,
+       * and only the shortage: with a ship for every gate there is nothing to decide.
+       */
+      const gates = state.board.systems.filter((s) => systemInfo(s).isGate)
+      const ships = contentsOf(state.figures, Location.reserve(faction)).filter(
+        (id) => parseFigureId(id).piece === 'Ship',
+      ).length
+      if (ships > 0 && ships < gates.length) {
+        const paid = spent(state, `placing ${ships} ship(s) at gates of their choice`)
+        return { state: paid, continue: gatesPlacement(paid, faction, [], suit, pips) }
+      }
       let next = state
       let placed = 0
-      for (const s of state.board.systems) {
-        if (!systemInfo(s).isGate) continue
+      for (const s of gates) {
         const ship = shipFromReserve(next, faction)
         if (ship === undefined) break
         next = { ...next, figures: move(next.figures, ship, Location.system(s)) }
@@ -1043,16 +1089,30 @@ function performGuildPrelude(state: GameState, action: Action): RuleResult {
     }
 
     case 'ships': {
-      const system = action['system'] as SystemId
+      /*
+       * "Place 3 ships in a system you control." The system is picked on the map: choosing the
+       * ability spends the card, then a `turn/ships-place` ask lights the controlled systems up
+       * (the docs/20 B3 pattern). Old journals carry the system inside this action — that shape
+       * still places directly, so existing saves replay unchanged.
+       */
+      const chosen = action['system'] as SystemId | undefined
+      if (chosen === undefined) {
+        const ships = contentsOf(state.figures, Location.reserve(faction)).filter(
+          (id) => parseFigureId(id).piece === 'Ship',
+        ).length
+        const n = Math.min(3, ships)
+        const paid = spent(state, `placing ${n} ship${n === 1 ? '' : 's'} in a system they control`)
+        return { state: paid, continue: shipsPlacement(paid, faction, suit, pips) }
+      }
       let next = state
       let placed = 0
       for (let i = 0; i < 3; i++) {
         const ship = shipFromReserve(next, faction)
         if (ship === undefined) break
-        next = { ...next, figures: move(next.figures, ship, Location.system(system)) }
+        next = { ...next, figures: move(next.figures, ship, Location.system(chosen)) }
         placed++
       }
-      return { state: spent(next, `placed ${placed} ship(s) in ${system}`), continue: back }
+      return { state: spent(next, `placed ${placed} ship(s) in ${chosen}`), continue: back }
     }
 
     case 'gain-three': {
@@ -1344,9 +1404,197 @@ function performReinforce(state: GameState, faction: FactionId, target: SystemId
 /** How many ships a swept faction returns with. */
 const REINFORCEMENTS = 3
 
+/**
+ * Gatekeepers' shortage picker: which gates get the remaining ships (docs/20 B3).
+ *
+ * Only reached when the reserve holds fewer ships than there are gates in play — the case the
+ * card does not cover, resolved as the player's choice by the same reasoning as Mass Uprising's
+ * shortage (vox.ts). `placed` excludes gates already given a ship, which is what enforces
+ * "1 ship in **each** gate"; the loop ends when the reserve or the gates run out.
+ */
+function gatesPlacement(
+  state: GameState,
+  faction: FactionId,
+  placed: readonly string[],
+  suit: Suit,
+  pips: number,
+): Continue {
+  const remaining = state.board.systems.filter(
+    (s) => systemInfo(s).isGate && !placed.includes(s),
+  )
+  const ships = contentsOf(state.figures, Location.reserve(faction)).filter(
+    (id) => parseFigureId(id).piece === 'Ship',
+  ).length
+  if (ships === 0 || remaining.length === 0) return C.then(Prelude(faction, suit, pips))
+  const options: Action[] = remaining.map((s) => ({
+    type: 'turn/gates-place',
+    faction,
+    system: s,
+    placed: [...placed],
+    suit,
+    pips,
+    label: `Place a ship in ${s} (${ships} left, one per gate)`,
+  }))
+  return C.ask(faction, options, `Gatekeepers — choose gates for the last ${ships} ship(s)`)
+}
+
+/**
+ * The 3-ships placement: which controlled system takes the group (bc12/13/14/15).
+ *
+ * One click places the whole group — "3 ships in a system you control" is a single system, so
+ * unlike Gatekeepers' shortage there is no loop and no exclusion list. Controlled systems can
+ * exist at ability-choice time and all be gone here only if `rules` changed in between, which
+ * nothing on this path does — the empty guard is belt-and-braces for the replay of a stale
+ * journal, where the ability is already paid and the Prelude simply resumes.
+ */
+function shipsPlacement(state: GameState, faction: FactionId, suit: Suit, pips: number): Continue {
+  const ships = contentsOf(state.figures, Location.reserve(faction)).filter(
+    (id) => parseFigureId(id).piece === 'Ship',
+  ).length
+  const n = Math.min(3, ships)
+  const options: Action[] = state.board.systems
+    .filter((s) => rules(state, faction, s))
+    .map((s) => ({
+      type: 'turn/ships-place',
+      faction,
+      system: s,
+      suit,
+      pips,
+      label: `Place ${n} ship${n === 1 ? '' : 's'} in ${s}`,
+    }))
+  if (n === 0 || options.length === 0) return C.then(Prelude(faction, suit, pips))
+  return C.ask(faction, options, `Place ${n} ship${n === 1 ? '' : 's'} in a system you control`)
+}
+
+/** Put the group down in the chosen system, then return to the Prelude. */
+function performShipsPlace(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  suit: Suit,
+  pips: number,
+): RuleResult {
+  let next = state
+  let placed = 0
+  for (let i = 0; i < 3; i++) {
+    const ship = shipFromReserve(next, faction)
+    if (ship === undefined) break
+    next = { ...next, figures: move(next.figures, ship, Location.system(system)) }
+    placed++
+  }
+  return {
+    state: {
+      ...next,
+      log: [...next.log, `${faction} placed ${placed} ship${placed === 1 ? '' : 's'} in ${system}`],
+    },
+    continue: C.then(Prelude(faction, suit, pips)),
+  }
+}
+
+/** Place one Gatekeepers ship in the chosen gate, then re-ask until the reserve runs out. */
+function performGatesPlace(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  placed: readonly string[],
+  suit: Suit,
+  pips: number,
+): RuleResult {
+  const ship = shipFromReserve(state, faction)
+  if (ship === undefined) return { state, continue: C.then(Prelude(faction, suit, pips)) }
+  const next: GameState = {
+    ...state,
+    figures: move(state.figures, ship, Location.system(system)),
+    log: [...state.log, `${faction} placed a ship in ${system} (Gatekeepers)`],
+  }
+  return { state: next, continue: gatesPlacement(next, faction, [...placed, system], suit, pips) }
+}
+
+/**
+ * Farseers' picker: which hand cards join the discard. Carried in the actions themselves —
+ * journal-safe plain ids — and rebuilt after every pick, so the journal replays the exact
+ * sequence and Done always announces the true draw count.
+ */
+function farseersPick(
+  state: GameState,
+  faction: FactionId,
+  picked: readonly string[],
+  suit: Suit,
+  pips: number,
+): Continue {
+  const hand = contentsOf(state.cards, CardLocation.hand(faction)).filter(
+    (c) => !picked.includes(c),
+  )
+  const options: Action[] = hand.map((c) => ({
+    type: 'turn/farseers-pick',
+    faction,
+    card: c,
+    picked: [...picked],
+    suit,
+    pips,
+    label: `Discard ${c}`,
+  }))
+  options.push({
+    type: 'turn/farseers-done',
+    faction,
+    picked: [...picked],
+    suit,
+    pips,
+    label: `Done — draw ${picked.length + 1} from the discard's bottom`,
+  })
+  return C.ask(faction, options, `${faction} — Farseers: discard any number of cards`)
+}
+
+/**
+ * The resolution: shuffle the picked cards **before** placing them (the official FAQ's ruling —
+ * "one of the few situations where discard order matters", because the draws come off the same
+ * pile's bottom and a small pile can hand your own discards back), then draw picked + 1, the +1
+ * being Farseers itself.
+ */
+function performFarseersDone(
+  state: GameState,
+  faction: FactionId,
+  picked: readonly string[],
+  suit: Suit,
+  pips: number,
+): RuleResult {
+  const [shuffled, rng] = shuffle(state.rng, picked)
+  let cards = state.cards
+  for (const c of shuffled) cards = move(cards, c, CardLocation.discard())
+  const want = picked.length + 1
+  let drawn = 0
+  for (let i = 0; i < want; i++) {
+    const bottom = contentsOf(cards, CardLocation.discard())[0]
+    if (bottom === undefined) break
+    cards = move(cards, bottom, CardLocation.hand(faction))
+    drawn++
+  }
+  return {
+    state: {
+      ...state,
+      cards,
+      rng,
+      log: [
+        ...state.log,
+        `${faction} discarded ${picked.length} card(s) and drew ${drawn} from the bottom of the discard (Farseers)`,
+      ],
+    },
+    continue: C.then(Prelude(faction, suit, pips)),
+  }
+}
+
 function performEndTurn(state: GameState, faction: FactionId): RuleResult {
   // Per-turn resets: cities become taxable and starports buildable again next turn.
-  state = { ...state, taxedThisTurn: [], workedThisTurn: [], loreUsedThisTurn: [], anyBattle: false }
+  // `usedThisTurn` joined this list late (docs/20 A4): without it, Galactic Bards' and Relic
+  // Fence's "once per turn" was actually once per game.
+  state = {
+    ...state,
+    taxedThisTurn: [],
+    workedThisTurn: [],
+    loreUsedThisTurn: [],
+    usedThisTurn: [],
+    anyBattle: false,
+  }
   /*
    * Checked before the hand-off, because the rule is "at the end of *their* turn" — the pieces have
    * to be back before the next faction acts into the space they left.
@@ -1413,6 +1661,19 @@ function nextInitiative(state: GameState): FactionId {
 }
 
 function performEndRound(state: GameState): RuleResult {
+  // The Unions' held cards arrive now — "when the round ends" (docs/20 B1).
+  let cards = state.cards
+  const delivered: string[] = []
+  for (const f of state.factions) {
+    for (const id of contentsOf(cards, CardLocation.pending(f))) {
+      cards = move(cards, id, CardLocation.hand(f))
+      delivered.push(`${f} drew ${id} (held by a Union)`)
+    }
+  }
+  if (delivered.length > 0) {
+    state = { ...state, cards, log: [...state.log, ...delivered] }
+  }
+
   const holder = nextInitiative(state)
   const order = rotateTo(state.factions, holder)
 
@@ -1664,6 +1925,42 @@ export const TurnModule: RuleModule = {
           state,
           action['faction'] as FactionId,
           action['system'] as SystemId,
+        )
+      case 'turn/ships-place':
+        return performShipsPlace(
+          state,
+          action['faction'] as FactionId,
+          action['system'] as SystemId,
+          action['suit'] as Suit,
+          action['pips'] as number,
+        )
+      case 'turn/gates-place':
+        return performGatesPlace(
+          state,
+          action['faction'] as FactionId,
+          action['system'] as SystemId,
+          action['placed'] as string[],
+          action['suit'] as Suit,
+          action['pips'] as number,
+        )
+      case 'turn/farseers-pick':
+        return {
+          state,
+          continue: farseersPick(
+            state,
+            action['faction'] as FactionId,
+            [...(action['picked'] as string[]), action['card'] as string],
+            action['suit'] as Suit,
+            action['pips'] as number,
+          ),
+        }
+      case 'turn/farseers-done':
+        return performFarseersDone(
+          state,
+          action['faction'] as FactionId,
+          action['picked'] as string[],
+          action['suit'] as Suit,
+          action['pips'] as number,
         )
       case 'turn/end':
         return performEndTurn(state, action['faction'] as FactionId)

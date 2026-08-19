@@ -104,7 +104,7 @@ export type GuildPrelude =
   /** Gatekeepers: a ship at every gate. */
   | { kind: 'gates'; card: string }
   /** Prison Wardens / Skirmishers / Court Enforcers / Loyal Marines: 3 ships in a ruled system. */
-  | { kind: 'ships'; card: string; system: string }
+  | { kind: 'ships'; card: string }
   /** Elder Broker: one Material, one Fuel, one Weapon. */
   | { kind: 'gain-three'; card: string }
 
@@ -218,16 +218,32 @@ export function guildPreludes(state: GameState, faction: FactionId): GuildPrelud
   const mine = spendable(state, faction)
 
   // Relic Fence — trade any resource for a Relic, if one is left in the supply.
-  if (cards.includes(RELIC_FENCE) && supplyOf(state.resources, 'Relic').length > 0) {
+  /*
+   * Relic Fence (bc24): "Once per turn, you may discard 1 resource to gain 1 Relic." Unlike the
+   * other Prelude abilities the card itself is NOT the cost — it stays secured and works every
+   * turn, limited by `usedThisTurn` (docs/20 A4; the audit found it wrongly burning itself).
+   */
+  if (
+    cards.includes(RELIC_FENCE) &&
+    !state.usedThisTurn.includes(RELIC_FENCE) &&
+    supplyOf(state.resources, 'Relic').length > 0
+  ) {
     for (const spend of mine) out.push({ kind: 'relic-fence', card: RELIC_FENCE, spend })
   }
 
-  // Silver Tongues — steal a resource or a guild card from a rival. Sworn Guardians blocks
-  // both, exactly as it blocks a battle raid.
+  /*
+   * Silver Tongues — steal a resource or a guild card from a rival. Sworn Guardians blocks the
+   * resources and every OTHER guild card, but Sworn Guardians itself is stealable — "Rivals
+   * cannot steal your resources and other Guild cards. If this card is stolen, bury it." — and
+   * the thief gets a buried card, not a kept one (docs/20 B2).
+   */
   if (cards.includes(SILVER_TONGUES)) {
     for (const rival of state.factions) {
       if (rival === faction) continue
-      if (securedCards(state, rival).includes(SWORN_GUARDIANS)) continue
+      if (securedCards(state, rival).includes(SWORN_GUARDIANS)) {
+        out.push({ kind: 'silver-tongues-card', card: SILVER_TONGUES, rival, stolen: SWORN_GUARDIANS })
+        continue
+      }
       for (const resource of spendable(state, rival)) {
         out.push({ kind: 'silver-tongues-resource', card: SILVER_TONGUES, rival, resource })
       }
@@ -281,12 +297,14 @@ export function guildPreludes(state: GameState, faction: FactionId): GuildPrelud
     out.push({ kind: 'gates', card: GATEKEEPERS })
   }
 
-  // Three ships into one system you rule.
+  /*
+   * Three ships into one system you control. One offer per card, not per card × system — the
+   * system is a spot on the map, so it is asked there once the ability is chosen (the docs/20 B3
+   * pattern), and the pane list no longer multiplies by however many systems you rule.
+   */
   for (const card of SHIP_PLACERS) {
     if (!cards.includes(card) || shipsInReserve(state, faction) === 0) continue
-    for (const s of state.board.systems) {
-      if (rules(state, faction, s)) out.push({ kind: 'ships', card, system: s })
-    }
+    if (state.board.systems.some((s) => rules(state, faction, s))) out.push({ kind: 'ships', card })
   }
 
   // Elder Broker — one each of Material, Fuel and Weapon.

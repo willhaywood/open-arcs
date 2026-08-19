@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  move,
   system as systemInfo,
   CardLocation,
   Continue as C,
@@ -50,16 +51,38 @@ function putCard(state: GameState, cardId: string, pile: string): GameState {
   return { ...state, courtCards: { ...state.courtCards, contents, at } }
 }
 
-describe('Call to Action (bc31) — draw a card', () => {
-  it('moves one card from the deck to your hand, then discards itself', () => {
-    const state = putCard(fresh(), 'bc31', CourtPile.discard())
+describe('Call to Action (bc31) — draw from the bottom of the action discard', () => {
+  /*
+   * "Draw 1 action card from the bottom of the action discard pile." This test used to assert a
+   * draw from the DECK — the docs/20 A5 defect pinned as if it were the rule. The discard's
+   * bottom is the pile's oldest entry, which is what makes the draw knowable rather than random.
+   */
+  it('moves the oldest discarded card to your hand, then discards itself', () => {
+    let state = putCard(fresh(), 'bc31', CourtPile.discard())
+    // Seed a known discard: two hand cards discarded in order — the FIRST is the bottom.
+    const hand = contentsOf(state.cards, CardLocation.hand('yellow'))
+    const bottom = hand[0]!
+    const top = hand[1]!
+    let cards = move(state.cards, bottom, CardLocation.discard())
+    cards = move(cards, top, CardLocation.discard())
+    state = { ...state, cards }
     const handBefore = contentsOf(state.cards, CardLocation.hand('red')).length
     const deckBefore = contentsOf(state.cards, CardLocation.deck()).length
 
     const step = fire(state, 'bc31')
+    expect(contentsOf(step.state.cards, CardLocation.hand('red'))).toContain(bottom)
     expect(contentsOf(step.state.cards, CardLocation.hand('red'))).toHaveLength(handBefore + 1)
-    expect(contentsOf(step.state.cards, CardLocation.deck())).toHaveLength(deckBefore - 1)
+    // The deck is untouched — the old behaviour drew from it.
+    expect(contentsOf(step.state.cards, CardLocation.deck())).toHaveLength(deckBefore)
     expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc31')
+  })
+
+  it('draws nothing when the action discard is empty', () => {
+    const state = putCard(fresh(), 'bc31', CourtPile.discard())
+    const handBefore = contentsOf(state.cards, CardLocation.hand('red')).length
+    const step = fire(state, 'bc31')
+    expect(contentsOf(step.state.cards, CardLocation.hand('red'))).toHaveLength(handBefore)
+    expect(step.state.log.some((l) => /discard is empty/.test(l))).toBe(true)
   })
 })
 

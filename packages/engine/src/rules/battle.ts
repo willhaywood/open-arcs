@@ -78,6 +78,7 @@ import {
   SWORN_GUARDIANS,
   courtCard,
   courtSlots,
+  GATEKEEPERS,
   hasGuild,
   securedCards,
 } from '../court.js'
@@ -417,7 +418,15 @@ function offerGather(
   // Committed (Rebel) raises the *limit*, not the fleet: HRF adds it to the same total the
   // ships feed (game-battle.scala:148), so you may roll two dice more than you have ships.
   const committed = hasTrait(state, faction, 'Committed') ? 2 : 0
-  const maxDice = Math.min(ships + committed, 18)
+  /*
+   * Gatekeepers (bc08): "When you battle in a gate, you may collect 2 more dice." The same
+   * shape as Committed — a raise to the limit, not the fleet — gated on the battle system being
+   * a gate. Found by the court audit (docs/20 A1): only the card's Prelude clause was
+   * implemented, so a held Gatekeepers never changed a single battle.
+   */
+  const gatekept =
+    systemInfo(system).isGate && hasGuild(state, faction, GATEKEEPERS) ? 2 : 0
+  const maxDice = Math.min(ships + committed + gatekept, 18)
   const enemyBuildings = piecesAt(state, system, enemy, isBuilding).length > 0
   // Hidden Harbors (lore05) shuts the raid dice off entirely while the defender still has an
   // undamaged starport here (game-battle.scala:159). Buildings alone are no longer enough.
@@ -1048,9 +1057,36 @@ function offerRaid(state: GameState, ctx: Resolve): Continue {
   const settle = { type: 'battle/settle', ctx } as Action
   const victim = defendingFaction(state, ctx.enemy)
   if (ctx.keys <= 0 || victim === undefined) return C.then(settle)
-  if (hasGuild(state, victim, SWORN_GUARDIANS)) return C.then(settle)
 
   const options: Action[] = []
+
+  /*
+   * Sworn Guardians (bc22): "Rivals cannot steal your resources and **other** Guild cards. If this
+   * card is stolen, bury it. (In battle, rivals can steal this card first before spending keys.)"
+   *
+   * The audit (docs/20 B2) found this over-blocking: the whole raid menu vanished, including the
+   * one theft the card writes out longhand — Sworn Guardians itself. While the victim holds it,
+   * it is the *only* raidable thing; taking it buries it (bottom of the court deck, the card's own
+   * definition), and the remaining keys then shop normally, which `performRaidTake` re-entering
+   * `offerRaid` provides for free once the card is gone.
+   */
+  if (hasGuild(state, victim, SWORN_GUARDIANS)) {
+    const cost = courtCard(SWORN_GUARDIANS).keys ?? 1
+    if (cost > ctx.keys) return C.then(settle)
+    options.push({
+      type: 'battle/raid-take',
+      ctx,
+      kind: 'guardians',
+      target: SWORN_GUARDIANS,
+      cost,
+      label: `Take Sworn Guardians — buried (${cost} key${cost === 1 ? '' : 's'})`,
+    })
+    return C.ask(
+      ctx.faction,
+      [...options, { ...settle, faction: ctx.faction, label: `Stop raiding (${ctx.keys} key(s) left)` }],
+      `${ctx.faction} raids ${ctx.enemy} — Sworn Guardians shields everything else`,
+    )
+  }
 
   /*
    * The Keeper's pair, both of which protect the victim rather than helping the raider:
@@ -1123,7 +1159,18 @@ function performRaidTake(
   if (victim === undefined) return { state, continue: C.then({ type: 'battle/settle', ctx } as Action) }
 
   let next = state
-  if (kind === 'card') {
+  if (kind === 'guardians') {
+    /*
+     * "If this card is stolen, bury it" — the thief pays the keys and gets nothing but the open
+     * door: the card goes to the **bottom** of the court deck (tracker moves append, and draws
+     * come off the front, so append is the bottom).
+     */
+    next = {
+      ...next,
+      courtCards: move(next.courtCards, target, CourtPile.deck()),
+      log: [...next.log, `${ctx.faction} stole Sworn Guardians from ${victim} — buried`],
+    }
+  } else if (kind === 'card') {
     next = {
       ...next,
       courtCards: move(next.courtCards, target, CourtPile.secured(ctx.faction)),

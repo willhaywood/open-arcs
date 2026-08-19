@@ -25,6 +25,7 @@ import {
   UNION_SUITS,
   guildPreludes,
   parseCardId,
+  rules,
   rivalAgentsOn,
   securedCards,
   slotCapacity,
@@ -35,7 +36,7 @@ import {
   supplyOf,
 } from '../src/index.js'
 import { system as systemInfo } from '../src/index.js'
-import type { Continue, GameState, Resource } from '../src/index.js'
+import type { Continue, FactionId, GameState, Resource } from '../src/index.js'
 
 const THREE = ['red', 'yellow', 'blue'] as const
 const registry = defaultRegistry()
@@ -625,16 +626,84 @@ describe('Sworn Guardians (bc22) — nothing of yours is stealable', () => {
     return out
   }
 
-  it('is never raided in a driven game, though it would be without the card', () => {
+  it('a raid against an SG holder offers exactly the Guardians, then the shop opens', () => {
+    /*
+     * The card's parenthetical, tested directly at the raid ask (the driven test below cannot
+     * catch an over-block restored, because with no raids happening its conditional assertions
+     * are vacuous): while the victim holds SG the only purchasable thing is SG itself; buying it
+     * buries it to the court deck's bottom and the SAME raid re-offers everything else.
+     */
+    let state = withCard2(fresh(), 'yellow', 'bc22')
+    state = withCard2(state, 'yellow', 'bc02')
+    state = { ...state, resources: gain(state.resources, slotsOf(state, 'yellow'), 'Fuel').tracker }
+    const ctx = {
+      faction: 'red',
+      system: state.board.systems[0],
+      enemy: 'yellow',
+      self: 0,
+      intercepted: 0,
+      ships: 0,
+      buildings: 0,
+      keys: 4,
+      razed: false,
+      then: { type: 'turn/lead-main', faction: 'red' },
+    }
+    // Through the real path: finishing a battle with keys produces the raid offer.
+    const offer = advance(stoppable(state), { type: 'battle/finish', ctx } as never, terminal)
+    const ask1 = offer.continue
+    if (ask1.kind !== 'ask') throw new Error('expected the raid ask')
+    const takes = ask1.actions.filter((a) => a.type === 'battle/raid-take')
+    expect(takes).toHaveLength(1)
+    expect(String(takes[0]!['label'])).toContain('Sworn Guardians')
+
+    const first = advance(offer.state, takes[0]!, terminal)
+    expect(contentsOf(first.state.courtCards, CourtPile.deck()).at(-1)).toBe('bc22')
+    expect(securedCards(first.state, 'red')).not.toContain('bc22')
+    expect(first.state.log.some((l) => /stole Sworn Guardians from yellow — buried/.test(l))).toBe(true)
+    // The re-entered offer now shops normally: yellow's other card and resources appear.
+    const c = first.continue
+    if (c.kind !== 'ask') throw new Error('expected the re-entered raid ask')
+    const labels2 = c.actions.map((a) => String(a['label'] ?? ''))
+    expect(labels2.some((l) => /Mining Interest/.test(l))).toBe(true)
+  })
+
+  it('shields a driven game until the card itself is stolen and buried', () => {
+    /*
+     * This used to assert an SG holder is NEVER raided — the docs/20 B2 over-block pinned as the
+     * rule. The card's own parenthetical says rivals can steal SG itself first; after that the
+     * raid continues normally. So the assertion is now conditional: any raid line against the
+     * protected victim must be preceded, somewhere earlier in the game, by the steal-and-bury of
+     * their Sworn Guardians.
+     */
     const control = raidVictims()
     const entries = Object.entries(control).sort((a, b) => b[1] - a[1])
     expect(entries.length, 'the policy must raid somebody').toBeGreaterThan(0)
-
     const [victim, losses] = entries[0]!
     expect(losses).toBeGreaterThan(0)
 
-    // Same seeds, same policy, with the card on the faction that was being raided.
-    expect(raidVictims(victim)[victim] ?? 0).toBe(0)
+    for (let seed = 1; seed <= 25; seed++) {
+      const opts = { board: 'Board4MixUp1', factions: ['red', 'yellow', 'blue', 'white'] as const, seed }
+      let step = startGame(opts, registry)
+      step = { ...step, state: withCard2(step.state as GameState, victim as 'red', 'bc22') }
+      for (let i = 0; i < 12000; i++) {
+        const c = step.continue
+        if (c.kind !== 'ask') break
+        step = advance(step.state, raidPolicy(c), registry)
+      }
+      const log = step.state.log
+      let buriedAt = -1
+      for (let i = 0; i < log.length; i++) {
+        if (new RegExp(`stole Sworn Guardians from ${victim}`).test(log[i]!)) buriedAt = i
+        if (/ raided .+ from /.test(log[i]!)) {
+          const prior = log.slice(0, i).reverse().find((l) => / attacks /.test(l)) ?? ''
+          const atk = / attacks (\w+) in/.exec(prior)
+          if (atk && atk[1] === victim) {
+            expect(buriedAt, `seed ${seed}: ${victim} raided before SG was buried`).toBeGreaterThanOrEqual(0)
+            expect(buriedAt).toBeLessThan(i)
+          }
+        }
+      }
+    }
   })
 
   it('shields the holder’s other guild cards from Guild Struggle, but not itself', () => {
@@ -763,7 +832,10 @@ describe('Galactic Bards (bc25) — a free declaration before the seize', () => 
 })
 
 describe('Guild Prelude abilities — the card is the cost', () => {
-  it('Relic Fence trades a resource for a Relic and discards itself', () => {
+  it('Relic Fence trades a resource for a Relic and KEEPS itself', () => {
+    // This test used to assert the card discarded itself — the docs/20 A4 defect, pinned as if
+    // it were the rule. The card reads "Once per turn, you may discard 1 resource": the resource
+    // is the whole cost.
     const state = onlyHolding(withCard2(fresh(), 'red', 'bc24'), 'red', 'Fuel', 1)
     const cap = slotsOf(state, 'red')
     const step = advance(
@@ -781,7 +853,8 @@ describe('Guild Prelude abilities — the card is the cost', () => {
     )
     expect(countResource(step.state.resources, cap, 'Relic')).toBe(1)
     expect(countResource(step.state.resources, cap, 'Fuel')).toBe(0)
-    expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc24')
+    expect(securedCards(step.state, 'red')).toContain('bc24')
+    expect(contentsOf(step.state.courtCards, CourtPile.discard())).not.toContain('bc24')
   })
 
   it('Silver Tongues steals a resource, and Sworn Guardians blocks it', () => {
@@ -796,32 +869,72 @@ describe('Guild Prelude abilities — the card is the cost', () => {
     ).toBe(false)
   })
 
-  it('Farseers throws the hand back and draws as many again', () => {
-    const state = withCard2(fresh(), 'red', 'bc17')
+  it('Farseers opens a picker: any number of discards, drawn +1 from the discard bottom', () => {
+    /*
+     * "Discard this and any number of cards from your hand. Draw the same number (including
+     * Farseers) from the bottom of the action discard pile." This test used to pin the docs/20
+     * A3 defect — forced whole-hand, deck-top draws, one too few. The FAQ example is the spec:
+     * discarded 2 plus Farseers, draw 3. Discarded picks are shuffled before placing (the FAQ's
+     * discard-order ruling), and the draws come off the same pile's bottom.
+     */
+    let state = withCard2(fresh(), 'red', 'bc17')
+    // Seed a known discard bottom so the first draw is predictable.
+    const yHand = contentsOf(state.cards, CardLocation.hand('yellow'))
+    const seedBottom = yHand[0]!
+    state = { ...state, cards: move(state.cards, seedBottom, CardLocation.discard()) }
     const before = contentsOf(state.cards, CardLocation.hand('red'))
-    expect(before.length).toBeGreaterThan(0)
 
-    const step = advance(
+    const opened = advance(
       stoppable(state),
-      {
-        type: 'turn/prelude-guild',
-        faction: 'red',
-        ability: 'farseers',
-        card: 'bc17',
-        suit: 'Aggression',
-        pips: 1,
-      },
+      { type: 'turn/prelude-guild', faction: 'red', ability: 'farseers', card: 'bc17', suit: 'Aggression', pips: 1 },
       terminal,
     )
-    const after = contentsOf(step.state.cards, CardLocation.hand('red'))
-    // Draws up to the hand size, but the deck is the limit — at three players setup deals
-    // 18 of 20 cards, so a full redraw is simply not available and the log says so.
-    const deckBefore = contentsOf(state.cards, CardLocation.deck()).length
-    expect(after).toHaveLength(Math.min(before.length, deckBefore))
-    expect(after).not.toEqual(before) // a genuinely different hand
-    expect(contentsOf(step.state.cards, CardLocation.deck())).toHaveLength(0)
-    expect(step.state.log.at(-1)).toMatch(/redrew \d+ of \d+ card/)
-    expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc17')
+    // The card is spent, and a picker is asked rather than the hand being swept.
+    expect(contentsOf(opened.state.courtCards, CourtPile.discard())).toContain('bc17')
+    expect(contentsOf(opened.state.cards, CardLocation.hand('red'))).toEqual(before)
+    const ask1 = opened.continue
+    if (ask1.kind !== 'ask') throw new Error('expected the picker')
+    expect(ask1.actions.some((a) => a.type === 'turn/farseers-done')).toBe(true)
+
+    // Pick two cards, then Done: the FAQ example — draw 2 + 1 = 3.
+    const pickA = ask1.actions.find((a) => a.type === 'turn/farseers-pick')!
+    const step2 = advance(opened.state, pickA, registry)
+    const ask2 = step2.continue
+    if (ask2.kind !== 'ask') throw new Error('expected the second pick')
+    const pickB = ask2.actions.find((a) => a.type === 'turn/farseers-pick')!
+    const step3 = advance(step2.state, pickB, registry)
+    const ask3 = step3.continue
+    if (ask3.kind !== 'ask') throw new Error('expected the done ask')
+    const done = ask3.actions.find((a) => a.type === 'turn/farseers-done')!
+    expect(String(done['label'])).toContain('draw 3')
+    const final = advance(step3.state, done, registry)
+
+    const after = contentsOf(final.state.cards, CardLocation.hand('red'))
+    // Two out, three in: net +1 — and the seeded bottom card must be among the draws.
+    expect(after).toHaveLength(before.length + 1)
+    expect(after).toContain(seedBottom)
+    expect(final.state.log.some((l) => /discarded 2 card\(s\) and drew 3 from the bottom/.test(l))).toBe(true)
+  })
+
+  it('Farseers with zero discards still draws 1 — the FAQ boundary', () => {
+    let state = withCard2(fresh(), 'red', 'bc17')
+    const yHand = contentsOf(state.cards, CardLocation.hand('yellow'))
+    const seedBottom = yHand[0]!
+    state = { ...state, cards: move(state.cards, seedBottom, CardLocation.discard()) }
+    const before = contentsOf(state.cards, CardLocation.hand('red')).length
+
+    const opened = advance(
+      stoppable(state),
+      { type: 'turn/prelude-guild', faction: 'red', ability: 'farseers', card: 'bc17', suit: 'Aggression', pips: 1 },
+      terminal,
+    )
+    const ask1 = opened.continue
+    if (ask1.kind !== 'ask') throw new Error('expected the picker')
+    const done = ask1.actions.find((a) => a.type === 'turn/farseers-done')!
+    expect(String(done['label'])).toContain('draw 1')
+    const final = advance(opened.state, done, registry)
+    expect(contentsOf(final.state.cards, CardLocation.hand('red'))).toHaveLength(before + 1)
+    expect(contentsOf(final.state.cards, CardLocation.hand('red'))).toContain(seedBottom)
   })
 })
 
@@ -901,7 +1014,7 @@ describe('Prelude discard abilities', () => {
     ).toBe(1)
   })
 
-  it('a Union takes a played card of its suit into your hand', () => {
+  it('a Union sets the taken card aside, and the round end delivers it (docs/20 B1)', () => {
     // Pick the Union to match a card yellow actually holds, so this never silently skips.
     const base = fresh()
     const card = contentsOf(base.cards, CardLocation.hand('yellow'))[0]!
@@ -922,8 +1035,19 @@ describe('Prelude discard abilities', () => {
       taken: card,
       from: 'yellow',
     })
-    expect(contentsOf(step.state.cards, CardLocation.hand('red'))).toContain(card)
+    /*
+     * "When the round ends, draw that card into your hand" — officially ruled to mean after all
+     * players have finished their turns. This test used to assert straight-to-hand, the docs/20
+     * B1 divergence: a card in hand this round can fund a seize and counts publicly.
+     */
+    expect(contentsOf(step.state.cards, CardLocation.hand('red'))).not.toContain(card)
+    expect(contentsOf(step.state.cards, CardLocation.pending('red'))).toContain(card)
     expect(contentsOf(step.state.cards, CardLocation.played('yellow'))).not.toContain(card)
+
+    const delivered = advance(step.state, { type: 'round/end' }, registry)
+    expect(contentsOf(delivered.state.cards, CardLocation.hand('red'))).toContain(card)
+    expect(contentsOf(delivered.state.cards, CardLocation.pending('red'))).toHaveLength(0)
+    expect(delivered.state.log.some((l) => /held by a Union/.test(l))).toBe(true)
   })
 
   it('Gatekeepers puts a ship on every gate', () => {
@@ -938,9 +1062,68 @@ describe('Prelude discard abilities', () => {
         g,
       ).toBeGreaterThan(0)
     }
+    // With a ship for every gate there is nothing to decide, so no gates picker appears.
+    expect(
+      step.continue.kind === 'ask' &&
+        step.continue.actions.some((a) => a.type === 'turn/gates-place'),
+    ).toBe(false)
   })
 
-  it('a ship-placer puts three ships in one system', () => {
+  it('Gatekeepers on a short reserve asks which gates get the ships (docs/20 B3)', () => {
+    /*
+     * "Place 1 ship in each gate" does not cover a reserve smaller than the gate count. The
+     * engine used to fill gates in board-definition order — an accident of data layout — while
+     * its own Mass Uprising docblock reasons the identical shortage out to "the player's
+     * choice". The picker is that choice; the card is spent before it, not by it.
+     */
+    let state = withCard2(fresh(), 'red', 'bc08')
+    const gates = state.board.systems.filter((s) => systemInfo(s).isGate)
+    expect(gates.length).toBeGreaterThan(2)
+    // Leave exactly two ships in reserve — fewer than the gates.
+    const reserve = contentsOf(state.figures, Location.reserve('red')).filter((id) =>
+      id.startsWith('red/Ship/'),
+    )
+    let figures = state.figures
+    for (const id of reserve.slice(2)) figures = move(figures, id, Location.trophies('blue'))
+    state = { ...state, figures }
+    const shipsAt = (s: GameState, g: string) =>
+      contentsOf(s.figures, Location.system(g)).filter((id) => id.startsWith('red/Ship/')).length
+    const before = new Map(gates.map((g) => [g, shipsAt(state, g)]))
+
+    const step = preludeGuild(state, { ability: 'gates', card: 'bc08' })
+    const ask1 = step.continue
+    if (ask1.kind !== 'ask') throw new Error('expected the gates picker')
+    expect(ask1.actions.every((a) => a.type === 'turn/gates-place')).toBe(true)
+    expect(ask1.actions.map((a) => a['system'])).toEqual(gates)
+    // The card is already spent — the picker decides placement, it is not a way out.
+    expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc08')
+
+    // Choose the LAST gate first: board order must not decide.
+    const last = gates.at(-1)!
+    const placedOne = advance(step.state, ask1.actions.at(-1)!, terminal)
+    expect(shipsAt(placedOne.state, last)).toBe(before.get(last)! + 1)
+
+    // The second ask excludes the gate already given a ship — "1 ship in EACH gate".
+    const ask2 = placedOne.continue
+    if (ask2.kind !== 'ask') throw new Error('expected the picker to re-ask')
+    expect(ask2.actions.map((a) => a['system'])).toEqual(gates.slice(0, -1))
+
+    const first = gates[0]!
+    const placedTwo = advance(placedOne.state, ask2.actions[0]!, terminal)
+    expect(shipsAt(placedTwo.state, first)).toBe(before.get(first)! + 1)
+    // Reserve empty: the picker ends, and the middle gate got nothing.
+    expect(
+      placedTwo.continue.kind === 'ask' &&
+        placedTwo.continue.actions.some((a) => a.type === 'turn/gates-place'),
+    ).toBe(false)
+    for (const g of gates.slice(1, -1)) expect(shipsAt(placedTwo.state, g)).toBe(before.get(g)!)
+  })
+
+  it('a ship-placer with the system inside the action still places directly (old journals)', () => {
+    /*
+     * The offer no longer carries a system — it is picked on the map — but journals recorded
+     * before that change do. The dispatch keeps the direct path so those saves replay unchanged.
+     */
     const state = withCard2(fresh(), 'red', 'bc13')
     const system = state.board.systems[0]!
     const before = contentsOf(state.figures, Location.system(system)).filter((id) =>
@@ -951,6 +1134,68 @@ describe('Prelude discard abilities', () => {
     expect(
       contentsOf(step.state.figures, Location.system(system)).filter((id) => id.startsWith('red/Ship/')),
     ).toHaveLength(before + 3)
+  })
+
+  it('a ship-placer asks for the system on the map, controlled systems only', () => {
+    /*
+     * "Place 3 ships in a system you control" — the offer is one per card, and the system is a
+     * `turn/ships-place` ask over exactly the controlled systems (the docs/20 B3 pattern),
+     * replacing a pane button per card × system.
+     */
+    const state = withCard2(fresh(), 'red', 'bc13')
+    const offers = guildPreludes(state, 'red').filter((g) => g.kind === 'ships')
+    expect(offers).toHaveLength(1)
+    expect('system' in offers[0]!).toBe(false)
+
+    const ruled = state.board.systems.filter((s) => rules(state, 'red', s))
+    expect(ruled.length).toBeGreaterThan(0)
+    const shipsAt = (s: GameState, sys: string) =>
+      contentsOf(s.figures, Location.system(sys)).filter((id) => id.startsWith('red/Ship/')).length
+
+    const step = preludeGuild(state, { ability: 'ships', card: 'bc13' })
+    const ask = step.continue
+    if (ask.kind !== 'ask') throw new Error('expected the placement ask')
+    expect(ask.actions.every((a) => a.type === 'turn/ships-place')).toBe(true)
+    expect(ask.actions.map((a) => a['system'])).toEqual(ruled)
+    // The card is already spent — the ask decides placement, it is not a way out.
+    expect(contentsOf(step.state.courtCards, CourtPile.discard())).toContain('bc13')
+
+    // Choose the LAST controlled system: board order must not decide.
+    const target = ruled.at(-1)!
+    const before = shipsAt(step.state, target)
+    const placed = advance(step.state, ask.actions.at(-1)!, terminal)
+    expect(shipsAt(placed.state, target)).toBe(before + 3)
+    expect(placed.state.log.some((l) => l === `red placed 3 ships in ${target}`)).toBe(true)
+    // One click placed the whole group, so no further placement ask.
+    expect(
+      placed.continue.kind === 'ask' &&
+        placed.continue.actions.some((a) => a.type === 'turn/ships-place'),
+    ).toBe(false)
+  })
+
+  it('a ship-placer on a short reserve places what remains', () => {
+    let state = withCard2(fresh(), 'red', 'bc13')
+    const reserve = contentsOf(state.figures, Location.reserve('red')).filter((id) =>
+      id.startsWith('red/Ship/'),
+    )
+    let figures = state.figures
+    for (const id of reserve.slice(2)) figures = move(figures, id, Location.trophies('blue'))
+    state = { ...state, figures }
+
+    const step = preludeGuild(state, { ability: 'ships', card: 'bc13' })
+    const ask = step.continue
+    if (ask.kind !== 'ask') throw new Error('expected the placement ask')
+    expect(String(ask.actions[0]!['label'])).toContain('Place 2 ships')
+    const target = String(ask.actions[0]!['system'])
+    const before = contentsOf(step.state.figures, Location.system(target)).filter((id) =>
+      id.startsWith('red/Ship/'),
+    ).length
+    const placed = advance(step.state, ask.actions[0]!, terminal)
+    expect(
+      contentsOf(placed.state.figures, Location.system(target)).filter((id) =>
+        id.startsWith('red/Ship/'),
+      ),
+    ).toHaveLength(before + 2)
   })
 
   it('Elder Broker gains one each of Material, Fuel and Weapon', () => {
@@ -1060,5 +1305,163 @@ describe("the Cartels' supply clauses (bc03 / bc06)", () => {
     // Yellow holds the Material Cartel: keeps Material, loses Fuel to red's Fuel Cartel.
     expect(count('yellow', 'Material')).toBe(1)
     expect(count('yellow', 'Fuel')).toBe(0)
+  })
+})
+
+describe('Relic Fence keeps itself (bc24, docs/20 A4)', () => {
+  /*
+   * "Prelude: Once per turn, you may discard 1 resource to gain 1 Relic." The resource is the
+   * whole cost — the audit found the generic guild-prelude `spent` helper burning the card, which
+   * turned a reusable once-per-turn engine into a one-shot.
+   */
+  function fenced(): GameState {
+    let state = withCard2(fresh(), 'red', 'bc24')
+    state = stripSlots(state, 'red')
+    state = { ...state, resources: gain(state.resources, slotsOf(state, 'red'), 'Material').tracker }
+    return state
+  }
+
+  it('gains the Relic, keeps the card, and marks the turn', () => {
+    const state = fenced()
+    const step = preludeGuild(state, { ability: 'relic-fence', card: 'bc24', spend: 'Material' })
+    expect(countResource(step.state.resources, slotsOf(step.state, 'red'), 'Relic')).toBe(1)
+    expect(securedCards(step.state, 'red')).toContain('bc24')
+    expect(step.state.usedThisTurn).toContain('bc24')
+    expect(step.state.log.at(-1)).toMatch(/traded Material for a Relic \(Relic Fence\)/)
+  })
+
+  it('is not offered again in the same turn, and returns next turn', () => {
+    const state = { ...fenced(), usedThisTurn: ['bc24'] }
+    const offers = guildPreludes(state, 'red')
+    expect(offers.some((o) => o.kind === 'relic-fence')).toBe(false)
+    const nextTurn = { ...state, usedThisTurn: [] }
+    expect(guildPreludes(nextTurn, 'red').some((o) => o.kind === 'relic-fence')).toBe(true)
+  })
+})
+
+describe("usedThisTurn resets at end of turn (the Bards' once-per-game bug, docs/20 A4)", () => {
+  it('performEndTurn clears the per-turn card uses', () => {
+    /*
+     * Found while fixing Relic Fence: the per-turn reset list in performEndTurn never included
+     * usedThisTurn, so Galactic Bards' "once per turn" was once per game. Pinned via the reset
+     * itself: a state carrying uses must leave turn/end without them.
+     */
+    const base = fresh()
+    const marked: GameState = { ...base, usedThisTurn: ['bc25', 'bc24'] }
+    const after = advance(marked, { type: 'turn/end', faction: 'red' }, registry)
+    expect(after.state.usedThisTurn).toEqual([])
+  })
+})
+
+describe("the Interests' Build riders (bc02/bc09, docs/20 A2)", () => {
+  /*
+   * "Manufacture (Build): Gain 1 Material." / "Synthesize (Build): Gain 1 Fuel." Keyed to taking
+   * the Build action from ANY card play — the cards print no Copy/Pivot gate like Insatiable's.
+   * The audit found neither rider implemented.
+   */
+  function buildInControlled(state: GameState, faction: 'red'): GameState {
+    // Find a system red controls with a ship to build from is overkill: performBuild is reached
+    // directly — build a City anywhere red has presence via the action itself.
+    const system = state.board.systems.find((s) =>
+      contentsOf(state.figures, Location.system(s)).some((id) => id.startsWith('red/')),
+    )!
+    return advance(
+      state,
+      { type: 'action/build', faction, piece: 'City', system, then: { type: 'turn/lead-main', faction } },
+      registry,
+    ).state
+  }
+
+  it('a held Mining Interest banks 1 Material on every Build', () => {
+    let state = withCard2(fresh(), 'red', 'bc02')
+    state = stripSlots(state, 'red')
+    const after = buildInControlled(state, 'red')
+    expect(countResource(after.resources, slotsOf(after, 'red'), 'Material')).toBe(1)
+    expect(after.log.some((l) => /red gained 1 Material \(Mining Interest\)/.test(l))).toBe(true)
+  })
+
+  it('Shipping Interest banks Fuel; without a card nothing banks', () => {
+    let armed = withCard2(fresh(), 'red', 'bc09')
+    armed = stripSlots(armed, 'red')
+    const after = buildInControlled(armed, 'red')
+    expect(countResource(after.resources, slotsOf(after, 'red'), 'Fuel')).toBe(1)
+
+    const bare = stripSlots(fresh(), 'red')
+    const nothing = buildInControlled(bare, 'red')
+    expect(countResource(nothing.resources, slotsOf(nothing, 'red'), 'Material')).toBe(0)
+    expect(countResource(nothing.resources, slotsOf(nothing, 'red'), 'Fuel')).toBe(0)
+  })
+})
+
+describe("Farseers' declare-time peek (bc17, docs/20 A3)", () => {
+  /*
+   * "When you declare an ambition, look at a Rival's hand. You may swap 1 card with them." The
+   * audit found this clause entirely absent. The look IS the ask — its options carry the rival's
+   * cards — and the swap moves one card each way.
+   */
+  function declared(state: GameState) {
+    return advance(
+      { ...state, ambitionable: [{ high: 5, low: 3 }] },
+      { type: 'ambition/declare', faction: 'red', ambition: 'Tycoon', suit: 'Aggression', pips: 2 },
+      registry,
+    )
+  }
+
+  it('offers the look after declaring, and the swap moves one card each way', () => {
+    const state = withCard2(fresh(), 'red', 'bc17')
+    const step = declared(state)
+    const c = step.continue
+    if (c.kind !== 'ask') throw new Error('expected the peek ask')
+    const look = c.actions.find((a) => a.type === 'ambition/farseers-look')!
+    expect(look).toBeDefined()
+
+    const swapAsk = advance(step.state, look, registry)
+    const c2 = swapAsk.continue
+    if (c2.kind !== 'ask') throw new Error('expected the swap ask')
+    const take = c2.actions.find((a) => a.type === 'ambition/farseers-take')!
+    const their = take['their'] as string
+    const rival = take['rival'] as FactionId
+
+    const giveAsk = advance(swapAsk.state, take, registry)
+    const c3 = giveAsk.continue
+    if (c3.kind !== 'ask') throw new Error('expected the give ask')
+    const give = c3.actions.find((a) => a.type === 'ambition/farseers-give')!
+    const mine = give['mine'] as string
+
+    const done = advance(giveAsk.state, give, registry)
+    expect(contentsOf(done.state.cards, CardLocation.hand('red'))).toContain(their)
+    expect(contentsOf(done.state.cards, CardLocation.hand(rival))).toContain(mine)
+    expect(done.state.log.some((l) => /swapped a card with/.test(l))).toBe(true)
+  })
+
+  it('declaring without the card goes straight on — no peek', () => {
+    const step = declared(fresh())
+    // The continue resolves onward (Prelude et al.), never a farseers ask.
+    const c = step.continue
+    const types = c.kind === 'ask' ? c.actions.map((a) => a.type) : []
+    expect(types.some((x) => String(x).startsWith('ambition/farseers'))).toBe(false)
+  })
+})
+
+describe('Sworn Guardians is itself stealable, then buried (bc22, docs/20 B2)', () => {
+  /*
+   * "Rivals cannot steal your resources and OTHER Guild cards. If this card is stolen, bury it.
+   * (In battle, rivals can steal this card first before spending keys.)" The audit found the
+   * engine over-blocking: the whole raid menu vanished, Silver Tongues skipped SG holders
+   * entirely, and bury had no implementation.
+   */
+  it('Silver Tongues can take exactly SG from a guarded rival — and it goes to the deck bottom', () => {
+    let state = withCard2(withCard2(fresh(), 'red', 'bc20'), 'yellow', 'bc22')
+    state = withCard2(state, 'yellow', 'bc24') // another guild card that must stay unstealable
+    const offers = guildPreludes(state, 'red').filter((o) => o.kind === 'silver-tongues-card')
+    expect(offers).toHaveLength(1)
+    expect((offers[0] as { stolen: string }).stolen).toBe('bc22')
+
+    const o = offers[0] as { kind: string; card: string; rival: string; stolen: string }
+    const step = preludeGuild(state, { ability: o.kind, card: o.card, rival: o.rival, stolen: o.stolen })
+    // Buried: bottom of the court deck, not red's pile.
+    expect(securedCards(step.state, 'red')).not.toContain('bc22')
+    expect(contentsOf(step.state.courtCards, CourtPile.deck()).at(-1)).toBe('bc22')
+    expect(step.state.log.some((l) => /stole Sworn Guardians from yellow — buried/.test(l))).toBe(true)
   })
 })

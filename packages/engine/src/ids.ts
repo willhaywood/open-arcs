@@ -89,5 +89,11 @@ export const CardLocation = {
   deck: (): LocationId => 'deck',
   hand: (f: FactionId): LocationId => `hand:${f}`,
   played: (f: FactionId): LocationId => `played:${f}`,
+  /**
+   * A Union's taken card, waiting out the round (docs/20 B1): "When the round ends, draw that
+   * card into your hand." Officially ruled — collected "at the end of the round, after all
+   * players have finished their turns" — so it cannot fund a seize or a discard this round.
+   */
+  pending: (f: FactionId): LocationId => `pending:${f}`,
   discard: (): LocationId => 'discard',
 } as const

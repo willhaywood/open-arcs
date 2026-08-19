@@ -72,6 +72,17 @@ Silver Tongues offer likewise skips SG holders entirely. And "bury it" (bottom o
 has no implementation on the steal path. Self-consistent, and wrong at the edge the card writes
 out longhand.
 
+### B3. Gatekeepers (bc08) — the Prelude's shortage case gives the player no choice
+Found after the audit, while answering "who picks the gates when the reserve runs short?".
+Card: "Prelude: You may discard this to place 1 ship in each gate (unless out of play)." The card
+does not say what happens when the reserve holds fewer ships than there are gates, and the FAQ is
+silent. Engine (rules/turn.ts `case 'gates'`): filled gates in **board-definition order** and
+stopped when the reserve emptied — which gates got ships was an accident of data layout. The
+engine's own Mass Uprising docblock (rules/vox.ts) reasons the identical shortage out the other
+way: "the card does not say what happens then, so the systems that get one are the player's
+choice", implemented as a placement prompt. Fixed to match: the shortage (and only the shortage)
+asks, offered on the map as lit-up gates like Mass Uprising's placement step.
+
 ## Findings — confirmed correct (with the citation that proves it)
 
 | card(s) | verdict |
@@ -85,7 +96,7 @@ out longhand.
 | Silver Tongues (bc20) | both steal modes (card and resource) offered |
 | Secret Order (bc18) | Keeper/Empath declare without zeroing (ambitions.ts:337) |
 | Lattice Spies (bc16) | burn-instead-of-card seize (turn.ts:545), discarded on use |
-| Galactic Bards (bc25) | Surpass/Pivot declare with `usedThisTurn` limiter, no zero marker |
+| Galactic Bards (bc25) | Surpass/Pivot declare, no zero marker — **correction found during the fixes**: the `usedThisTurn` limiter existed but nothing ever reset it, so "once per turn" was once per game; the reset landed with the A4 fix |
 | Mass Uprising (bc26) | one-per-system reading, with a documented deliberate divergence *from HRF toward the card text* (vox.ts) — the direction this audit exists to enforce |
 | Populist Demands (bc27), Outrage Spreads (bc28), Song of Freedom (bc29, bury + reshuffle), Guild Struggle (bc30, steal + discard-recycle), | vox.ts, each matching its text |
 | Interests' Prelude (bc02/09) | fill-open-slots with steal-on-empty-supply — the *Prelude* half is right; only the Build riders (A2) are missing |
@@ -109,3 +120,6 @@ Build riders**, **A3 Farseers** (largest, four sub-fixes), **A5 Call to Action**
 Unions** and **B2 Sworn Guardians**. Each is its own branch with the card text as its test's
 docstring, per the Cartel precedent. The golden baseline will move for any fix the baseline games
 touch — the documented rules-fix exception applies.
+
+**B3** (the Gatekeepers shortage prompt) was found and fixed after this list was triaged; it rides
+the same fix branch as A1–B2.
