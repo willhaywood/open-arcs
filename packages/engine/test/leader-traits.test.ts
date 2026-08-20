@@ -18,6 +18,7 @@ import {
   Location,
   advance,
   citiesInReserve,
+  connectedSystems,
   contentsOf,
   countResource,
   courtCard,
@@ -736,7 +737,11 @@ describe('Tactical (Warrior) and Charismatic (Feastbringer) — a second action 
     })
 
     it('carries on when a required follow-up turns out to be impossible', () => {
-      // No ships anywhere means no battle to be had after the move.
+      /*
+       * The unreachable guard for docs/21 B1: the pair offers and the per-leg/per-slot filters
+       * mean a required follow-up can no longer come up empty in ordinary play, but a direct
+       * dispatch (or a future gap) still lands softly rather than crashing the turn.
+       */
       let s = variant()
       for (const sys of s.board.systems) s = clearSystem(s, sys)
       const out = advance(
@@ -746,6 +751,98 @@ describe('Tactical (Warrior) and Charismatic (Feastbringer) — a second action 
       )
       expect(out.state.log.join('\n')).toContain('had no Battle to take')
       expect(out.continue.kind).toBe('ask')
+    })
+  })
+
+  describe('an unmeetable "must" is never opened (docs/21 B1)', () => {
+    /*
+     * FAQ (Warrior): "You must perform a legal Battle action after moving (must have a legal
+     * target to attack). Otherwise the move must be undone." FAQ (Feastbringer): the same for
+     * Influence-then-Secure. A journaled engine cannot undo, so the restriction is constructive:
+     * the pair is gated on the follow-up being satisfiable, and the primary action's own menu
+     * only offers legs/slots the follow-up survives.
+     */
+    const empty = (state: GameState): GameState => {
+      let s = state
+      for (const sys of s.board.systems) s = clearSystem(s, sys)
+      return s
+    }
+
+    it("Tactical's pair never opens with no enemy anywhere to battle", () => {
+      let s = empty(played(withLeader(fresh(), 'red', 'leader06'), 'red', 'copy'))
+      const a = s.board.systems[0]!
+      s = place(s, 'red', a, 'Ship', 3)
+      s = { ...s, anyBattle: true }
+      expect(menu(s, 'Administration')).not.toContain('Move, then must Battle')
+    })
+
+    it('the must-move offers only legs a battle survives', () => {
+      let s = empty(played(withLeader(fresh(), 'red', 'leader06'), 'red', 'copy'))
+      const a = s.board.systems[0]!
+      const neighbours = connectedSystems(s.board, a)
+      const b = neighbours[0]!
+      const c = neighbours.find((x: string) => x !== b)!
+      s = place(s, 'red', a, 'Ship', 2)
+      s = place(s, 'yellow', b, 'Ship', 1)
+      s = { ...s, anyBattle: true }
+      const pair = menuActions(s, 'Administration').find(
+        (x) => x['label'] === 'Move, then must Battle',
+      )!
+      const moves = labels(advance(s, pair, registry).continue)
+      expect(moves.some((l) => l.startsWith(`Move ${a} → ${b}`))).toBe(true)
+      expect(moves.some((l) => l.startsWith(`Move ${a} → ${c}`))).toBe(false)
+    })
+
+    it('a battle only at the origin caps the move at fleet minus one', () => {
+      // Enemies stand where red stands and nowhere else: any leg is legal only by leaving a
+      // ship behind to fight them, so moving the whole fleet is never offered.
+      let s = empty(played(withLeader(fresh(), 'red', 'leader06'), 'red', 'copy'))
+      const a = s.board.systems[0]!
+      const b = connectedSystems(s.board, a)[0]!
+      s = place(s, 'red', a, 'Ship', 2)
+      s = place(s, 'yellow', a, 'Ship', 1)
+      s = { ...s, anyBattle: true }
+      const pair = menuActions(s, 'Administration').find(
+        (x) => x['label'] === 'Move, then must Battle',
+      )!
+      const pick = ask(advance(s, pair, registry).continue).actions.find(
+        (x) => x.type === 'action/move-pick' && x['to'] === b,
+      )!
+      const counts = ask(advance(s, pick, registry).continue)
+        .actions.filter((x) => x.type === 'action/move-ships')
+        .map((x) => x['count'])
+      expect(counts).toEqual([1])
+    })
+
+    it("Charismatic's must-influence offers only slots a secure survives", () => {
+      // Slot j is contested two-deep (one more agent cannot secure it); slot k is open.
+      let s = played(withLeader(fresh(), 'red', 'leader07'), 'red', 'copy')
+      const slots = courtSlots(s.factions.length)
+      const j = slots[0]!
+      const contestedCourt = Location.court(j)
+      const contents = new Map(s.figures.contents)
+      const at = new Map(s.figures.at)
+      const yellows = (contents.get('reserve:yellow') ?? [])
+        .filter((id) => id.startsWith('yellow/Agent/'))
+        .slice(0, 2)
+      contents.set('reserve:yellow', (contents.get('reserve:yellow') ?? []).filter((id) => !yellows.includes(id)))
+      contents.set(contestedCourt, [...(contents.get(contestedCourt) ?? []), ...yellows])
+      for (const id of yellows) at.set(id, contestedCourt)
+      s = { ...s, figures: { ...s.figures, contents, at } }
+
+      const offer = advance(
+        s,
+        {
+          type: 'action/take',
+          faction: 'red',
+          action: 'Influence',
+          then: { type: 'leaders/must-follow', faction: 'red', act: 'Secure', then: STOP },
+        },
+        registry,
+      ).continue
+      const offered = ask(offer).actions.filter((x) => x.type === 'action/influence')
+      expect(offered.length).toBeGreaterThan(0)
+      expect(offered.some((x) => x['slot'] === j)).toBe(false)
     })
   })
 })

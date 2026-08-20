@@ -69,7 +69,14 @@ import {
   afterDeclarePeek,
   takeAmbitionMarker,
 } from './ambitions.js'
-import { TakeAction, arrangeThen, canTake, overflowThen } from './standard-actions.js'
+import {
+  TakeAction,
+  arrangeThen,
+  canMustBattleMove,
+  canMustSecureInfluence,
+  canTake,
+  overflowThen,
+} from './standard-actions.js'
 import type { PipReturn } from './standard-actions.js'
 import { hasTrait } from '../leaders.js'
 import {
@@ -1245,15 +1252,29 @@ function pipOptions(
     else options.push({ ...TakeAction(faction, a, then), faction, label: a })
   }
 
-  // The "before" entries, which reach an action this suit may not otherwise offer.
-  if (tactical && !available.includes('Move') && canTake(state, faction, 'Move', then)) {
+  /*
+   * The "before" entries, which reach an action this suit may not otherwise offer. Each is gated
+   * on the required follow-up being satisfiable at all (docs/21 B1) — the FAQ says an unmet
+   * "must" undoes the primary action, and the constructive equivalent is never opening a pair
+   * whose second half cannot happen. The action offers themselves then restrict per-leg/per-slot.
+   */
+  if (
+    tactical &&
+    !available.includes('Move') &&
+    canTake(state, faction, 'Move', then) &&
+    canMustBattleMove(state, faction)
+  ) {
     options.push({
       ...TakeAction(faction, 'Move', MustFollow(faction, 'Battle', then)),
       faction,
       label: 'Move, then must Battle',
     })
   }
-  if (charismatic && canTake(state, faction, 'Influence', then)) {
+  if (
+    charismatic &&
+    canTake(state, faction, 'Influence', then) &&
+    canMustSecureInfluence(state, faction)
+  ) {
     options.push({
       ...TakeAction(faction, 'Influence', MustFollow(faction, 'Secure', then)),
       faction,

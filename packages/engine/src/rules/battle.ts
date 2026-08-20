@@ -162,7 +162,7 @@ export function interceptionRisk(
   return { chance, hits }
 }
 
-function enemiesAt(state: Battlefield, s: SystemId, self: FactionId): ColorId[] {
+export function enemiesAt(state: Battlefield, s: SystemId, self: FactionId): ColorId[] {
   const colors = new Set<ColorId>()
   for (const id of contentsOf(state.figures, Location.system(s))) {
     const f = parseFigureId(id)

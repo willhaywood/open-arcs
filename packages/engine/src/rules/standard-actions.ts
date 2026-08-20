@@ -82,7 +82,7 @@ import {
   tradeTargets,
   weaponReach,
 } from '../guild-actions.js'
-import { DeclareBattle, canBattle } from './battle.js'
+import { DeclareBattle, canBattle, enemiesAt } from './battle.js'
 import { VoxTrigger } from './vox.js'
 
 /** The pip step to return to after an action resolves. Encoded, so it survives the journal. */
@@ -224,6 +224,8 @@ function offerMove(state: GameState, faction: FactionId, then: PipReturn): Conti
     const fleet = fleetAt(state, faction, system)
     if (fleet.length === 0) continue
     for (const dest of connectedSystems(state.board, system)) {
+      // Tactical's must-Battle rider: legs a battle cannot survive are never offered (docs/21 B1).
+      if (mustFollowBattle(then) && !mustBattleLegOk(state, faction, system, dest)) continue
       const cat = canCatapult(state, faction, system, dest)
       options.push({
         ...MovePick(faction, system, dest, then),
@@ -250,6 +252,66 @@ function movableCount(state: GameState, faction: FactionId, fleet: number): numb
   return hasTrait(state, faction, 'Disorganized') ? Math.min(fleet, 2) : fleet
 }
 
+/*
+ * Tactical's "must Battle" rider (docs/21 B1). The FAQ: the Tactical move needs "a legal Battle
+ * action after moving (must have a legal target to attack). Otherwise the move must be undone."
+ * A journaled engine cannot undo, so the restriction is constructive — a leg is offered only when
+ * a battle survives it:
+ *
+ *   (a) the destination holds enemy pieces — the arriving fleet fights there;
+ *   (b) a battle exists in some system other than the origin, untouched by this departure;
+ *   (c) enemies stand at the origin and ships can stay behind to fight them — which is why the
+ *       count step caps at fleet − 1 when (c) is the only justification (`mustBattleCap`).
+ *
+ * The same test runs at every catapult leg with the current position as the origin: each arrival
+ * was only ever offered under (a)–(c), so stopping is always safe, and continuing is re-checked.
+ */
+function mustFollowBattle(then: PipReturn): boolean {
+  return then.type === 'leaders/must-follow' && then['act'] === 'Battle'
+}
+
+/** A battle in some system other than `except`: my ships and enemy pieces already together. */
+function battleElsewhere(state: GameState, faction: FactionId, except: SystemId): boolean {
+  return state.board.systems.some(
+    (s) =>
+      s !== except &&
+      fleetAt(state, faction, s).length > 0 &&
+      enemiesAt(state, s, faction).length > 0,
+  )
+}
+
+function mustBattleLegOk(state: GameState, faction: FactionId, from: SystemId, to: SystemId): boolean {
+  if (enemiesAt(state, to, faction).length > 0) return true
+  if (battleElsewhere(state, faction, from)) return true
+  return enemiesAt(state, from, faction).length > 0 && fleetAt(state, faction, from).length >= 2
+}
+
+/** The fleet-size ceiling under the must-Battle rider — see `mustBattleLegOk` clause (c). */
+function mustBattleCap(
+  state: GameState,
+  faction: FactionId,
+  from: SystemId,
+  to: SystemId,
+  then: PipReturn,
+  fleet: number,
+): number {
+  if (!mustFollowBattle(then)) return fleet
+  if (enemiesAt(state, to, faction).length > 0) return fleet
+  if (battleElsewhere(state, faction, from)) return fleet
+  return fleet - 1
+}
+
+/** Whether any move leg at all could satisfy the must-Battle rider — gates the pair's offer. */
+export function canMustBattleMove(state: GameState, faction: FactionId): boolean {
+  for (const from of state.board.systems) {
+    if (fleetAt(state, faction, from).length === 0) continue
+    for (const to of connectedSystems(state.board, from)) {
+      if (mustBattleLegOk(state, faction, from, to)) return true
+    }
+  }
+  return false
+}
+
 function offerFleetSize(
   state: GameState,
   faction: FactionId,
@@ -260,7 +322,11 @@ function offerFleetSize(
   const fleet = fleetAt(state, faction, from)
   if (fleet.length === 0) return C.then(then as Action)
   const options: Action[] = []
-  for (let n = movableCount(state, faction, fleet.length); n >= 1; n--) {
+  const ceiling = Math.min(
+    movableCount(state, faction, fleet.length),
+    mustBattleCap(state, faction, from, to, then, fleet.length),
+  )
+  for (let n = ceiling; n >= 1; n--) {
     options.push({
       ...MoveShips(faction, from, to, n, then),
       faction,
@@ -646,6 +712,8 @@ function offerMoveMore(
 
   const options: Action[] = []
   for (const dest of connectedSystems(state.board, from)) {
+    // The must-Battle rider re-checks every catapult leg from the fleet's current position.
+    if (mustFollowBattle(then) && !mustBattleLegOk(state, faction, from, dest)) continue
     const onward =
       systemInfo(dest).isGate &&
       !state.factions.some((e) => e !== faction && rules(state, e, dest))
@@ -674,12 +742,19 @@ function offerMoveMoreSize(
 ): Continue {
   const alive = presentGroup(state, group)
   if (alive.length === 0) return C.then(then as Action)
-  if (alive.length === 1) {
+  const home = state.figures.at.get(alive[0]!) ?? ''
+  const from = home.startsWith('system:') ? (home.slice('system:'.length) as SystemId) : undefined
+  const cap =
+    from === undefined
+      ? alive.length
+      : mustBattleCap(state, faction, from, to, then, alive.length)
+  if (cap === 0) return C.then(then as Action)
+  if (alive.length === 1 && cap >= 1) {
     // No choice to make with a single ship; skip the question.
     return C.then(MoveMoreGo(faction, to, alive, 1, then))
   }
   const options: Action[] = []
-  for (let n = alive.length; n >= 1; n--) {
+  for (let n = cap; n >= 1; n--) {
     const left = alive.length - n
     options.push({
       ...MoveMoreGo(faction, to, alive, n, then),
@@ -1712,8 +1787,19 @@ function offerInfluence(state: GameState, faction: FactionId, then: PipReturn): 
   if (reservePiece(state, faction, 'Agent') === undefined) {
     return C.ask(state.current ?? faction, [skip(faction, then)], `${faction} has no agents left`)
   }
+  /*
+   * Charismatic's "must Secure" rider (docs/21 B1) — the same FAQ shape as Tactical's: "You must
+   * perform a legal secure after you influence... Otherwise the influence must be undone." No
+   * undo in a journaled engine, so a slot is only offered when a secure survives: placing the
+   * agent there creates one, or some other slot is securable already (influence only ever adds
+   * my agents, so an existing secure elsewhere cannot be broken by this placement).
+   */
+  const mustSecure = then.type === 'leaders/must-follow' && then['act'] === 'Secure'
+  const secureSomewhere =
+    mustSecure && courtSlots(state.factions.length).some((n) => canSecure(state, faction, n))
   const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => cardInSlot(state, n) !== undefined)
+    .filter((n) => !mustSecure || secureSomewhere || securesWithOneMore(state, faction, n))
     .map((n) => ({
       ...InfluenceSlot(faction, n, then),
       faction,
@@ -1783,6 +1869,31 @@ function offerSecondInfluence(state: GameState, faction: FactionId, then: PipRet
  * HRF disables the option when your count is `<=` the best any one rival has
  * (`game-common.scala:1170`) — a tie is not enough, which is the whole tension of the court.
  */
+/** Would one more of my agents on slot `n` make it securable? Charismatic's rider reads this. */
+function securesWithOneMore(state: GameState, faction: FactionId, n: number): boolean {
+  const card = cardInSlot(state, n)
+  if (card === undefined) return false
+  const mine = agentsOn(state, n, faction).length + 1
+  // Mirror canSecure's Paranoid clause, so the two never drift (no leader carries both traits,
+  // but the hypothetical must answer the same question canSecure will be asked afterwards).
+  if (hasTrait(state, faction, 'Paranoid') && courtCard(card).kind === 'guild' && mine <= 1) {
+    return false
+  }
+  const best = Math.max(
+    0,
+    ...state.factions.filter((f) => f !== faction).map((f) => agentsOn(state, n, f).length),
+  )
+  return mine > best
+}
+
+/** Whether influencing any slot could satisfy the must-Secure rider — gates the pair's offer. */
+export function canMustSecureInfluence(state: GameState, faction: FactionId): boolean {
+  if (reservePiece(state, faction, 'Agent') === undefined) return false
+  return courtSlots(state.factions.length).some(
+    (n) => canSecure(state, faction, n) || securesWithOneMore(state, faction, n),
+  )
+}
+
 function canSecure(state: GameState, faction: FactionId, n: number): boolean {
   const card = cardInSlot(state, n)
   if (card === undefined) return false
