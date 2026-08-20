@@ -29,11 +29,11 @@ CENTERS = {
 # verified by overlay in the renderer. Gates have no planet, and no printed building slots.
 PLANETS = {
     (1, "Arrow"): (1108, 192, 88), (1, "Crescent"): (1441, 206, 81), (1, "Hex"): (1720, 268, 90),
-    (2, "Arrow"): (2003, 442, 82), (2, "Crescent"): (2118, 667, 80), (2, "Hex"): (2196, 828, 100),
-    (3, "Arrow"): (2207, 1133, 68), (3, "Crescent"): (2340, 1511, 69), (3, "Hex"): (1735, 1470, 95),
+    (2, "Arrow"): (2003, 442, 82), (2, "Crescent"): (1986, 717, 105), (2, "Hex"): (2150, 920, 110),
+    (3, "Arrow"): (2207, 1133, 68), (3, "Crescent"): (1928, 1400, 95), (3, "Hex"): (1772, 1604, 100),
     (4, "Arrow"): (1492, 1522, 90), (4, "Crescent"): (1096, 1620, 104), (4, "Hex"): (769, 1543, 112),
     (5, "Arrow"): (440, 1352, 80), (5, "Crescent"): (200, 1166, 95), (5, "Hex"): (320, 870, 100),
-    (6, "Arrow"): (401, 690, 110), (6, "Crescent"): (370, 327, 117), (6, "Hex"): (794, 374, 80),
+    (6, "Arrow"): (401, 690, 110), (6, "Crescent"): (370, 327, 117), (6, "Hex"): (730, 278, 100),
 }
 
 # arcs/ui.scala:450-469 — where the gate-link marker is drawn. 18 entries, one per
