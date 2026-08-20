@@ -933,6 +933,45 @@ describe('Noble (leader12) — Connected secures on a fresh declaration', () => 
     const base = withLeader(fresh(), 'yellow', 'leader12')
     expect(securedCards(declare(base, 'red', 'Tycoon'), 'red')).toHaveLength(0)
   })
+
+  it('a Farseers drawn by Connected does not peek on the same declaration (docs/21 B4)', () => {
+    /*
+     * The official FAQ: "If I secure Farseers, does Connected trigger? No. Farseers being drawn
+     * as a result of Connected does not see the timing window to then trigger its ability."
+     * Eligibility is judged on the pre-declare hold, so the freshly secured card stays quiet —
+     * and a Farseers held BEFORE declaring still peeks (the positive control).
+     */
+    const moveCourt = (state: GameState, card: string, to: string): GameState => {
+      const contents = new Map(state.courtCards.contents)
+      const at = new Map(state.courtCards.at)
+      const from = at.get(card)!
+      contents.set(from, (contents.get(from) ?? []).filter((c) => c !== card))
+      contents.set(to, [card, ...(contents.get(to) ?? []).filter((c) => c !== card)])
+      at.set(card, to)
+      return { ...state, courtCards: { ...state.courtCards, contents, at } }
+    }
+    const DECLARE = {
+      type: 'ambition/declare',
+      faction: 'red',
+      ambition: 'Tycoon',
+      suit: 'Material',
+      pips: 1,
+    } as const
+
+    const noble = moveCourt(withLeader(fresh(), 'red', 'leader12'), 'bc17', CourtPile.deck())
+    const out = advance(noble, DECLARE, registry)
+    expect(securedCards(out.state, 'red')).toEqual(['bc17'])
+    expect(
+      out.continue.kind === 'ask' &&
+        out.continue.actions.some((a) => String(a.type).startsWith('ambition/farseers')),
+    ).toBe(false)
+
+    const holder = moveCourt(fresh(), 'bc17', CourtPile.secured('red'))
+    const peek = advance(holder, DECLARE, registry).continue
+    expect(
+      peek.kind === 'ask' && peek.actions.some((a) => a.type === 'ambition/farseers-look'),
+    ).toBe(true)
+  })
 })
 
 describe('Influential (Noble, leader12) — a Copy or Pivot influences twice', () => {

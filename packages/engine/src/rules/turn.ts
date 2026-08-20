@@ -32,6 +32,7 @@ import { citiesInReserve, rules, slotsOf } from '../control.js'
 import { system as systemInfo } from '../board.js'
 import {
   CourtPile,
+  FARSEERS,
   GALACTIC_BARDS,
   RELIC_FENCE,
   LATTICE_SPIES,
@@ -601,8 +602,17 @@ function performBardsDeclare(
   // Free, and like Populist Demands it does not zero the played card.
   const taken = takeAmbitionMarker(state, faction, ambition)
   const next: GameState = { ...taken, usedThisTurn: [...taken.usedThisTurn, GALACTIC_BARDS] }
-  // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3).
-  return { state: next, continue: afterDeclarePeek(next, faction, CheckSeize(faction, pips, suit)) }
+  // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3),
+  // judged on the pre-declare hold so a Connected-drawn Farseers stays quiet (docs/21 B4).
+  return {
+    state: next,
+    continue: afterDeclarePeek(
+      next,
+      faction,
+      CheckSeize(faction, pips, suit),
+      hasGuild(state, faction, FARSEERS),
+    ),
+  }
 }
 
 function performSeize(
