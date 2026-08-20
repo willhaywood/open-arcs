@@ -464,7 +464,12 @@ function offerBold(
  *
  * The recipient is every rival tied for the least Power, so the giver chooses among them.
  */
-function offerGenerous(state: GameState, faction: FactionId, declare: Action): Continue {
+function offerGenerous(
+  state: GameState,
+  faction: FactionId,
+  declare: Action,
+  forfeit: Action,
+): Continue {
   const rivals = state.factions.filter((f) => f !== faction)
   const least = Math.min(...rivals.map((f) => state.power[f] ?? 0))
   const poorest = rivals.filter((f) => (state.power[f] ?? 0) === least)
@@ -483,18 +488,49 @@ function offerGenerous(state: GameState, faction: FactionId, declare: Action): C
       })
     }
   }
-  const forfeit: Action = {
-    type: 'ambition/skip-declare',
-    faction,
-    suit: declare['suit'],
-    pips: declare['pips'],
-    label: `Forfeit declaring ${String(declare['ambition'])}`,
-  }
   return C.ask(
     faction,
     [...options, forfeit],
     `${faction} must give a Guild card to declare (their leader)`,
   )
+}
+
+/**
+ * Generous is a cost on **every** declare path — the official FAQ, asked about Populist Demands
+ * outright: "Giving away a Guild is a mandatory cost for all declares" (docs/21 B2). Besides the
+ * standard `ambition/declare`, two actions take a marker directly and are intercepted here the
+ * same way: Populist Demands' free declaration and Tycoon's Ambition's Prelude one. Each path
+ * keeps its own way out, since forfeiting must land wherever declining would have.
+ */
+function generousIntercept(state: GameState, action: Action): RuleResult | undefined {
+  const faction = action['faction'] as FactionId
+  if (action['generous'] === 'paid') return undefined
+  if (!hasTrait(state, faction, 'Generous')) return undefined
+
+  const forfeit: Action =
+    action.type === 'vox/populist'
+      ? {
+          type: 'vox/done',
+          faction,
+          card: action['card'],
+          then: action['then'],
+          bury: false,
+          label: `Forfeit declaring ${String(action['ambition'])}`,
+        }
+      : action.type === 'turn/prelude-tycoon'
+        ? {
+            ...Prelude(faction, action['suit'] as Suit, action['pips'] as number),
+            faction,
+            label: `Forfeit declaring ${String(action['ambition'])}`,
+          }
+        : {
+            type: 'ambition/skip-declare',
+            faction,
+            suit: action['suit'],
+            pips: action['pips'],
+            label: `Forfeit declaring ${String(action['ambition'])}`,
+          }
+  return { state, continue: offerGenerous(state, faction, action, forfeit) }
 }
 
 function performGenerousGive(
@@ -766,12 +802,11 @@ export const LeadersModule: RuleModule = {
           action['then'] as Action,
         )
 
-      case 'ambition/declare': {
-        // A cost paid before the base rules take the marker — see `offerGenerous`.
-        const faction = action['faction'] as FactionId
-        if (action['generous'] === 'paid') return unhandled(state)
-        if (!hasTrait(state, faction, 'Generous')) return unhandled(state)
-        return { state, continue: offerGenerous(state, faction, action) }
+      case 'ambition/declare':
+      case 'vox/populist':
+      case 'turn/prelude-tycoon': {
+        // A cost paid before any marker is taken — see `generousIntercept` (docs/21 B2).
+        return generousIntercept(state, action) ?? unhandled(state)
       }
 
       case 'leaders/ambitious-gain':

@@ -900,6 +900,56 @@ describe('Bold (Demagogue) and Generous (Feastbringer) — the declare-time trai
       expect(advance(s, forfeit, registry).state.declared).toEqual(s.declared)
     })
 
+    it('charges Populist Demands too — a mandatory cost for ALL declares (docs/21 B2)', () => {
+      /*
+       * The official FAQ, asked about exactly this: "Can I declare without giving away a Guild
+       * card if I have none, or if I'm using Populist Demands? No. Giving away a Guild is a
+       * mandatory cost for all declares." The free declaration used to bypass the gift.
+       */
+      const base = variant('leader07')
+      const card = aGuildCard(base)
+      const s = secured(base, 'red', card)
+      const populist = {
+        type: 'vox/populist',
+        faction: 'red',
+        ambition: 'Tycoon',
+        card: 'bc27',
+        then: { type: 'turn/lead-main', faction: 'red' },
+      }
+      const out = advance(s, populist, registry)
+      expect(labels(out.continue).some((l) => l.startsWith('Give '))).toBe(true)
+      expect(out.state.declared).toEqual(s.declared)
+
+      const give = ask(out.continue).actions.find((a) => a.type === 'leaders/generous-give')!
+      const after = advance(s, give, registry)
+      expect(after.state.declared.length).toBe(s.declared.length + 1)
+
+      // Forfeiting is a real way out and declares nothing.
+      const forfeit = ask(out.continue).actions.find((a) =>
+        String(a['label']).startsWith('Forfeit'),
+      )!
+      expect(advance(s, forfeit, registry).state.declared).toEqual(s.declared)
+    })
+
+    it("charges Tycoon's Ambition's Prelude declare as well", () => {
+      const base = variant('leader07')
+      const card = aGuildCard(base)
+      const s = secured(base, 'red', card)
+      const tycoon = {
+        type: 'turn/prelude-tycoon',
+        faction: 'red',
+        ambition: 'Warlord',
+        suit: 'Administration',
+        pips: 1,
+      }
+      const out = advance(s, tycoon, registry)
+      expect(labels(out.continue).some((l) => l.startsWith('Give '))).toBe(true)
+      expect(out.state.declared).toEqual(s.declared)
+      const give = ask(out.continue).actions.find((a) => a.type === 'leaders/generous-give')!
+      const after = advance(s, give, registry)
+      expect(after.state.declared.at(-1)!.ambition).toBe('Warlord')
+    })
+
     it('does not intercept a faction without the trait', () => {
       const s = variant(undefined)
       const out = advance(s, DECLARE, registry)
