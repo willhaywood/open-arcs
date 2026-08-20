@@ -972,7 +972,8 @@ function offerTax(state: GameState, faction: FactionId, then: PipReturn): Contin
     // Gate Stations (lore11) makes a gate city taxable for any type its cluster holds, so a gate
     // offers one option per type rather than the single printed resource a planet has.
     for (const city of taxableAt(state, faction, s)) {
-      for (const r of gateCityTypes(state, s)) {
+      const types = gateCityTypes(state, s)
+      for (const r of types) {
         if (taxGainsNothing(state, faction, s, city, r)) continue
         options.push({
           ...TaxCity(faction, s, then),
@@ -983,6 +984,24 @@ function offerTax(state: GameState, faction: FactionId, then: PipReturn): Contin
             cityOwner(state, faction, city) === undefined
               ? `Tax ${s} (+${r}, Gate Stations)`
               : `Tax ${cityOwner(state, faction, city)!}'s city in ${s} (+${r}, Gate Stations)`,
+        })
+      }
+      /*
+       * The FAQ's typeless case (docs/21 B6): "If a Gate Station is in a cluster with no other
+       * city, it has no type... Taxing it yields no resource, **but it can still be taxed**."
+       * One option, no resource — the tax still marks the city, captures off a rival's, and
+       * feeds tax-triggered effects.
+       */
+      const stationsInPlay = state.factions.some((f) => hasLore(state, f, GATE_STATIONS))
+      if (types.length === 0 && systemInfo(s).isGate && stationsInPlay) {
+        options.push({
+          ...TaxCity(faction, s, then),
+          city,
+          faction,
+          label:
+            cityOwner(state, faction, city) === undefined
+              ? `Tax ${s} (no type — nothing gained, Gate Stations)`
+              : `Tax ${cityOwner(state, faction, city)!}'s city in ${s} (no type, Gate Stations)`,
         })
       }
     }
@@ -1046,8 +1065,12 @@ function performTaxCity(
   city: string,
   chosen?: Resource,
 ): RuleResult {
-  // A gate has no printed resource; the type comes from the option that was picked.
-  const resource = chosen ?? (planetResource(state, system) as Resource)
+  // A gate has no printed resource; the type comes from the option that was picked. A TYPELESS
+  // gate city (docs/21 B6) has neither — the tax proceeds and simply gains nothing.
+  const resource = chosen ?? (planetResource(state, system) as Resource | undefined)
+  if (resource === undefined) {
+    return performTaxCityTypeless(state, faction, system, then, city)
+  }
   const taxed = gain(state.resources, slotsOf(state, faction), resource, ResourceSlot.overflow(faction))
   const { tracker } = taxed
   const note = taxed.gained
@@ -1096,6 +1119,55 @@ function performTaxCity(
   // Mythic comes after the overflow is settled, so the Shaper reshapes the planet holding what it
   // actually ended up with rather than what it briefly had in hand.
   const after = Mythic(faction, system, city, Ruthless(faction, system, city, 'tax', then, resource))
+  return { state: next, continue: overflowThen(next, faction, after) }
+}
+
+/**
+ * A typeless gate city's tax (docs/21 B6): the FAQ says it "can still be taxed" — yielding no
+ * resource, but everything else a tax does still happens: the once-per-turn mark, the capture off
+ * a rival's city, the Copy/Pivot leader bonuses (the Mystic FAQ already rules a yield-free tax
+ * pays them), and the Ruthless follow-up. Mythic self-gates on gates, so the chain is harmless.
+ */
+function performTaxCityTypeless(
+  state: GameState,
+  faction: FactionId,
+  system: SystemId,
+  then: PipReturn,
+  city: string,
+): RuleResult {
+  let resources = state.resources
+  const log = [...state.log, `${faction} taxed ${system} (no type — nothing gained)`]
+
+  let figures = state.figures
+  const owner = loreActive(state, faction, EMPATHS_BOND)
+    ? undefined
+    : cityOwner(state, faction, city)
+  if (owner !== undefined) {
+    const agent = reservePiece(state, owner, 'Agent')
+    if (agent === undefined) {
+      log.push(`${owner} had no agent for ${faction} to capture`)
+    } else {
+      figures = move(figures, agent, Location.captives(faction))
+      log.push(`${faction} captured a ${owner} agent by taxing`)
+    }
+  }
+  for (const r of taxBonusResources(state, faction)) {
+    const extra = gain(resources, slotsOf(state, faction), r, ResourceSlot.overflow(faction))
+    resources = extra.tracker
+    log.push(
+      extra.gained || extra.overflowed
+        ? `${faction} gained ${r} from their leader`
+        : `${faction} could not gain ${r} from their leader (none in supply)`,
+    )
+  }
+  const next: GameState = {
+    ...state,
+    figures,
+    resources,
+    taxedThisTurn: [...state.taxedThisTurn, city],
+    log,
+  }
+  const after = Mythic(faction, system, city, Ruthless(faction, system, city, 'tax', then, undefined))
   return { state: next, continue: overflowThen(next, faction, after) }
 }
 

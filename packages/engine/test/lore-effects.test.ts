@@ -30,6 +30,7 @@ import {
   outragedResources,
   slotCapacity,
   slotKeys,
+  heldTokens,
   slotsOf,
   startGame,
   tallyOf,
@@ -951,6 +952,13 @@ describe('Gate Stations (lore11) — a gate city takes its cluster’s types', (
     ).actions.map((a) => String(a['label'] ?? a.type))
   }
 
+  function taxOptions(state: GameState): readonly Action[] {
+    return ask(
+      advance(state, { type: 'action/take', faction: 'red', action: 'Tax', then: STOP }, registry)
+        .continue,
+    ).actions.filter((a) => a.type === 'action/tax-city')
+  }
+
   it('a gate city is untaxable without the card', () => {
     const { state, gate } = gateCity()
     expect(taxLabels(state).some((l) => l.includes(gate))).toBe(false)
@@ -987,11 +995,48 @@ describe('Gate Stations (lore11) — a gate city takes its cluster’s types', (
     expect(countResource(after.resources, cap, chosen)).toBe(1)
   })
 
-  it('offers nothing extra once no city stands in the cluster', () => {
+  it('a typeless gate city can STILL be taxed — for nothing (docs/21 B6)', () => {
+    /*
+     * Inverted: this test used to assert no offer at all, but the official FAQ says "If a Gate
+     * Station is in a cluster with no other city, it has no type... Taxing it yields no resource,
+     * but it can still be taxed." The tax happens — the once-per-turn mark included — it just
+     * gains nothing.
+     */
     const { state, gate, cluster } = gateCity('red')
     let bare = state
     for (const s of cluster) bare = clearSystem(bare, s)
-    expect(taxLabels(bare).some((l) => l.includes(gate))).toBe(false)
+    const offer = taxOptions(bare).find((a) => a['system'] === gate)
+    expect(offer).toBeDefined()
+    expect(offer!['resource']).toBeUndefined()
+    expect(String(offer!['label'])).toContain('no type')
+
+    const before = heldTokens(bare.resources, slotsOf(bare, 'red')).length
+    const after = advance(bare, offer!, registry).state
+    expect(heldTokens(after.resources, slotsOf(after, 'red')).length).toBe(before)
+    expect(after.taxedThisTurn).toContain(String(offer!['city']))
+    // Taxed once means taxed for the turn — the offer disappears on the second look.
+    expect(taxOptions(after).some((a) => a['system'] === gate)).toBe(false)
+  })
+
+  it("taxing a RIVAL's typeless gate city still takes the captive", () => {
+    // The whole point of a yield-free tax: the capture is what you came for.
+    const base = fresh()
+    const gate = base.board.systems.find((s) => s.includes('Gate'))!
+    const cluster = base.board.systems.filter(
+      (s) => s !== gate && s.split('-')[0] === gate.split('-')[0],
+    )
+    let s = withLore(base, 'red', 'lore11')
+    s = clearSystem(s, gate)
+    s = place(s, 'yellow', gate, 'City', 1)
+    s = place(s, 'red', gate, 'Ship', 3)
+    for (const sys of cluster) s = clearSystem(s, sys)
+
+    const offer = taxOptions(s).find((a) => a['system'] === gate)
+    expect(offer).toBeDefined()
+    const captives = (g: GameState) => contentsOf(g.figures, Location.captives('red')).length
+    const after = advance(s, offer!, registry).state
+    expect(captives(after)).toBe(captives(s) + 1)
+    expect(after.log.some((l) => /red captured a yellow agent by taxing/.test(l))).toBe(true)
   })
 
   it('razing a gate city provokes outrage of every type in its cluster', () => {
