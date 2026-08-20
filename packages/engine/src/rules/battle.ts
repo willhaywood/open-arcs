@@ -415,8 +415,14 @@ function offerGather(
   then: PipReturn,
 ): Continue {
   const ships = piecesAt(state, system, faction, isShip).length
-  // Committed (Rebel) raises the *limit*, not the fleet: HRF adds it to the same total the
-  // ships feed (game-battle.scala:148), so you may roll two dice more than you have ships.
+  /*
+   * Committed (Rebel) raises the *limit*, not the fleet: HRF adds it to the same total the
+   * ships feed (game-battle.scala:148), so you may roll two dice more than you have ships.
+   * The extras are also **mandatory** — the official FAQ: "collecting these two dice is
+   * mandatory" (docs/21 B3) — so the per-ship dice stay optional but every pool carries the two,
+   * which makes the legal totals 2..ships+2 and the floor below 2 rather than 1. HRF diverges
+   * (its combinations start at 1); the FAQ postdates it.
+   */
   const committed = hasTrait(state, faction, 'Committed') ? 2 : 0
   /*
    * Gatekeepers (bc08): "When you battle in a gate, you may collect 2 more dice." The same
@@ -475,7 +481,7 @@ function offerGather(
    * self-hit and no intercept face. That is the right default for a human reading the menu as well.
    */
   const options: Action[] = []
-  for (let total = maxDice; total >= 1; total--) {
+  for (let total = maxDice; total >= Math.max(1, committed); total--) {
     for (let raid = 0; raid <= Math.min(maxRaid, total, 6); raid++) {
       for (let assault = 0; assault <= Math.min(6, total - raid); assault++) {
         const skirmish = total - raid - assault

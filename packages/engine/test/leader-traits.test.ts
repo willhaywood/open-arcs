@@ -184,6 +184,29 @@ describe('Committed (Rebel) — two extra battle dice', () => {
     const { state, system } = contested(withLeader(fresh(), 'yellow', 'leader05'))
     expect(maxTotal(state, system, 'yellow')).toBe(3)
   })
+
+  it('the two extras are mandatory — no pool smaller than 2 is offered (docs/21 B3)', () => {
+    /*
+     * The official FAQ: "Can I choose not to use the two extra dice from Committed? No,
+     * collecting these two dice is mandatory." Only the per-ship dice are a choice, so the legal
+     * totals are 2..ships+2 — a single-die pool exists without the leader and vanishes with it.
+     */
+    const minTotal = (state: GameState, system: SystemId): number => {
+      const c = advance(
+        state,
+        { type: 'battle/target', faction: 'red', system, enemy: 'yellow', then: STOP },
+        registry,
+      ).continue
+      const totals = ask(c)
+        .actions.filter((a) => a.type === 'battle/roll')
+        .map((a) => (a['skirmish'] as number) + (a['assault'] as number) + (a['raid'] as number))
+      return Math.min(...totals)
+    }
+    const bare = contested(fresh())
+    expect(minTotal(bare.state, bare.system)).toBe(1)
+    const rebel = contested(withLeader(fresh(), 'red', 'leader05'))
+    expect(minTotal(rebel.state, rebel.system)).toBe(2)
+  })
 })
 
 describe('Disorganized (Rebel) — never move more than 2 ships', () => {
