@@ -1382,9 +1382,11 @@ function tokenOfResource(state: GameState, faction: FactionId, r: Resource): str
  *
  * Gates carry no building slots at all — `freeSlots` reads `buildingSlots ?? 0` — so the ordinary
  * offer above can never place anything there. Gate Stations (lore11) opens gates to cities and
- * Gate Ports (lore08) to starports, and each card's "max 1 per gate" is **one of yours**, not one
- * in total: HRF gates on `f.at(_).cities.none` / `f.at(_).starports.none`
- * (game-common.scala:847-851), so two factions may each hold a building on the same gate.
+ * Gate Ports (lore08) to starports, and each card's "max 1 per gate" is **one in total** — the
+ * official FAQ for both cards: "can multiple players have a starport in the same gate? No, it is
+ * a maximum of one total." HRF tests only the builder's own pieces (`f.at(_).starports.none`),
+ * which docs/21 B5 retires: a rival's gate building (reachable via Tyrant's Authority annexing
+ * the holder's) blocks a second one.
  *
  * Presence is enough — ruling is not required, unlike a slotted system. That is HRF's `present`
  * rather than `present.%(f.rules)`, and it is what makes these cards a way *into* a contested
@@ -1396,16 +1398,15 @@ function gateBuilds(
   s: SystemId,
 ): { piece: Piece; card: string }[] {
   if (!systemInfo(s).isGate) return []
-  const mine = (piece: Piece): boolean =>
-    contentsOf(state.figures, Location.system(s)).some((id) => {
-      const f = parseFigureId(id)
-      return f.color === faction && f.piece === piece
-    })
+  const anyOn = (piece: Piece): boolean =>
+    contentsOf(state.figures, Location.system(s)).some(
+      (id) => parseFigureId(id).piece === piece,
+    )
   const out: { piece: Piece; card: string }[] = []
-  if (hasLore(state, faction, GATE_STATIONS) && !mine('City')) {
+  if (hasLore(state, faction, GATE_STATIONS) && !anyOn('City')) {
     out.push({ piece: 'City', card: 'Gate Stations' })
   }
-  if (hasLore(state, faction, GATE_PORTS) && !mine('Starport')) {
+  if (hasLore(state, faction, GATE_PORTS) && !anyOn('Starport')) {
     out.push({ piece: 'Starport', card: 'Gate Ports' })
   }
   return out

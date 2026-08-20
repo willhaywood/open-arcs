@@ -671,26 +671,33 @@ describe('Gate Ports (lore08) and Gate Stations (lore11) — building on gates',
     ).toBe(true)
   })
 
-  it('allows only one starport of yours per gate, but not one in total', () => {
+  it('allows one starport per gate IN TOTAL — a rival piece blocks too (docs/21 B5)', () => {
+    /*
+     * Inverted: this test used to follow HRF's per-faction reading, but the official FAQ answers
+     * the exact question — "can multiple players have a starport in the same gate? No, it is a
+     * maximum of one total." A rival's gate starport is reachable via Tyrant's Authority annexing
+     * the holder's, so the block is not hypothetical.
+     */
     const { state, gate } = atGate(withLore(fresh(), 'red', 'lore08'))
     const mine = place(state, 'red', gate, 'Starport', 1)
     expect(buildLabels(mine).some((l) => l.includes('Starport on'))).toBe(false)
 
-    // A rival's starport on the same gate is no obstacle. That is reachable, not hypothetical:
-    // Gate Stations builds a gate city and Living Structures' Prune turns it into a starport, so
-    // a faction without Gate Ports can hold one. See docs/14 — the card's "max 1 per gate" is
-    // ambiguous and this follows HRF's per-faction reading.
     const theirs = place(state, 'yellow', gate, 'Starport', 1)
-    expect(buildLabels(theirs).some((l) => l.includes('Starport on'))).toBe(true)
+    expect(buildLabels(theirs).some((l) => l.includes('Starport on'))).toBe(false)
   })
 
-  it('allows only one city of yours per gate, but not one in total', () => {
+  it('allows one city per gate IN TOTAL — the same FAQ ruling for Gate Stations (docs/21 B5)', () => {
     const { state, gate } = atGate(withLore(fresh(), 'red', 'lore11'))
     const mine = place(state, 'red', gate, 'City', 1)
     expect(buildLabels(mine).some((l) => l.includes('City on'))).toBe(false)
 
     const theirs = place(state, 'yellow', gate, 'City', 1)
-    expect(buildLabels(theirs).some((l) => l.includes('City on'))).toBe(true)
+    expect(buildLabels(theirs).some((l) => l.includes('City on'))).toBe(false)
+
+    // The two cards limit their own piece kind: a rival CITY never blocks a Gate Ports starport.
+    const ports = atGate(withLore(fresh(), 'red', 'lore08'))
+    const cross = place(ports.state, 'yellow', ports.gate, 'City', 1)
+    expect(buildLabels(cross).some((l) => l.includes('Starport on'))).toBe(true)
   })
 
   it('is not offered with nothing left in reserve to build', () => {
