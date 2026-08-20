@@ -22,7 +22,7 @@ import type { Continue } from '../continue.js'
 import { rules } from '../control.js'
 import type { RuleModule, RuleResult } from '../dispatch.js'
 import { unhandled } from '../dispatch.js'
-import { CourtPile, SWORN_GUARDIANS, courtCard } from '../court.js'
+import { CourtPile, FARSEERS, SWORN_GUARDIANS, courtCard, hasGuild } from '../court.js'
 import { CardLocation, Location, parseFigureId } from '../ids.js'
 import type { FactionId, SystemId } from '../ids.js'
 import { provokeOutrage } from '../outrage.js'
@@ -347,8 +347,17 @@ export const VoxModule: RuleModule = {
 
       case 'vox/populist': {
         const taken = takeAmbitionMarker(state, faction, action['ambition'] as Ambition)
-        // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3).
-        return { state: taken, continue: afterDeclarePeek(taken, faction, Done(faction, card, then)) }
+        // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3),
+        // judged on the pre-declare hold so a Connected-drawn Farseers stays quiet (docs/21 B4).
+        return {
+          state: taken,
+          continue: afterDeclarePeek(
+            taken,
+            faction,
+            Done(faction, card, then),
+            hasGuild(state, faction, FARSEERS),
+          ),
+        }
       }
 
       case 'vox/uprising':

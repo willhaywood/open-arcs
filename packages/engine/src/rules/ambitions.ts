@@ -341,8 +341,15 @@ export function afterDeclarePeek(
   state: GameState,
   faction: FactionId,
   then: Action,
+  /**
+   * Whether the declarer held Farseers **before** the marker was taken. Connected (Noble) secures
+   * the top court card inside `takeAmbitionMarker`, and the official FAQ rules that a Farseers
+   * drawn that way "does not see the timing window" of the same declaration (docs/21 B4) — so
+   * eligibility must be judged on the pre-declare state, which only the caller still has.
+   */
+  eligible: boolean = hasGuild(state, faction, FARSEERS),
 ): Continue {
-  if (!hasGuild(state, faction, FARSEERS)) return C.then(then)
+  if (!eligible) return C.then(then)
   const rivals = state.factions.filter(
     (f) => f !== faction && contentsOf(state.cards, CardLocation.hand(f)).length > 0,
   )
@@ -420,7 +427,12 @@ function performDeclare(
     ? AfterDeclare(faction, suit as Suit, pips)
     : Prelude(faction, suit as Suit, pips)
   const declared = { ...taken, lead }
-  return { state: declared, continue: afterDeclarePeek(declared, faction, next) }
+  // Eligibility read off the PRE-declare state: a Farseers secured by Connected during the
+  // marker-taking does not peek on this declaration (docs/21 B4).
+  return {
+    state: declared,
+    continue: afterDeclarePeek(declared, faction, next, hasGuild(state, faction, FARSEERS)),
+  }
 }
 
 const AfterDeclare = (faction: FactionId, suit: Suit, pips: number): Action => ({

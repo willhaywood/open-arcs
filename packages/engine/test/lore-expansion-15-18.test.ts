@@ -19,6 +19,7 @@ import {
   connectedSystems,
   contentsOf,
   defaultRegistry,
+  move,
   startGame,
   system as systemInfo,
 } from '../src/index.js'
@@ -133,9 +134,34 @@ describe('Raider Exosuits (lore17) — a raid die where there are no buildings',
         .map((a) => a['raid'] as number),
     )
 
-  it('the base game offers no raid dice at all with no defending buildings', () => {
+  it('the base game offers no raid dice at all with no defending buildings HERE', () => {
+    /*
+     * "Here" is load-bearing: `bare()` clears only the battle system, so yellow keeps its
+     * starting buildings elsewhere. A defender with no buildings ANYWHERE is raidable without
+     * this card — the homeless-defender rule (docs/21 A3), pinned in the next test — so this one
+     * must never be read as "no buildings in the battle system means no raid dice, full stop".
+     */
     const { s, system } = bare()
     expect(maxRaid(s, system)).toBe(0)
+  })
+
+  it('a defender with no buildings anywhere is raidable without the card (rulebook 7.6)', () => {
+    /*
+     * "You can only collect raid dice if there are defending buildings or if the defender has no
+     * Loyal buildings in any systems on the map" — the second opening, docs/21 A3. Strip every
+     * yellow building and the raid dice return in full, no Exosuits required — the whole
+     * three-ship fleet may raid, where the missing rule allowed zero.
+     */
+    let { s, system } = bare()
+    for (const sys of s.board.systems) {
+      const buildings = contentsOf(s.figures, Location.system(sys)).filter(
+        (id) => id.startsWith('yellow/City/') || id.startsWith('yellow/Starport/'),
+      )
+      for (const id of buildings) {
+        s = { ...s, figures: move(s.figures, id, Location.reserve('yellow')) }
+      }
+    }
+    expect(maxRaid(s, system)).toBe(3)
   })
 
   it('the card offers exactly one, never more', () => {

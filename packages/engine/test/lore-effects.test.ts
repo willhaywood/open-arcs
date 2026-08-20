@@ -30,6 +30,7 @@ import {
   outragedResources,
   slotCapacity,
   slotKeys,
+  heldTokens,
   slotsOf,
   startGame,
   tallyOf,
@@ -176,6 +177,57 @@ describe('Hidden Harbors (lore05) — no raid dice against a fresh defending sta
   it('does nothing for the attacker holding it', () => {
     const { state, system } = field(withLore(fresh(), 'red', 'lore05'), { yellowPorts: 1 })
     expect(gatherOptions(state, system).some((a) => (a['raid'] as number) > 0)).toBe(true)
+  })
+})
+
+describe("Hidden Harbors (lore05) — 'You always build ships fresh' (docs/21 A1)", () => {
+  /*
+   * The card's first clause, long recorded as a no-op because rulebook 7.2.2 was missing: "When
+   * you build anything in a system that is controlled by anyone other than you, place the piece
+   * damaged." The clause is the ship-only exemption — the holder's ships arrive fresh where
+   * anyone else's would be damaged, and the holder's BUILDINGS still arrive damaged.
+   */
+  const contestedYard = (holder: boolean) => {
+    const base = holder ? withLore(fresh(), 'red', 'lore05') : fresh()
+    const system = base.board.systems[0]!
+    // Red's starport plus a yellow fleet that rules the system.
+    let s = clearSystem(base, system)
+    s = place(s, 'red', system, 'Starport', 1)
+    s = place(s, 'yellow', system, 'Ship', 4)
+    return { s, system }
+  }
+  const build = (s: GameState, piece: string, system: SystemId): GameState => {
+    const c = advance(s, { type: 'action/take', faction: 'red', action: 'Build', then: STOP }, registry)
+    const act = ask(c.continue).actions.find(
+      (a) => a.type === 'action/build' && a['piece'] === piece && a['system'] === system,
+    )!
+    return advance(s, act, registry).state
+  }
+  const builtPiece = (s: GameState, piece: string, system: SystemId): string =>
+    contentsOf(s.figures, Location.system(system)).find((id) => id.startsWith(`red/${piece}/`))!
+
+  it('a ship built under rival control arrives damaged without the card (rulebook 7.2.2)', () => {
+    const { s, system } = contestedYard(false)
+    const after = build(s, 'Ship', system)
+    expect(after.damaged).toContain(builtPiece(after, 'Ship', system))
+    expect(after.log.some((l) => /damaged — Rival-controlled/.test(l))).toBe(true)
+  })
+
+  it('the holder builds that same ship fresh', () => {
+    const { s, system } = contestedYard(true)
+    const after = build(s, 'Ship', system)
+    expect(after.damaged).not.toContain(builtPiece(after, 'Ship', system))
+  })
+
+  it("the holder's buildings still arrive damaged — ships only", () => {
+    // Presence by ship rather than starport, so the building slot stays free for the City.
+    const base = withLore(fresh(), 'red', 'lore05')
+    const system = base.board.systems[0]!
+    let s = clearSystem(base, system)
+    s = place(s, 'red', system, 'Ship', 1)
+    s = place(s, 'yellow', system, 'Ship', 4)
+    const after = build(s, 'City', system)
+    expect(after.damaged).toContain(builtPiece(after, 'City', system))
   })
 })
 
@@ -620,26 +672,33 @@ describe('Gate Ports (lore08) and Gate Stations (lore11) — building on gates',
     ).toBe(true)
   })
 
-  it('allows only one starport of yours per gate, but not one in total', () => {
+  it('allows one starport per gate IN TOTAL — a rival piece blocks too (docs/21 B5)', () => {
+    /*
+     * Inverted: this test used to follow HRF's per-faction reading, but the official FAQ answers
+     * the exact question — "can multiple players have a starport in the same gate? No, it is a
+     * maximum of one total." A rival's gate starport is reachable via Tyrant's Authority annexing
+     * the holder's, so the block is not hypothetical.
+     */
     const { state, gate } = atGate(withLore(fresh(), 'red', 'lore08'))
     const mine = place(state, 'red', gate, 'Starport', 1)
     expect(buildLabels(mine).some((l) => l.includes('Starport on'))).toBe(false)
 
-    // A rival's starport on the same gate is no obstacle. That is reachable, not hypothetical:
-    // Gate Stations builds a gate city and Living Structures' Prune turns it into a starport, so
-    // a faction without Gate Ports can hold one. See docs/14 — the card's "max 1 per gate" is
-    // ambiguous and this follows HRF's per-faction reading.
     const theirs = place(state, 'yellow', gate, 'Starport', 1)
-    expect(buildLabels(theirs).some((l) => l.includes('Starport on'))).toBe(true)
+    expect(buildLabels(theirs).some((l) => l.includes('Starport on'))).toBe(false)
   })
 
-  it('allows only one city of yours per gate, but not one in total', () => {
+  it('allows one city per gate IN TOTAL — the same FAQ ruling for Gate Stations (docs/21 B5)', () => {
     const { state, gate } = atGate(withLore(fresh(), 'red', 'lore11'))
     const mine = place(state, 'red', gate, 'City', 1)
     expect(buildLabels(mine).some((l) => l.includes('City on'))).toBe(false)
 
     const theirs = place(state, 'yellow', gate, 'City', 1)
-    expect(buildLabels(theirs).some((l) => l.includes('City on'))).toBe(true)
+    expect(buildLabels(theirs).some((l) => l.includes('City on'))).toBe(false)
+
+    // The two cards limit their own piece kind: a rival CITY never blocks a Gate Ports starport.
+    const ports = atGate(withLore(fresh(), 'red', 'lore08'))
+    const cross = place(ports.state, 'yellow', ports.gate, 'City', 1)
+    expect(buildLabels(cross).some((l) => l.includes('Starport on'))).toBe(true)
   })
 
   it('is not offered with nothing left in reserve to build', () => {
@@ -893,6 +952,13 @@ describe('Gate Stations (lore11) — a gate city takes its cluster’s types', (
     ).actions.map((a) => String(a['label'] ?? a.type))
   }
 
+  function taxOptions(state: GameState): readonly Action[] {
+    return ask(
+      advance(state, { type: 'action/take', faction: 'red', action: 'Tax', then: STOP }, registry)
+        .continue,
+    ).actions.filter((a) => a.type === 'action/tax-city')
+  }
+
   it('a gate city is untaxable without the card', () => {
     const { state, gate } = gateCity()
     expect(taxLabels(state).some((l) => l.includes(gate))).toBe(false)
@@ -929,11 +995,48 @@ describe('Gate Stations (lore11) — a gate city takes its cluster’s types', (
     expect(countResource(after.resources, cap, chosen)).toBe(1)
   })
 
-  it('offers nothing extra once no city stands in the cluster', () => {
+  it('a typeless gate city can STILL be taxed — for nothing (docs/21 B6)', () => {
+    /*
+     * Inverted: this test used to assert no offer at all, but the official FAQ says "If a Gate
+     * Station is in a cluster with no other city, it has no type... Taxing it yields no resource,
+     * but it can still be taxed." The tax happens — the once-per-turn mark included — it just
+     * gains nothing.
+     */
     const { state, gate, cluster } = gateCity('red')
     let bare = state
     for (const s of cluster) bare = clearSystem(bare, s)
-    expect(taxLabels(bare).some((l) => l.includes(gate))).toBe(false)
+    const offer = taxOptions(bare).find((a) => a['system'] === gate)
+    expect(offer).toBeDefined()
+    expect(offer!['resource']).toBeUndefined()
+    expect(String(offer!['label'])).toContain('no type')
+
+    const before = heldTokens(bare.resources, slotsOf(bare, 'red')).length
+    const after = advance(bare, offer!, registry).state
+    expect(heldTokens(after.resources, slotsOf(after, 'red')).length).toBe(before)
+    expect(after.taxedThisTurn).toContain(String(offer!['city']))
+    // Taxed once means taxed for the turn — the offer disappears on the second look.
+    expect(taxOptions(after).some((a) => a['system'] === gate)).toBe(false)
+  })
+
+  it("taxing a RIVAL's typeless gate city still takes the captive", () => {
+    // The whole point of a yield-free tax: the capture is what you came for.
+    const base = fresh()
+    const gate = base.board.systems.find((s) => s.includes('Gate'))!
+    const cluster = base.board.systems.filter(
+      (s) => s !== gate && s.split('-')[0] === gate.split('-')[0],
+    )
+    let s = withLore(base, 'red', 'lore11')
+    s = clearSystem(s, gate)
+    s = place(s, 'yellow', gate, 'City', 1)
+    s = place(s, 'red', gate, 'Ship', 3)
+    for (const sys of cluster) s = clearSystem(s, sys)
+
+    const offer = taxOptions(s).find((a) => a['system'] === gate)
+    expect(offer).toBeDefined()
+    const captives = (g: GameState) => contentsOf(g.figures, Location.captives('red')).length
+    const after = advance(s, offer!, registry).state
+    expect(captives(after)).toBe(captives(s) + 1)
+    expect(after.log.some((l) => /red captured a yellow agent by taxing/.test(l))).toBe(true)
   })
 
   it('razing a gate city provokes outrage of every type in its cluster', () => {

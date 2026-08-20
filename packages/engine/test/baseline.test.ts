@@ -123,8 +123,14 @@ describe('the frozen baseline', () => {
  * moved this time. Values before: [32,33,2], [15,20,38], [26,35,37]; after the B2 Sworn
  * Guardians fix landed on the same branch, seed 3 moved again: [13,43,35] -> [13,43,23].
  */
+/*
+ * Re-recorded for the Leaders & Lore audit's base-rule fixes (docs/21 A1+A2): building needs
+ * presence, not rule (7.2.1), and a piece built where anyone else rules arrives damaged (7.2.2).
+ * Build options exist in every game, so all three seeds moved — the usual rules-fix exception;
+ * `weightsMatchBaseline` still passes. Values before: [32,33,2], [15,20,38], [13,43,23].
+ */
 const GOLDEN = [
-  [32, 33, 2],
-  [15, 20, 38],
-  [13, 43, 23],
+  [39, 27, 17],
+  [28, 27, 24],
+  [9, 37, 7],
 ]

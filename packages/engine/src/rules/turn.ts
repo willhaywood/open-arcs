@@ -32,6 +32,7 @@ import { citiesInReserve, rules, slotsOf } from '../control.js'
 import { system as systemInfo } from '../board.js'
 import {
   CourtPile,
+  FARSEERS,
   GALACTIC_BARDS,
   RELIC_FENCE,
   LATTICE_SPIES,
@@ -69,7 +70,14 @@ import {
   afterDeclarePeek,
   takeAmbitionMarker,
 } from './ambitions.js'
-import { TakeAction, arrangeThen, canTake, overflowThen } from './standard-actions.js'
+import {
+  TakeAction,
+  arrangeThen,
+  canMustBattleMove,
+  canMustSecureInfluence,
+  canTake,
+  overflowThen,
+} from './standard-actions.js'
 import type { PipReturn } from './standard-actions.js'
 import { hasTrait } from '../leaders.js'
 import {
@@ -594,8 +602,17 @@ function performBardsDeclare(
   // Free, and like Populist Demands it does not zero the played card.
   const taken = takeAmbitionMarker(state, faction, ambition)
   const next: GameState = { ...taken, usedThisTurn: [...taken.usedThisTurn, GALACTIC_BARDS] }
-  // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3).
-  return { state: next, continue: afterDeclarePeek(next, faction, CheckSeize(faction, pips, suit)) }
+  // "When you declare an ambition" — the Farseers peek covers this declare too (docs/20 A3),
+  // judged on the pre-declare hold so a Connected-drawn Farseers stays quiet (docs/21 B4).
+  return {
+    state: next,
+    continue: afterDeclarePeek(
+      next,
+      faction,
+      CheckSeize(faction, pips, suit),
+      hasGuild(state, faction, FARSEERS),
+    ),
+  }
 }
 
 function performSeize(
@@ -788,23 +805,21 @@ function performPrelude(
    */
   const tycoon: Action[] = []
   if (loreActive(state, faction, TYCOONS_AMBITION) && state.ambitionable.length > 0) {
-    const slots = slotsOf(state, faction)
-    const fuelish = (['Material', 'Fuel'] as const).reduce(
-      (n, r) => n + countResource(state.resources, slots, r),
-      0,
-    )
-    if (fuelish > 0) {
-      for (const a of state.ambitions) {
-        if (state.declared.some((d) => d.ambition === a)) continue
-        tycoon.push({
-          type: 'turn/prelude-tycoon',
-          faction,
-          ambition: a,
-          suit,
-          pips,
-          label: `Tycoon's Ambition — discard all Material and Fuel to declare ${a}`,
-        })
-      }
+    /*
+     * No resource gate — the official FAQ: "You can use its ability even if you have zero
+     * Material and Fuel" (docs/21 A4). Discarding all of nothing is a legal cost, so the offer
+     * stands whenever Tycoon is declared and an undeclared ambition remains.
+     */
+    for (const a of state.ambitions) {
+      if (state.declared.some((d) => d.ambition === a)) continue
+      tycoon.push({
+        type: 'turn/prelude-tycoon',
+        faction,
+        ambition: a,
+        suit,
+        pips,
+        label: `Tycoon's Ambition — discard all Material and Fuel to declare ${a}`,
+      })
     }
   }
 
@@ -1247,15 +1262,29 @@ function pipOptions(
     else options.push({ ...TakeAction(faction, a, then), faction, label: a })
   }
 
-  // The "before" entries, which reach an action this suit may not otherwise offer.
-  if (tactical && !available.includes('Move') && canTake(state, faction, 'Move', then)) {
+  /*
+   * The "before" entries, which reach an action this suit may not otherwise offer. Each is gated
+   * on the required follow-up being satisfiable at all (docs/21 B1) — the FAQ says an unmet
+   * "must" undoes the primary action, and the constructive equivalent is never opening a pair
+   * whose second half cannot happen. The action offers themselves then restrict per-leg/per-slot.
+   */
+  if (
+    tactical &&
+    !available.includes('Move') &&
+    canTake(state, faction, 'Move', then) &&
+    canMustBattleMove(state, faction)
+  ) {
     options.push({
       ...TakeAction(faction, 'Move', MustFollow(faction, 'Battle', then)),
       faction,
       label: 'Move, then must Battle',
     })
   }
-  if (charismatic && canTake(state, faction, 'Influence', then)) {
+  if (
+    charismatic &&
+    canTake(state, faction, 'Influence', then) &&
+    canMustSecureInfluence(state, faction)
+  ) {
     options.push({
       ...TakeAction(faction, 'Influence', MustFollow(faction, 'Secure', then)),
       faction,
