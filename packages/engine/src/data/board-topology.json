@@ -32,6 +32,7 @@
           1300,
           550
         ],
+        "planet": null,
         "gateMarkers": [],
         "regionColour": "#85707c",
         "selectColour": "#85707c",
@@ -89,6 +90,11 @@
         "anchor": [
           1050,
           360
+        ],
+        "planet": [
+          1108,
+          192,
+          88
         ],
         "gateMarkers": [
           [
@@ -152,6 +158,11 @@
         "anchor": [
           1320,
           130
+        ],
+        "planet": [
+          1441,
+          206,
+          81
         ],
         "gateMarkers": [
           [
@@ -220,6 +231,11 @@
           1630,
           400
         ],
+        "planet": [
+          1720,
+          268,
+          90
+        ],
         "gateMarkers": [
           [
             1745,
@@ -287,6 +303,7 @@
           1630,
           780
         ],
+        "planet": null,
         "gateMarkers": [],
         "regionColour": "#737e73",
         "selectColour": "#737e73",
@@ -340,6 +357,11 @@
         "anchor": [
           1810,
           580
+        ],
+        "planet": [
+          2003,
+          442,
+          82
         ],
         "gateMarkers": [
           [
@@ -400,6 +422,11 @@
           1920,
           730
         ],
+        "planet": [
+          2118,
+          667,
+          80
+        ],
         "gateMarkers": [
           [
             2300,
@@ -458,6 +485,11 @@
         "anchor": [
           1900,
           900
+        ],
+        "planet": [
+          2196,
+          828,
+          100
         ],
         "gateMarkers": [
           [
@@ -522,6 +554,7 @@
           1590,
           1110
         ],
+        "planet": null,
         "gateMarkers": [],
         "regionColour": "#a88080",
         "selectColour": "#a88080",
@@ -575,6 +608,11 @@
         "anchor": [
           1860,
           1060
+        ],
+        "planet": [
+          2207,
+          1133,
+          68
         ],
         "gateMarkers": [
           [
@@ -643,6 +681,11 @@
           2110,
           1420
         ],
+        "planet": [
+          2340,
+          1511,
+          69
+        ],
         "gateMarkers": [
           [
             1846,
@@ -705,6 +748,11 @@
         "anchor": [
           1670,
           1370
+        ],
+        "planet": [
+          1735,
+          1470,
+          95
         ],
         "gateMarkers": [
           [
@@ -769,6 +817,7 @@
           1170,
           1260
         ],
+        "planet": null,
         "gateMarkers": [],
         "regionColour": "#636378",
         "selectColour": "#636378",
@@ -822,6 +871,11 @@
         "anchor": [
           1350,
           1660
+        ],
+        "planet": [
+          1492,
+          1522,
+          90
         ],
         "gateMarkers": [
           [
@@ -889,6 +943,11 @@
         "anchor": [
           940,
           1700
+        ],
+        "planet": [
+          1096,
+          1620,
+          104
         ],
         "gateMarkers": [
           [
@@ -960,6 +1019,11 @@
         "anchor": [
           570,
           1630
+        ],
+        "planet": [
+          769,
+          1543,
+          112
         ],
         "gateMarkers": [
           [
@@ -1036,6 +1100,7 @@
           870,
           990
         ],
+        "planet": null,
         "gateMarkers": [],
         "regionColour": "#9d9d9d",
         "selectColour": "#848484",
@@ -1089,6 +1154,11 @@
         "anchor": [
           640,
           1230
+        ],
+        "planet": [
+          440,
+          1352,
+          80
         ],
         "gateMarkers": [
           [
@@ -1149,6 +1219,11 @@
           240,
           1160
         ],
+        "planet": [
+          200,
+          1166,
+          95
+        ],
         "gateMarkers": [
           [
             434,
@@ -1207,6 +1282,11 @@
         "anchor": [
           530,
           900
+        ],
+        "planet": [
+          320,
+          870,
+          100
         ],
         "gateMarkers": [
           [
@@ -1275,6 +1355,7 @@
           910,
           690
         ],
+        "planet": null,
         "gateMarkers": [],
         "regionColour": "#86866f",
         "selectColour": "#86866f",
@@ -1328,6 +1409,11 @@
         "anchor": [
           630,
           730
+        ],
+        "planet": [
+          401,
+          690,
+          110
         ],
         "gateMarkers": [
           [
@@ -1387,6 +1473,11 @@
         "anchor": [
           630,
           520
+        ],
+        "planet": [
+          370,
+          327,
+          117
         ],
         "gateMarkers": [
           [
@@ -1459,6 +1550,11 @@
           830,
           450
         ],
+        "planet": [
+          794,
+          374,
+          80
+        ],
         "gateMarkers": [
           [
             678,
@@ -1518,6 +1614,7 @@
           1250,
           894
         ],
+        "planet": null,
         "gateMarkers": [],
         "regionColour": "#808080",
         "selectColour": "#000000",
