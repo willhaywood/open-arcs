@@ -1751,7 +1751,9 @@ function performRuthlessAgain(
 
 /**
  * The Ransack the parenthesis calls for, on the same terms as a battle's: one card, only from
- * slots the victim has an agent on, and never against Beloved.
+ * slots the victim has an agent on. **Beloved does not shield it** (docs/21 B7): the Elder's card
+ * reads "Rivals cannot Ransack the Court when they **battle** you", and a Ruthless demolition is
+ * not a battle — the battle-path shield in battle.ts is where that clause lives.
  */
 function offerRuthlessRansack(
   state: GameState,
@@ -1759,9 +1761,6 @@ function offerRuthlessRansack(
   victim: FactionId,
   then: Action,
 ): Continue {
-  if (hasTrait(state, victim, 'Beloved')) {
-    return C.log(`${victim} cannot be ransacked (their leader)`, C.then(then))
-  }
   const options: Action[] = courtSlots(state.factions.length)
     .filter((n) => cardInSlot(state, n) !== undefined)
     .filter((n) =>

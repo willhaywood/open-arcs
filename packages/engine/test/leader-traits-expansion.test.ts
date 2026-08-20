@@ -1233,6 +1233,18 @@ describe('Ruthless (Overseer, leader10) — hit a building to use it twice', () 
     const after = advance(first.state, hit, registry)
     expect(labels(after.continue).some((l) => l.startsWith('Ransack'))).toBe(true)
     expect(labels(after.continue)).toContain('Ransack nothing')
+
+    /*
+     * Beloved does NOT shield this ransack (docs/21 B7): the Elder's card reads "Rivals cannot
+     * Ransack the Court when they battle you", and a Ruthless demolition is not a battle. The
+     * battle-path shield lives in battle.ts and is pinned by its own test.
+     */
+    const elderVictim = withLeader(overseer, 'yellow', 'leader01')
+    const guarded = tax(elderVictim, system, city)
+    const hit2 = ask(guarded.continue).actions.find((a) => a.type === 'leaders/ruthless-hit')!
+    const razed = advance(guarded.state, hit2, registry)
+    expect(labels(razed.continue).some((l) => l.startsWith('Ransack'))).toBe(true)
+    expect(razed.state.log.join('\n')).not.toContain('cannot be ransacked')
   })
 
   it('fires off building a Ship at a starport, and builds another', () => {
