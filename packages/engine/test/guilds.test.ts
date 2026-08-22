@@ -197,6 +197,54 @@ describe('Loyal guilds in the Prelude', () => {
     expect(actionsFor(preludeOffers(loyal, 'red', 'Construction', 'Construction'))).toContain('Build')
   })
 
+  it('names the Loyal card that lets a resource be spent as another type', () => {
+    /*
+     * The playtest question this answers: "I secured a Guild card with a Psionic — why was
+     * that possible?" Loyal Keepers: "You may spend any resources as Relics", and a Relic's
+     * Prelude action is Secure. The offer now carries `via` so the surfaces can say so; a
+     * resource spending as its own type (a held Relic) carries nothing.
+     */
+    const state = withCard(onlyHolding(fresh(), 'red', 'Psionic'), 'red', 'bc21') // Loyal Keepers
+    const offers = preludeOffers(state, 'red', 'Mobilization', 'Mobilization')
+    const secure = offers.find((o) => o.kind === 'action' && o.action === 'Secure')
+    expect(secure).toBeDefined()
+    expect(secure!.kind === 'action' && secure!.via).toEqual({ as: 'Relic', card: 'bc21' })
+    // The Psionic's own grant (the lead's Mobilization actions) carries no `via`.
+    const move = offers.find((o) => o.kind === 'action' && o.action === 'Move')
+    expect(move!.kind === 'action' && move!.via).toBeUndefined()
+
+    // A held Relic's own Secure is direct, even with the card in play.
+    const relic = withCard(onlyHolding(fresh(), 'red', 'Relic'), 'red', 'bc21')
+    const own = preludeOffers(relic, 'red', 'Mobilization', 'Mobilization').find(
+      (o) => o.kind === 'action' && o.action === 'Secure',
+    )
+    expect(own!.kind === 'action' && own!.via).toBeUndefined()
+    // …and exactly once — the via path must not duplicate a direct grant.
+    expect(
+      preludeOffers(relic, 'red', 'Mobilization', 'Mobilization').filter(
+        (o) => o.kind === 'action' && o.action === 'Secure',
+      ),
+    ).toHaveLength(1)
+
+    // The Prelude menu label says what is happening — once there is something to secure.
+    const securable = (() => {
+      const contents = new Map(state.figures.contents)
+      const at = new Map(state.figures.at)
+      const court = Location.court(1)
+      const agents = (contents.get('reserve:red') ?? []).filter((id) => id.startsWith('red/Agent/')).slice(0, 2)
+      contents.set('reserve:red', (contents.get('reserve:red') ?? []).filter((id) => !agents.includes(id)))
+      contents.set(court, [...(contents.get(court) ?? []), ...agents])
+      for (const id of agents) at.set(id, court)
+      return { ...state, figures: { ...state.figures, contents, at } }
+    })()
+    const menu = advance(
+      stoppable(securable),
+      { type: 'turn/prelude', faction: 'red', suit: 'Mobilization', pips: 1 },
+      terminal,
+    ).continue
+    expect(labels(menu)).toContain('Psionic as Relic: Secure (Loyal Keepers)')
+  })
+
   it('confers only its own suit, not every suit', () => {
     const state = withCard(onlyHolding(fresh(), 'red', 'Fuel'), 'red', 'bc01')
     // Loyal Engineers is Material: Build/Repair. It must not hand out Secure (Relic's).
