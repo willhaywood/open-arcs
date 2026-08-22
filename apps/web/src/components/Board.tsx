@@ -448,18 +448,22 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
             <Route key={`route-${to}`} from={centreOf(state, from)} to={centreOf(state, to)} />
           ))}
 
-        {systems.map((s) => (
-          <g key={s.id}>
-            {slotsAndPieces(state, s.id, groupPieces(state, s.id)).map((r, i) => {
-              const at = placementFor(s, i)
-              return r.kind === 'slot' ? (
-                <EmptySlot key={`slot-${i}`} at={at} />
-              ) : (
-                <PieceBadge key={r.group.key} at={at} piece={r.group} />
-              )
-            })}
-          </g>
-        ))}
+        {systems.map((s) => {
+          const items = slotsAndPieces(state, s.id, groupPieces(state, s.id))
+          const positions = positionsFor(s, items)
+          return (
+            <g key={s.id}>
+              {items.map((r, i) => {
+                const at = positions[i]!
+                return r.kind === 'slot' ? (
+                  <EmptySlot key={`slot-${i}`} at={at} />
+                ) : (
+                  <PieceBadge key={r.group.key} at={at} piece={r.group} />
+                )
+              })}
+            </g>
+          )
+        })}
 
         {fleet !== null ? (
           <FleetPicker state={state} choice={fleet} scale={unitsPerPx} />
@@ -785,6 +789,35 @@ function placementFor(s: SystemInfo, i: number): readonly [number, number] {
   const overflow = i - pts.length + 1
   const [x, y] = pts[pts.length - 1]!
   return [x + overflow * 46, y + overflow * 46]
+}
+
+/**
+ * Positions for everything at a system, aligned with `slotsAndPieces`' order.
+ *
+ * The physical board prints its building slots **on the planet disc**, so buildings and the
+ * empty-slot markers — the contiguous prefix `slotsAndPieces` puts first — are laid out as a
+ * centred row on `render.planet`. Ships and agents keep the precomputed `placements`, indexed
+ * as if the prefix still occupied the early points, so fleets sit exactly where they always
+ * did. Gates have no planet (`planet: null`) and keep the old combined layout — their
+ * buildings only exist through Gate Ports/Stations, which invent the position anyway.
+ */
+function positionsFor(
+  s: SystemInfo,
+  items: readonly Renderable[],
+): (readonly [number, number])[] {
+  const planet = s.render.planet
+  if (planet === null) return items.map((_, i) => placementFor(s, i))
+  const isSlotish = (it: Renderable): boolean =>
+    it.kind === 'slot' || it.group.piece === 'City' || it.group.piece === 'Starport'
+  const onDisc = items.filter(isSlotish).length
+  const [px, py, pr] = planet
+  // A centred row, spaced one token apart but never wider than the disc allows.
+  const spacing = onDisc <= 1 ? 0 : Math.min(92, (2 * pr - 70) / (onDisc - 1))
+  return items.map((it, i) => {
+    if (!isSlotish(it)) return placementFor(s, i)
+    // The prefix is contiguous, so `i` is also the index within the disc row.
+    return [px + (i - (onDisc - 1) / 2) * spacing, py] as const
+  })
 }
 
 /**

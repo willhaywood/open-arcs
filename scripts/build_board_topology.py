@@ -23,6 +23,19 @@ CENTERS = {
     (7, "Gate"): (1250, 894),
 }
 
+# The planet disc of each non-gate system: centre x, y and radius in map coordinates.
+# Derived from map-regions.webp — most discs are cut out of their wedge as black holes, whose
+# max-inscribed-circle centres these are; the painted-over rest were read off the art and
+# verified by overlay in the renderer. Gates have no planet, and no printed building slots.
+PLANETS = {
+    (1, "Arrow"): (1108, 192, 88), (1, "Crescent"): (1441, 206, 81), (1, "Hex"): (1720, 268, 90),
+    (2, "Arrow"): (2003, 442, 82), (2, "Crescent"): (1986, 717, 105), (2, "Hex"): (2150, 920, 110),
+    (3, "Arrow"): (2207, 1133, 68), (3, "Crescent"): (1875, 1360, 120), (3, "Hex"): (1772, 1604, 100),
+    (4, "Arrow"): (1492, 1522, 90), (4, "Crescent"): (1096, 1620, 104), (4, "Hex"): (769, 1543, 112),
+    (5, "Arrow"): (440, 1352, 80), (5, "Crescent"): (433, 1157, 130), (5, "Hex"): (320, 870, 100),
+    (6, "Arrow"): (401, 690, 110), (6, "Crescent"): (370, 327, 117), (6, "Hex"): (730, 278, 100),
+}
+
 # arcs/ui.scala:450-469 — where the gate-link marker is drawn. 18 entries, one per
 # non-gate system, matching the 18 map-broken-gate-N-{arrow,crescent,hex} assets.
 GATE_MARKERS = {
@@ -211,6 +224,7 @@ def main():
                 "fateOnly": cluster == 7,
                 "render": {
                     "anchor": list(CENTERS[key]),
+                    "planet": list(PLANETS[key]) if key in PLANETS else None,
                     "gateMarkers": GATE_MARKERS.get(key, []),
                     "regionColour": place.get("hex"),
                     "selectColour": select.get("hex"),

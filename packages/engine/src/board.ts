@@ -20,6 +20,12 @@ export interface SystemInfo {
   readonly fateOnly: boolean
   readonly render: {
     readonly anchor: readonly [number, number]
+    /**
+     * The planet disc: centre x, y and radius in map coordinates, or `null` for gates, which
+     * have no planet. Buildings and empty building slots are drawn on the disc — the physical
+     * board prints its slot triangles there — while ships lay out on `placements`.
+     */
+    readonly planet: readonly [number, number, number] | null
     readonly gateMarkers: readonly (readonly [number, number])[]
     readonly regionColour: string
     readonly selectColour: string
