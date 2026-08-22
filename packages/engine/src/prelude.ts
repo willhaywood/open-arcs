@@ -40,6 +40,7 @@ import {
   SILVER_TONGUES,
   SWORN_GUARDIANS,
   UNION_SUITS,
+  courtCard,
   loyalSuits,
   securedCards,
 } from './court.js'
@@ -109,8 +110,18 @@ export type GuildPrelude =
   | { kind: 'gain-three'; card: string }
 
 export type PreludeOffer =
-  /** Spend `resource` to take `action` once, for free. */
-  | { kind: 'action'; resource: Resource; action: StandardAction }
+  /**
+   * Spend `resource` to take `action` once, for free. `via` is set when the resource buys this
+   * action only because a Loyal guild card lets it be spent **as** another type — "You may
+   * spend any resources as Relics" (Loyal Keepers) turns a Psionic into a Secure — so the
+   * surfaces can name the card doing the work rather than present a baffling spend.
+   */
+  | {
+      kind: 'action'
+      resource: Resource
+      action: StandardAction
+      via?: { as: Resource; card: string }
+    }
   /**
    * Spend `resource` so this turn's card can Battle even though its suit cannot. Normally
    * that resource is a Weapon, but Loyal Marines lets any held resource buy it — so the
@@ -150,14 +161,25 @@ export function preludeOffers(
     //   (r.is(X) && !outraged(X)) || f.hasGuild(LoyalX)
     // so a Loyal guild does two things at once: it lets *any* resource buy that suit's
     // action, and it ignores outrage on that suit. Both fall out of unioning the grants.
-    const grants = new Set<StandardAction>()
+    const direct = new Set<StandardAction>()
     if (canSpendForPrelude(state, faction, resource)) {
-      for (const a of preludeGrants(resource, leadSuit)) grants.add(a)
+      for (const a of preludeGrants(resource, leadSuit)) direct.add(a)
     }
-    for (const suit of loyal) {
-      for (const a of preludeGrants(suit, leadSuit)) grants.add(a)
+    // Loyal grants, remembered by the card that gives them, so the offer can say so. A resource
+    // spent as its own type is never "via" anything — the card's "ignore Outrage when spending
+    // X for its Prelude action" clause just lands it back in the direct set.
+    const viaLoyal = new Map<StandardAction, { as: Resource; card: string }>()
+    for (const card of securedCards(state, faction)) {
+      const info = courtCard(card)
+      if (info.loyal !== true || info.suit === undefined) continue
+      for (const a of preludeGrants(info.suit, leadSuit)) {
+        if (info.suit === resource) direct.add(a)
+        else if (!direct.has(a) && !viaLoyal.has(a)) viaLoyal.set(a, { as: info.suit, card })
+      }
     }
-    for (const action of grants) offers.push({ kind: 'action', resource, action })
+    for (const action of direct) viaLoyal.delete(action)
+    for (const action of direct) offers.push({ kind: 'action', resource, action })
+    for (const [action, via] of viaLoyal) offers.push({ kind: 'action', resource, action, via })
   }
 
   // A Weapon adds Battle to a card that could not otherwise battle. Aggression already can,

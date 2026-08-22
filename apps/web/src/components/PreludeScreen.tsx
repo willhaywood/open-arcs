@@ -56,6 +56,13 @@ interface Tile {
   buys: { label: string; action: Action; discard: boolean }[]
 }
 
+/** A Loyal card letting this resource be spent as another type, when the engine says so. */
+function viaOf(a: Action): { as: string; name: string } | undefined {
+  const via = a['via'] as { as: string; card: string } | undefined
+  if (via === undefined) return undefined
+  return { as: via.as, name: courtCard(via.card).name }
+}
+
 /** What a spend of this kind is called on a chip — the verb, not a sentence. */
 function chipLabel(a: Action): string {
   switch (a.type) {
@@ -63,9 +70,22 @@ function chipLabel(a: Action): string {
       return 'Battle option'
     case 'turn/prelude-discard':
       return 'Discard'
-    default:
-      return String(a['action'])
+    default: {
+      const via = viaOf(a)
+      return via === undefined
+        ? String(a['action'])
+        : `${String(a['action'])} — as ${via.as} (${via.name})`
+    }
   }
+}
+
+/** The full sentence for the chip's tooltip. */
+function spendTitle(resource: string, a: Action, label: string): string {
+  if (a.type === 'turn/prelude-discard') return `Spend the ${resource} for nothing, to free its slot`
+  const via = viaOf(a)
+  return via === undefined
+    ? `Spend the ${resource} to ${label}`
+    : `Spend the ${resource} as a ${via.as} to ${String(a['action'])} — ${via.name} lets any resource be spent as ${via.as}s`
 }
 
 export function PreludeScreen({
@@ -156,11 +176,7 @@ export function PreludeScreen({
                       key={i}
                       className={`pr-buy${b.discard ? ' discard' : ''}`}
                       onClick={() => store.apply(b.action)}
-                      title={
-                        b.discard
-                          ? `Spend the ${t.resource} for nothing, to free its slot`
-                          : `Spend the ${t.resource} to ${b.label}`
-                      }
+                      title={spendTitle(t.resource, b.action, b.label)}
                     >
                       {b.label}
                     </button>
