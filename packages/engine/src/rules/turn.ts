@@ -254,12 +254,29 @@ function performStartChapter(state: GameState): RuleResult {
     cards = seedDeck(cards, state.factions.length)
   }
 
-  const [order, rng] = shuffle(state.rng, contentsOf(cards, deck))
+  /*
+   * Shuffle from the deck's **canonical** order (`deckFor`), not from whatever order the cards
+   * arrived in. A Fisher-Yates over the arrival order meant any change to which pile a card sat
+   * in — a refactor of discards, not a rules change — re-dealt every later chapter for the same
+   * seed and broke every recorded journal (docs/22). Chapter 1 is seeded in this order already,
+   * so first-chapter deals are byte-identical to before.
+   */
+  const inDeck = new Set(contentsOf(cards, deck))
+  const canonical = deckFor(state.factions.length).map(cardId).filter((id) => inDeck.has(id))
+  const [order, rng] = shuffle(state.rng, canonical)
   let dealt = cards
   for (const f of state.factions) {
     const take = order.splice(0, CHAPTER_HAND_SIZE)
     dealt = moveAll(dealt, take, CardLocation.hand(f))
   }
+  /*
+   * "Discard all action cards not in players' hands into the action discard pile on the map
+   * face down, then shuffle it." The remainder is already in shuffled order, so it lands in the
+   * discard as-is — the pile the bottom-of-discard draws (Farseers, Call to Action) read from
+   * is therefore populated from the chapter's first turn, as at the table. It used to stay in
+   * the deck, where nothing ever drew from it (docs/22).
+   */
+  dealt = moveAll(dealt, order, CardLocation.discard())
 
   // Initiative carries across chapters. HRF sets the faction order once at setup
   // (game-common.scala:282) and thereafter only rotates it on a transfer of initiative
@@ -312,9 +329,12 @@ function offerMulligan(state: GameState): Continue | undefined {
  */
 function performMulligan(state: GameState, faction: FactionId): RuleResult {
   const hand = CardLocation.hand(faction)
-  const deck = CardLocation.deck()
-  let cards = moveAll(state.cards, [...contentsOf(state.cards, hand)], CardLocation.discard())
-  const [order, rng] = shuffle(state.rng, contentsOf(cards, deck))
+  const discard = CardLocation.discard()
+  let cards = moveAll(state.cards, [...contentsOf(state.cards, hand)], discard)
+  // The undealt cards live in the discard now (see `performStartChapter`), so the new six come
+  // from there: shuffle the pile so the returned hand cannot simply be drawn straight back.
+  const [order, rng] = shuffle(state.rng, contentsOf(cards, discard))
+  cards = moveAll(cards, order, discard)
   cards = moveAll(cards, order.slice(0, CHAPTER_HAND_SIZE), hand)
   return {
     state: {
@@ -1698,19 +1718,40 @@ function nextInitiative(state: GameState): FactionId {
   return best?.faction ?? state.initiativeOrder[0]!
 }
 
-function performEndRound(state: GameState): RuleResult {
-  // The Unions' held cards arrive now — "when the round ends" (docs/20 B1).
+/**
+ * What every round end does, whether it arrives normally or by a pass (5.1.2: passing
+ * "immediately end[s] the round").
+ *
+ * Rulebook 5.4.1: "Discard all played action cards, and any action card used to seize the
+ * initiative, into the action discard pile on the map face down." The seize card is already
+ * discarded when it is spent; the played piles used to persist for the whole chapter (docs/22),
+ * which let a Union take any card anyone had played in any earlier round and left the action
+ * discard nearly empty for the bottom-of-discard draws.
+ *
+ * Then the Unions' held cards arrive — "when the round ends" (docs/20 B1).
+ */
+function endRoundHousekeeping(state: GameState): GameState {
   let cards = state.cards
-  const delivered: string[] = []
+  const log: string[] = []
+  let discarded = 0
+  for (const f of state.factions) {
+    const played = [...contentsOf(cards, CardLocation.played(f))]
+    if (played.length === 0) continue
+    cards = moveAll(cards, played, CardLocation.discard())
+    discarded += played.length
+  }
+  if (discarded > 0) log.push(`round over — ${discarded} played card${discarded === 1 ? '' : 's'} discarded`)
   for (const f of state.factions) {
     for (const id of contentsOf(cards, CardLocation.pending(f))) {
       cards = move(cards, id, CardLocation.hand(f))
-      delivered.push(`${f} drew ${id} (held by a Union)`)
+      log.push(`${f} drew ${id} (held by a Union)`)
     }
   }
-  if (delivered.length > 0) {
-    state = { ...state, cards, log: [...state.log, ...delivered] }
-  }
+  return log.length > 0 ? { ...state, cards, log: [...state.log, ...log] } : state
+}
+
+function performEndRound(state: GameState): RuleResult {
+  state = endRoundHousekeeping(state)
 
   const holder = nextInitiative(state)
   const order = rotateTo(state.factions, holder)
@@ -1747,15 +1788,17 @@ function performPass(state: GameState, faction: FactionId): RuleResult {
   // consumed, at end of round.
   const next = nextInOrder(state, faction) ?? faction
   const order = rotateTo(state.factions, next)
+  // 5.1.2: a pass ends the round, so the played cards go and the Unions' held cards arrive.
+  const ended = endRoundHousekeeping({ ...state, log })
   return {
     state: {
-      ...state,
+      ...ended,
       passed,
       initiativeOrder: order,
       lead: undefined,
       roundPlays: [],
       current: next,
-      log: [...log, `initiative passes to ${next}`],
+      log: [...ended.log, `initiative passes to ${next}`],
     },
     continue: C.then(LeadMain(next)),
   }

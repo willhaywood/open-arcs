@@ -11,15 +11,16 @@
  * 44 step 505, `Pass` and `Lead Mobilization-5` rolled out 12/12 for red and
  * `Lead Administration-4` 0/12, with every same-horizon configuration preferring the 0/12 move.
  *
- * **Re-derived for the docs/21 A1+A2 build rules.** Presence-based building and 7.2.2's damaged
- * placement change every driven game, so the historical position is unreachable — the game-44
- * drive now ends chapter 5 with every lead option at 12/12 (vacuous). The same 12-salted-rollout
- * oracle re-adjudicated every late red lead menu in the new drive; the one discriminating
- * position is **step 379, chapter 4**: `Lead Construction-6` 6/12, `Lead Construction-5`,
- * `Lead Administration-2` and `Pass` all 0/12. At the new position the plain-horizon bot happens
- * to agree with the oracle, so the original v4-blunder contrast no longer reproduces here — the
- * feature's discriminating evidence stays in docs/19 sections 18-19; this test is its regression
- * floor: the shipped cross-round bot must keep choosing the oracle-winning move.
+ * **Re-derived twice since.** The docs/21 A1+A2 build rules and then the docs/22 round-end
+ * discard fix each re-dealt every driven game, so the historical position is unreachable. The
+ * same 12-salted-rollout oracle re-adjudicated every late red lead menu in the current drive: the
+ * game now resolves early — one chapter-4 menu is lost whatever red leads (all 0-1/12), the
+ * rest are won whatever red leads (12/12) — and the least vacuous is **step 429, chapter 4**,
+ * where `Lead Mobilization-2` and `Lead Administration-4` roll out 12/12 and `Pass` 11/12. The
+ * plain-horizon bot also picks a winning move there, so the original v4-blunder contrast no
+ * longer reproduces in this game — the feature's discriminating evidence stays in docs/19
+ * sections 18-19; this test is its regression floor: the shipped cross-round bot must keep
+ * choosing an oracle-winning move.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -40,14 +41,14 @@ import type { FactionId, RuleResult } from '../src/index.js'
 const registry = defaultRegistry()
 const TWO: readonly FactionId[] = ['red', 'yellow']
 
-/** The re-derived oracle position: arena game 44, step 379, red (hard) to lead in chapter 4. */
+/** The re-derived oracle position: arena game 44, step 429, red (hard) to lead in chapter 4. */
 function gamePosition(): { cur: RuleResult; asked: AskedThisTurn; f: FactionId } {
   const hard = searchBot({ width: 3, depth: 14, replies: { roots: 1, deals: 1 } })
   const seats = seatsForGame([hard, standardBot], TWO, 44)
   const seed = seedForGame(1, 44, TWO.length)
   let cur: RuleResult = startGame({ board: 'Board2Frontiers', factions: [...TWO], seed }, registry)
   let asked: AskedThisTurn = NO_ASKS
-  for (let step = 0; step < 379; step++) {
+  for (let step = 0; step < 429; step++) {
     const f = botToAct(cur, TWO)
     expect(f, `the drive reached step ${step} with a bot to act`).toBeDefined()
     const s = stepBot(cur, (seats as never as Record<FactionId, typeof hard>)[f!], f!, registry, asked)
@@ -79,15 +80,15 @@ describe('rounds defaults to the reply horizon', () => {
 describe('the cross-round horizon', () => {
   it('chooses the oracle-winning lead at the re-derived game-44 position', () => {
     /*
-     * Adjudicated by rollout, not by taste: from this position `Lead Construction-6` won 6 of 12
-     * salted standard-bot continuations, and `Lead Construction-5`, `Lead Administration-2` and
-     * `Pass` each won 0 of 12 (re-run for docs/21 A1+A2 — see the file docstring). The shipped
-     * cross-round bot must keep picking the sole oracle-winning move.
+     * Adjudicated by rollout, not by taste: from this position `Lead Mobilization-2` and
+     * `Lead Administration-4` each won 12 of 12 salted standard-bot continuations and `Pass`
+     * 11 of 12 (re-run for docs/22 — see the file docstring). The shipped cross-round bot must
+     * keep picking one of the oracle-winning moves.
      */
     const { cur, asked, f } = gamePosition()
     const v5 = searchBot({ width: 3, depth: 14, replies: { roots: 3, deals: 2, rounds: 2 } })
     const decision = stepBot(cur, v5, f, registry, asked).decision
-    expect(String(decision.action['label'])).toBe('Lead Construction-6')
+    expect(['Lead Mobilization-2', 'Lead Administration-4']).toContain(String(decision.action['label']))
   })
 
   it('is deterministic: the same position decides the same way twice', () => {

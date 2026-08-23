@@ -131,14 +131,16 @@ describe('the reply-ranked search bot (v4)', () => {
 
   it('re-ranks by replies where they change the answer', () => {
     /*
-     * Seed 3, step 32, found by sweeping: red's follow. Tier-1 surpasses with Administration-3;
-     * after the rivals' replies are foreseen, Administration-6 wins instead. Pinned so a silent
-     * fallback to tier-1 (foresee dropped, replies option ignored, checked set never consulted)
-     * fails here rather than passing on some other disagreement.
+     * Seed 3, step 122, found by sweeping: red's lead. Tier-1 leads Administration-6; after the
+     * rivals' replies are foreseen, passing wins instead. Pinned so a silent fallback to tier-1
+     * (foresee dropped, replies option ignored, checked set never consulted) fails here rather than
+     * passing on some other disagreement. Re-swept for the round-end discard fix (docs/22): the
+     * foresight's unseen pool now takes in each round's discards, so the first disagreement moved
+     * from step 32 (a follow) to here.
      */
     let cur = opening(3)
     let asked = NO_ASKS
-    for (let i = 0; i < 32; i++) {
+    for (let i = 0; i < 122; i++) {
       const step = stepBot(cur, standardBot, botToAct(cur, THREE)!, registry, asked)
       cur = step.result
       asked = step.asked
@@ -147,8 +149,8 @@ describe('the reply-ranked search bot (v4)', () => {
     expect(f).toBe('red')
     const tier1 = stepBot(cur, searchBot(), f, registry, asked).decision
     const tier2 = stepBot(cur, v4(), f, registry, asked).decision
-    expect(String(tier1.action['label'])).toBe('Surpass with Administration-3')
-    expect(String(tier2.action['label'])).toBe('Surpass with Administration-6')
+    expect(String(tier1.action['label'])).toBe('Lead Administration-6')
+    expect(String(tier2.action['label'])).toBe('Pass')
     // The diagnostic panel shows which candidates were reply-checked.
     expect(tier2.considered?.some((c) => c.note?.includes('after replies'))).toBe(true)
   })

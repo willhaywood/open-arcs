@@ -966,6 +966,11 @@ describe('Guild Prelude abilities — the card is the cost', () => {
 
   it('Farseers with zero discards still draws 1 — the FAQ boundary', () => {
     let state = withCard2(fresh(), 'red', 'bc17')
+    // The chapter's undealt remainder already sits in the discard (docs/22); empty it so the
+    // seeded card is unambiguously the pile's bottom.
+    for (const id of [...contentsOf(state.cards, CardLocation.discard())]) {
+      state = { ...state, cards: move(state.cards, id, CardLocation.deck()) }
+    }
     const yHand = contentsOf(state.cards, CardLocation.hand('yellow'))
     const seedBottom = yHand[0]!
     state = { ...state, cards: move(state.cards, seedBottom, CardLocation.discard()) }
@@ -1070,7 +1075,12 @@ describe('Prelude discard abilities', () => {
     const union = Object.entries(UNION_SUITS).find(([, s]) => s === suit)![0]
 
     let state = withCard2(base, 'red', union)
-    state = { ...state, cards: move(state.cards, card, CardLocation.played('yellow')) }
+    // Yellow played it face up this round (a Pivot) — the play record is what the offer reads.
+    state = {
+      ...state,
+      cards: move(state.cards, card, CardLocation.played('yellow')),
+      roundPlays: [...state.roundPlays, { faction: 'yellow', cardId: card, kind: 'pivot' as const }],
+    }
 
     // It must be on offer, not just performable.
     expect(guildPreludes(state, 'red').some((g) => g.kind === 'take-played' && g.taken === card)).toBe(
@@ -1096,6 +1106,53 @@ describe('Prelude discard abilities', () => {
     expect(contentsOf(delivered.state.cards, CardLocation.hand('red'))).toContain(card)
     expect(contentsOf(delivered.state.cards, CardLocation.pending('red'))).toHaveLength(0)
     expect(delivered.state.log.some((l) => /held by a Union/.test(l))).toBe(true)
+  })
+
+  it('a Union cannot take a card played face down (a Copy), only a face-up play (docs/22)', () => {
+    /*
+     * "You may place this card next to a **face-up** played X card." 5.2.2: "Copy. Play any
+     * action card face down." The offer used to read the played pile alone and took Copies.
+     */
+    const base = fresh()
+    const card = contentsOf(base.cards, CardLocation.hand('yellow'))[0]!
+    const suit = parseCardId(card).suit
+    const union = Object.entries(UNION_SUITS).find(([, s]) => s === suit)![0]
+    const held = withCard2(base, 'red', union)
+    const playedAs = (kind: 'lead' | 'surpass' | 'copy' | 'pivot'): GameState => ({
+      ...held,
+      cards: move(held.cards, card, CardLocation.played('yellow')),
+      roundPlays: [{ faction: 'yellow', cardId: card, kind }],
+    })
+    const offered = (s: GameState): boolean =>
+      guildPreludes(s, 'red').some((g) => g.kind === 'take-played' && g.taken === card)
+    expect(offered(playedAs('copy'))).toBe(false)
+    expect(offered(playedAs('lead'))).toBe(true)
+    expect(offered(playedAs('surpass'))).toBe(true)
+    expect(offered(playedAs('pivot'))).toBe(true)
+  })
+
+  it("a Union cannot reach back to an earlier round's play — the round end discards it (docs/22)", () => {
+    /*
+     * 5.4.1: "Discard all played action cards ... into the action discard pile" at every round
+     * end. The played piles used to persist for the whole chapter, so a Union could take any
+     * card anyone had played since the chapter began.
+     */
+    const base = fresh()
+    const card = contentsOf(base.cards, CardLocation.hand('yellow'))[0]!
+    const suit = parseCardId(card).suit
+    const union = Object.entries(UNION_SUITS).find(([, s]) => s === suit)![0]
+    let state = withCard2(base, 'red', union)
+    state = {
+      ...state,
+      cards: move(state.cards, card, CardLocation.played('yellow')),
+      roundPlays: [{ faction: 'yellow', cardId: card, kind: 'pivot' as const }],
+    }
+    expect(guildPreludes(state, 'red').some((g) => g.kind === 'take-played')).toBe(true)
+
+    const next = advance(state, { type: 'round/end' }, registry).state
+    expect(contentsOf(next.cards, CardLocation.played('yellow'))).toHaveLength(0)
+    expect(contentsOf(next.cards, CardLocation.discard())).toContain(card)
+    expect(guildPreludes(next, 'red').some((g) => g.kind === 'take-played')).toBe(false)
   })
 
   it('Gatekeepers puts a ship on every gate', () => {

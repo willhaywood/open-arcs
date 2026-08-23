@@ -51,7 +51,7 @@ Those need eyes. What they do not need is twenty minutes of setup first.
 
 ### Railgun Arrays — the hit before the dice
 
-`saves/lore/lore12-railgun-arrays--volley.json` — seed 5, 172 actions in.
+`saves/lore/lore12-railgun-arrays--volley.json` — seed 5, 137 actions in.
 
 **You are here:** red — assign 1 self-hit(s)
 
@@ -69,9 +69,9 @@ Cards: lore12=blue
 
 ### Predictive Sensors then Railgun Arrays — two defender interrupts, one battle
 
-`saves/lore/lore15-predictive-sensors--then-railgun-arrays.json` — seed 13, 299 actions in.
+`saves/lore/lore15-predictive-sensors--then-railgun-arrays.json` — seed 13, 218 actions in.
 
-**You are here:** blue — Predictive Sensors: reinforce 3-Arrow before red collects dice
+**You are here:** blue — Predictive Sensors: reinforce 2-Hex before red collects dice
 
 **➜ Do this first:** You are the defender: pick a neighbouring system and bring ships into the battle.
 
@@ -88,7 +88,7 @@ Cards: lore15=blue, lore12=blue
 
 ### Galactic Rifles — a strike that is not a battle
 
-`saves/lore/lore02-galactic-rifles--fire-rifles.json` — seed 3, 166 actions in.
+`saves/lore/lore02-galactic-rifles--fire-rifles.json` — seed 3, 146 actions in.
 
 **You are here:** blue — Fire Rifles — from where?
 
@@ -109,9 +109,9 @@ Cards: lore02=blue
 
 ### Seeker Torpedoes + Empath’s Vision — two reroll sources in one roll
 
-`saves/lore/lore14-seeker-torpedoes--with-empaths-vision.json` — seed 1, 256 actions in.
+`saves/lore/lore14-seeker-torpedoes--with-empaths-vision.json` — seed 2, 91 actions in.
 
-**You are here:** blue — Seeker Torpedoes: reroll up to 1 assault die?
+**You are here:** blue — Seeker Torpedoes: reroll up to 3 assault dice?
 
 **➜ Do this first:** Click assault dice to reroll them, then Reroll — a second source should ask next.
 
@@ -263,7 +263,7 @@ Cards: lore18=blue
 
 ### Tyrant’s Authority — Annex, and the slot it frees
 
-`saves/lore/lore26-tyrants-authority--annex.json` — seed 5, 263 actions in.
+`saves/lore/lore26-tyrants-authority--annex.json` — seed 5, 173 actions in.
 
 **You are here:** blue — Build
 
@@ -281,7 +281,7 @@ Cards: lore26=blue
 
 ### Gate Ports + Gate Stations — two cards building on gates
 
-`saves/lore/lore08-gate-ports--with-gate-stations.json` — seed 4, 39 actions in.
+`saves/lore/lore08-gate-ports--with-gate-stations.json` — seed 4, 41 actions in.
 
 **You are here:** blue — Build
 
@@ -299,7 +299,7 @@ Cards: lore08=blue, lore11=blue
 
 ### Tool Priests — build a ship at a city, once a turn
 
-`saves/lore/lore01-tool-priests--summon-at-a-city.json` — seed 16, 58 actions in.
+`saves/lore/lore01-tool-priests--summon-at-a-city.json` — seed 16, 62 actions in.
 
 **You are here:** blue — Build
 
@@ -317,7 +317,7 @@ Cards: lore01=blue
 
 ### Cloud Cities — a city where there is no building slot
 
-`saves/lore/lore09-cloud-cities--city-outside-the-slots.json` — seed 10, 27 actions in.
+`saves/lore/lore09-cloud-cities--city-outside-the-slots.json` — seed 8, 153 actions in.
 
 **You are here:** blue — Build
 
@@ -335,7 +335,7 @@ Cards: lore09=blue
 
 ### Living Structures — a Build that taxes, a Repair that rebuilds
 
-`saves/lore/lore10-living-structures--nurture-and-prune.json` — seed 1, 206 actions in.
+`saves/lore/lore10-living-structures--nurture-and-prune.json` — seed 1, 124 actions in.
 
 **You are here:** blue — Build
 
@@ -355,7 +355,7 @@ Cards: lore10=blue
 
 ### The outrage-clearing discards — ungated by ambition
 
-`saves/lore/lore23-warlords-cruelty--outrage-clear.json` — seed 2, 142 actions in.
+`saves/lore/lore23-warlords-cruelty--outrage-clear.json` — seed 2, 145 actions in.
 
 **You are here:** blue — Prelude
 
@@ -373,7 +373,7 @@ Cards: lore23=blue
 
 ### Tycoon’s Ambition — a declaration that does not zero the card
 
-`saves/lore/lore27-tycoons-ambition--declare-without-zeroing.json` — seed 11, 174 actions in.
+`saves/lore/lore27-tycoons-ambition--declare-without-zeroing.json` — seed 1, 162 actions in.
 
 **You are here:** blue — Prelude
 
@@ -391,7 +391,7 @@ Cards: lore27=blue
 
 ### Ancient Holdings — a resource slot that is not on the player board
 
-`saves/lore/lore13-ancient-holdings--the-extra-slot.json` — seed 4, 35 actions in.
+`saves/lore/lore13-ancient-holdings--the-extra-slot.json` — seed 4, 37 actions in.
 
 **You are here:** blue — Prelude
 
@@ -410,7 +410,7 @@ Cards: lore13=blue
 
 ### Warlord's Terror — spend a trophy on an action
 
-`saves/lore/lore24-warlords-terror--trophy-for-an-influence.json` — seed 7, 287 actions in.
+`saves/lore/lore24-warlords-terror--trophy-for-an-influence.json` — seed 7, 297 actions in.
 
 **You are here:** blue — Prelude
 
@@ -429,7 +429,7 @@ Cards: lore24=blue
 
 ### Tyrant's Ego — spend a captive on an action
 
-`saves/lore/lore25-tyrants-ego--captive-for-a-secure.json` — seed 2, 159 actions in.
+`saves/lore/lore25-tyrants-ego--captive-for-a-secure.json` — seed 2, 163 actions in.
 
 **You are here:** blue — Prelude
 
@@ -448,7 +448,7 @@ Cards: lore25=blue
 
 ### Tycoon's Charm — swap Material or Fuel for anything
 
-`saves/lore/lore28-tycoons-charm--trade-material-for-anything.json` — seed 1, 438 actions in.
+`saves/lore/lore28-tycoons-charm--trade-material-for-anything.json` — seed 22, 44 actions in.
 
 **You are here:** blue — Prelude
 
@@ -469,7 +469,7 @@ Cards: lore28=blue
 
 ### Empath’s Bond — tax, build and catapult all rewritten at once
 
-`saves/lore/lore20-empaths-bond--tax-build-catapult.json` — seed 1, 427 actions in.
+`saves/lore/lore20-empaths-bond--tax-build-catapult.json` — seed 1, 158 actions in.
 
 **You are here:** blue — Tax
 
@@ -490,9 +490,9 @@ Cards: lore20=blue
 
 ### Keeper's Trust — what a raid may take from you
 
-`saves/lore/lore21-keepers-trust--raid-a-guild-card.json` — seed 6, 308 actions in.
+`saves/lore/lore21-keepers-trust--raid-a-guild-card.json` — seed 10, 372 actions in.
 
-**You are here:** red raids yellow — 1 key(s) to spend
+**You are here:** red raids blue — 2 key(s) to spend
 
 **➜ Do this first:** Spend the keys — take a resource or a card, and watch what the price is.
 
@@ -508,9 +508,9 @@ Cards: lore21=blue
 
 ### Keeper's Solidarity — a card whose suit you do not hold
 
-`saves/lore/lore22-keepers-solidarity--take-a-card-of-any-suit.json` — seed 54, 194 actions in.
+`saves/lore/lore22-keepers-solidarity--take-a-card-of-any-suit.json` — seed 50, 144 actions in.
 
-**You are here:** red raids blue — 2 key(s) to spend
+**You are here:** red raids blue — 3 key(s) to spend
 
 **➜ Do this first:** Spend keys on a court card and check which suits are on offer.
 

@@ -57,8 +57,17 @@ describe('Call to Action (bc31) — draw from the bottom of the action discard',
    * draw from the DECK — the docs/20 A5 defect pinned as if it were the rule. The discard's
    * bottom is the pile's oldest entry, which is what makes the draw knowable rather than random.
    */
+  /** The chapter's undealt remainder already sits in the discard (docs/22); clear it. */
+  const emptyDiscard = (state: GameState): GameState => {
+    let cards = state.cards
+    for (const id of [...contentsOf(cards, CardLocation.discard())]) {
+      cards = move(cards, id, CardLocation.deck())
+    }
+    return { ...state, cards }
+  }
+
   it('moves the oldest discarded card to your hand, then discards itself', () => {
-    let state = putCard(fresh(), 'bc31', CourtPile.discard())
+    let state = emptyDiscard(putCard(fresh(), 'bc31', CourtPile.discard()))
     // Seed a known discard: two hand cards discarded in order — the FIRST is the bottom.
     const hand = contentsOf(state.cards, CardLocation.hand('yellow'))
     const bottom = hand[0]!
@@ -78,7 +87,7 @@ describe('Call to Action (bc31) — draw from the bottom of the action discard',
   })
 
   it('draws nothing when the action discard is empty', () => {
-    const state = putCard(fresh(), 'bc31', CourtPile.discard())
+    const state = emptyDiscard(putCard(fresh(), 'bc31', CourtPile.discard()))
     const handBefore = contentsOf(state.cards, CardLocation.hand('red')).length
     const step = fire(state, 'bc31')
     expect(contentsOf(step.state.cards, CardLocation.hand('red'))).toHaveLength(handBefore)

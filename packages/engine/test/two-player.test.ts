@@ -228,9 +228,15 @@ describe('the mulligan', () => {
     const now = handOf(after, 'yellow')
 
     expect(now).toHaveLength(6)
-    // None of the six comes back: the old hand is discarded, not shuffled back in and redealt.
-    expect(now.filter((c) => was.includes(c))).toEqual([])
-    expect(contentsOf(after.state.cards, CardLocation.discard())).toHaveLength(6)
+    /*
+     * The new six come from the action discard, which holds the chapter's 8 undealt cards plus
+     * the 6 just returned (docs/22: the remainder is discarded at setup, then shuffled). With 14
+     * to draw from, some of the old six MAY come back — what the rule forbids is topping up,
+     * not coincidence — so the pin is the count and that the discard holds exactly the rest.
+     */
+    expect(contentsOf(after.state.cards, CardLocation.discard())).toHaveLength(8)
+    expect(contentsOf(after.state.cards, CardLocation.deck())).toHaveLength(0)
+    expect(new Set([...now, ...contentsOf(after.state.cards, CardLocation.discard())]).size).toBe(14)
     // The other player is untouched.
     expect(handOf(after, 'red')).toEqual(handOf(before, 'red'))
   })
@@ -249,7 +255,8 @@ describe('the mulligan', () => {
     const keep = offered(before).find((a) => a.type === 'turn/keep-hand')!
     const after = applyExternal(before, keep as never, registry)
     expect(handOf(after, 'yellow')).toEqual(handOf(before, 'yellow'))
-    expect(contentsOf(after.state.cards, CardLocation.discard())).toHaveLength(0)
+    // The discard still holds only the chapter's 8 undealt cards (docs/22) — nothing was returned.
+    expect(contentsOf(after.state.cards, CardLocation.discard())).toHaveLength(8)
   })
 })
 
