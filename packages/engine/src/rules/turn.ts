@@ -669,11 +669,20 @@ function performPrelude(
   const options: Action[] = offers.map((o) => {
     switch (o.kind) {
       case 'action':
-        return {
-          ...PreludeSpend(faction, o.resource, o.action, suit, pips),
-          faction,
-          label: `${o.resource}: ${o.action}`,
-        }
+        // A Loyal-granted spend names the card and the type it is spent as, so "Psionic:
+        // Secure" reads as the Loyal Keepers play it is rather than an impossible option.
+        return o.via === undefined
+          ? {
+              ...PreludeSpend(faction, o.resource, o.action, suit, pips),
+              faction,
+              label: `${o.resource}: ${o.action}`,
+            }
+          : {
+              ...PreludeSpend(faction, o.resource, o.action, suit, pips),
+              faction,
+              via: o.via,
+              label: `${o.resource} as ${o.via.as}: ${o.action} (${courtCard(o.via.card).name})`,
+            }
       case 'battle-option':
         return {
           ...PreludeBattleOption(faction, o.resource, suit, pips),
