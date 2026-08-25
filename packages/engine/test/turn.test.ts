@@ -96,10 +96,17 @@ describe('dealing', () => {
     expect(c.actions.some((a) => a.type === 'turn/pass')).toBe(true)
   })
 
-  it('leaves the rest of the deck undealt', () => {
+  it('discards the rest of the deck, face down, so the pile is populated from turn one', () => {
+    /*
+     * Inverted by docs/22: setup and chapter reset say "Discard all action cards not in
+     * players' hands into the action discard pile on the map face down, then shuffle it." The
+     * remainder used to sit in the deck, where nothing ever drew from it — the bottom-of-discard
+     * draws (Farseers, Call to Action) need it in the pile.
+     */
     const { state } = startGame({ board: 'Board3MixUp', factions: THREE, seed: 5 })
-    // 20-card deck, 3 x 6 dealt = 18, so 2 remain.
-    expect(contentsOf(state.cards, CardLocation.deck())).toHaveLength(20 - 18)
+    // 20-card deck, 3 x 6 dealt = 18, so 2 go to the discard and the deck empties.
+    expect(contentsOf(state.cards, CardLocation.deck())).toHaveLength(0)
+    expect(contentsOf(state.cards, CardLocation.discard())).toHaveLength(20 - 18)
   })
 })
 
@@ -938,6 +945,31 @@ describe('a faction swept from the map', () => {
  * restarted, handing a human the lead out of turn. It also let bots hoard cards for free, ending
  * chapters with hands still full.
  */
+describe('a pass ends the round (rulebook 5.1.2, docs/22)', () => {
+  /*
+   * "When you pass the initiative, give the initiative marker to the next clockwise player who
+   * has any cards in their hand, then immediately end the round." So the round-end housekeeping
+   * runs on a pass too: played cards are discarded (5.4.1) and a Union's held card arrives
+   * ("when the round ends"). `performPass` used to restart the lead without either.
+   */
+  it('discards the played piles and delivers a Union-held card', () => {
+    const base = startGame({ board: 'Board3MixUp', factions: [...THREE], seed: 5 }).state
+    const yellowCard = contentsOf(base.cards, CardLocation.hand('yellow'))[0]!
+    const redCard = contentsOf(base.cards, CardLocation.hand('red'))[0]!
+    let cards = move(base.cards, yellowCard, CardLocation.played('yellow'))
+    cards = move(cards, redCard, CardLocation.pending('red'))
+    const staged = { ...base, cards, current: 'red' as const }
+
+    const out = advance(staged, { type: 'turn/pass', faction: 'red' }, registry).state
+    expect(contentsOf(out.cards, CardLocation.played('yellow'))).toHaveLength(0)
+    expect(contentsOf(out.cards, CardLocation.discard())).toContain(yellowCard)
+    expect(contentsOf(out.cards, CardLocation.hand('red'))).toContain(redCard)
+    expect(contentsOf(out.cards, CardLocation.pending('red'))).toHaveLength(0)
+    expect(out.log.some((l) => /played card.* discarded/.test(l))).toBe(true)
+    expect(out.log.some((l) => /held by a Union/.test(l))).toBe(true)
+  })
+})
+
 describe('passing belongs to the initiative holder', () => {
   const drive = (seed: number, steps: number): RuleResult => {
     let cur = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed }, registry)

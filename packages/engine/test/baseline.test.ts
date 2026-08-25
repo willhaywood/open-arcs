@@ -129,8 +129,16 @@ describe('the frozen baseline', () => {
  * Build options exist in every game, so all three seeds moved — the usual rules-fix exception;
  * `weightsMatchBaseline` still passes. Values before: [32,33,2], [15,20,38], [13,43,23].
  */
+/*
+ * Re-recorded for the round-end discard fix (docs/22): played cards are discarded at every round
+ * end (5.4.1), a pass ends the round (5.1.2), and the chapter's undealt remainder goes to the
+ * discard. All three seeds moved — every chapter-2+ deal changes, because the chapter reshuffle
+ * now runs from the deck's canonical order rather than the cards' arrival order (the same change
+ * that makes future pile refactors unable to move a deal again). The usual rules-fix exception;
+ * `weightsMatchBaseline` still passes. Values before: [39,27,17], [28,27,24], [9,37,7].
+ */
 const GOLDEN = [
-  [39, 27, 17],
-  [28, 27, 24],
-  [9, 37, 7],
+  [35, 16, 18],
+  [41, 9, 23],
+  [21, 18, 37],
 ]

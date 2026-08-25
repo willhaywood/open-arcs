@@ -115,21 +115,23 @@ describe('the hand features', () => {
 describe('the hand-quality bot', () => {
   it('keeps the 4-pip card and leads the middling one where a blind bot burns it', () => {
     /*
-     * Seed 1 step 215, the first divergence — found by running the actual mutation (both weights
-     * zeroed in `HAND_WEIGHTS`) and diffing `handBot`'s own choices across a standard-driven game,
-     * the method levels.test.ts records after two proxy-built sweeps pinned vacuous positions.
+     * Seed 1 step 187, the first Lead/Pivot divergence — found by running the actual mutation
+     * (both weights zeroed in `HAND_WEIGHTS`) and diffing `handBot`'s own choices across a
+     * standard-driven game, the method levels.test.ts records after two proxy-built sweeps pinned
+     * vacuous positions. Re-swept for the round-end discard fix (docs/22), which re-deals every
+     * chapter-2+ hand.
      *
-     * Blue leads Construction-4 and keeps Mobilization-2 in hand; the blind bot leads the 2,
-     * burning a 4-pip card for a 2-pip turn. Fifteen such divergences appeared in ~800 driven
-     * steps, every one a Lead or Pivot — the decision docs/19 section 2d rates highest — and all
-     * in this direction: spend the middle, keep the pips and the top card.
+     * Yellow pivots with Aggression-4 and keeps Construction-4 in hand; the blind bot pivots with
+     * the Construction-4, burning the 4-pip card for a one-action turn. The direction is the one
+     * the original sweep found fifteen times over: spend the middle, keep the pips and the top
+     * card.
      */
     let cur: RuleResult = startGame(
       { board: 'Board3Frontiers', factions: [...THREE], seed: 1 },
       registry,
     )
     let asked: AskedThisTurn = NO_ASKS
-    for (let i = 0; i < 215; i++) {
+    for (let i = 0; i < 187; i++) {
       const f = botToAct(cur, THREE)
       expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
       const step = stepBot(cur, standardBot, f!, registry, asked)
@@ -137,9 +139,9 @@ describe('the hand-quality bot', () => {
       asked = step.asked
     }
     const f = botToAct(cur, THREE)
-    expect(f).toBe('blue')
+    expect(f).toBe('yellow')
     const decision = stepBot(cur, handBot, f!, registry, asked).decision
-    expect(String(decision.action['label'])).toBe('Lead Construction-4')
+    expect(String(decision.action['label'])).toBe('Pivot with Aggression-4')
   })
 
   it('is deterministic: the same position decides the same way twice', () => {

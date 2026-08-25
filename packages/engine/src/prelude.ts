@@ -304,11 +304,19 @@ export function guildPreludes(state: GameState, faction: FactionId): GuildPrelud
   }
 
   // The Unions — take a played card of their suit out of the round.
+  /*
+   * The Unions: "You may place this card next to a **face-up** played X card." Face-up is the
+   * lead, a Surpass or a Pivot — a Copy is "played face down" (5.2.2) and cannot be taken, so
+   * the offer reads `roundPlays` rather than the played pile alone (docs/22). The pile itself
+   * now holds only this round's cards, since 5.4.1 discards it every round end.
+   */
   for (const [card, suit] of Object.entries(UNION_SUITS)) {
     if (!cards.includes(card)) continue
     for (const from of state.factions) {
       for (const played of contentsOf(state.cards, CardLocation.played(from))) {
         if (parseCardId(played).suit !== suit) continue
+        const play = state.roundPlays.find((p) => p.cardId === played && p.faction === from)
+        if (play === undefined || play.kind === 'copy') continue
         out.push({ kind: 'take-played', card, taken: played, from })
       }
     }

@@ -82,20 +82,20 @@ describe('valueOf with rival intent', () => {
 describe('the rival-intent bot', () => {
   it('reaches a different decision than standard on a real position', () => {
     /*
-     * Seed 1, step 187, found by sweeping full games for the first disagreement. Red declines to
-     * declare under `standardBot` and declares Tycoon under `rivalBot` — seeing what the rivals are
-     * going for is what makes the marker worth taking. Pinning the step (not just "they differ
-     * somewhere") is what makes a silent `opts`-dropping regression fail here rather than pass on a
-     * different disagreement.
+     * Seed 1, step 182, found by sweeping full games for the first disagreement. Red taxes its own
+     * 1-Hex under `standardBot` and taxes yellow's city in 1-Arrow — taking a captive — under
+     * `rivalBot`: seeing what the rivals are going for is what makes the captive worth more than the
+     * Material. Pinning the step (not just "they differ somewhere") is what makes a silent
+     * `opts`-dropping regression fail here rather than pass on a different disagreement.
      *
-     * Re-swept whenever the legal action set moves, which it has five times now — the pin names a
+     * Re-swept whenever the legal action set moves, which it has six times now — the pin names a
      * point in a *driven game*, so this is maintenance rather than a surprise. The disagreement it
-     * lands on has changed shape too: it used to be a tax, and after the dice-selection fix the
-     * first divergence is a declaration.
+     * lands on has changed shape too: a tax, then a declaration after the dice-selection fix, and a
+     * captive-taking tax after the round-end discard fix (docs/22).
      */
     let cur: RuleResult = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 1 }, registry)
     let asked: AskedThisTurn = NO_ASKS
-    for (let i = 0; i < 187; i++) {
+    for (let i = 0; i < 182; i++) {
       const f = botToAct(cur, THREE)
       expect(f, `the drive reached step ${i} with a bot to act`).toBeDefined()
       const step = stepBot(cur, standardBot, f!, registry, asked)
@@ -106,8 +106,8 @@ describe('the rival-intent bot', () => {
     expect(f).toBe('red')
     const standard = stepBot(cur, standardBot, f!, registry, asked).decision
     const rival = stepBot(cur, rivalBot, f!, registry, asked).decision
-    expect(String(standard.action['label'])).toContain('Do not declare')
-    expect(String(rival.action['label'])).toContain('Declare Tycoon')
+    expect(String(standard.action['label'])).toBe('Tax 1-Hex (+Material)')
+    expect(String(rival.action['label'])).toBe("Tax yellow's city in 1-Arrow (+Weapon, capture an agent)")
   })
 
   it('scores rivals under the RIVAL’s intent, not a recomputation of its own', () => {
