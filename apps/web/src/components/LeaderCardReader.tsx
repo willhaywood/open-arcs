@@ -13,6 +13,7 @@
 import { leaderCard, loreCard } from '@arcs/engine'
 import type { Action, FactionId } from '@arcs/engine'
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 
 import { store } from '../store.js'
@@ -27,6 +28,33 @@ export function cardArt(id: string, kind: DraftKind): string {
 
 export function cardName(id: string, kind: DraftKind): string {
   return kind === 'leader' ? leaderCard(id).name : loreCard(id).name
+}
+
+/**
+ * Just the card's illustration — the top band of the leader art, cropped by a fixed-aspect
+ * frame. The end screens want the leader as a *portrait*, not a document: at their sizes the
+ * card's body text is unreadable noise, and the picture alone is the identity. Sized by the
+ * caller's className; the crop shows the top ~46% of the card, which is where every leader's
+ * illustration lives.
+ */
+export function LeaderArt({
+  id,
+  className,
+  style,
+}: {
+  id: string
+  className?: string
+  style?: CSSProperties
+}): JSX.Element {
+  return (
+    <span
+      className={`leader-art${className === undefined ? '' : ` ${className}`}`}
+      style={style}
+      title={cardName(id, 'leader')}
+    >
+      <img src={cardArt(id, 'leader')} alt={cardName(id, 'leader')} />
+    </span>
+  )
 }
 
 /**

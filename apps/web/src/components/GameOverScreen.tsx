@@ -22,7 +22,7 @@ import type { Continue, FactionId, GameState } from '@arcs/engine'
 import { asset } from '../assets.js'
 import { store, useInterlude } from '../store.js'
 import { colorOf, figureArt, textOn } from '../theme.js'
-import { cardArt, cardName } from './LeaderCardReader.js'
+import { LeaderArt, cardName } from './LeaderCardReader.js'
 import { FactionChip, roman } from './ChapterInterlude.js'
 import type { GameHistory } from '../chapter-report.js'
 
@@ -117,14 +117,15 @@ function LeaderPortrait({
   const leader = state.leaders[faction]
   const frame = { boxShadow: `0 0 ${hero ? 34 : 16}px ${colorOf(faction)}66, 0 0 0 2px ${colorOf(faction)}` }
   if (leader !== undefined) {
+    // The illustration, not the document — with the leader's name restored beneath it, since
+    // the crop takes the card's own name band away.
     return (
-      <img
-        className={`gos-leader${hero ? ' hero' : ''}`}
-        style={frame}
-        src={cardArt(leader, 'leader')}
-        alt={cardName(leader, 'leader')}
-        title={cardName(leader, 'leader')}
-      />
+      <span className={`gos-portrait${hero ? ' hero' : ''}`}>
+        <LeaderArt id={leader} className={`gos-leader${hero ? ' hero' : ''}`} style={frame} />
+        <span className="gos-leader-name" style={{ color: colorOf(faction) }}>
+          {cardName(leader, 'leader')}
+        </span>
+      </span>
     )
   }
   return (

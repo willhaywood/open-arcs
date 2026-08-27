@@ -21,7 +21,7 @@ import type { Ambition, FactionId, GameState, Resource } from '@arcs/engine'
 import { asset } from '../assets.js'
 import { store, useInterlude } from '../store.js'
 import { colorOf, textOn } from '../theme.js'
-import { cardArt } from './LeaderCardReader.js'
+import { LeaderArt } from './LeaderCardReader.js'
 import type { AmbitionResult, ChapterReport } from '../chapter-report.js'
 
 /** How long an all-bot game lingers on the screen before play resumes on its own. */
@@ -128,9 +128,7 @@ function AmbitionRow({ r, prev }: { r: AmbitionResult; prev: GameState }): JSX.E
           const leader = prev.leaders[a.faction]
           return (
             <span key={`${a.faction}-${a.place}`} className="il-award">
-              {leader !== undefined ? (
-                <img className="il-leader-thumb" src={cardArt(leader, 'leader')} alt="" />
-              ) : null}
+              {leader !== undefined ? <LeaderArt id={leader} className="il-leader-thumb" /> : null}
               <FactionChip faction={a.faction} />
               <span className="il-place">{PLACE_LABEL[a.place]}</span>
               <span className="il-power">+{a.power}</span>
