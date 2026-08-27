@@ -18,7 +18,8 @@ import { AMBITIONS, FUEL_CARTEL, MATERIAL_CARTEL, RESOURCES, ResourceSlot, conte
 import type { Action, Ambition, AmbitionMarker, Continue, GameState } from '@arcs/engine'
 import { useState } from 'react'
 
-import { store } from '../store.js'
+import { ambitionFlash, liveFlash } from '../bot-events.js'
+import { store, useBotUi } from '../store.js'
 import { colorOf } from '../theme.js'
 import { asset } from '../assets.js'
 
@@ -64,6 +65,18 @@ export function AmbitionTrack({
   }
   const hideTip = (): void => setTip(null)
   const threshold = 39 - state.factions.length * 3
+
+  // A bot declaring an ambition flashes that row (see bot-events.ts).
+  useBotUi()
+  const flash = liveFlash(store.botEvents, performance.now(), ambitionFlash)
+  const rowFlash =
+    flash !== undefined && flash.value in ROW_Y ? (
+      <div
+        key={`evt-${flash.id}`}
+        className="amb-evt evt-flash"
+        style={{ top: ROW_Y[flash.value as Ambition] }}
+      />
+    ) : null
 
   /*
    * Populist Demands declares an ambition, and declaring one is a thing you do *to this track* —
@@ -148,6 +161,9 @@ export function AmbitionTrack({
 
         {/* Populist Demands — click the ambition's row to declare it. */}
         {claims}
+
+        {/* A bot's declaration, flashed on the row it claimed. */}
+        {rowFlash}
 
         {/*
           * The two-player rival: the six out-of-play resources, sitting in the boxes they were

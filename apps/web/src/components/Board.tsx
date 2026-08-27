@@ -23,7 +23,9 @@ import {
 import type { Action, Continue, GameState, SystemInfo } from '@arcs/engine'
 import { useEffect, useRef, useState } from 'react'
 
-import { store } from '../store.js'
+import { store, useBotUi } from '../store.js'
+import { caption, derivePlacement, liveEvents } from '../bot-events.js'
+import type { BotEvent } from '../bot-events.js'
 import { colorOf, figureArt } from '../theme.js'
 import { asset } from '../assets.js'
 
@@ -290,6 +292,71 @@ function Route({
   )
 }
 
+/**
+ * The bot's actions, drawn where they happened.
+ *
+ * Replaces the BotPanel's prose narration: each event from `store.botEvents` renders for
+ * ~2.6 seconds as a pulse (or battle pulse) on its system — an arrow along its move — with the
+ * engine's own log line as a caption chip. The interval only runs while something is live, and
+ * expiry is handled here so the store never needs a cleanup timer.
+ */
+function BotEventLayer({ state }: { state: GameState }): JSX.Element | null {
+  useBotUi()
+  const [, bump] = useState(0)
+  const events = liveEvents(store.botEvents, performance.now())
+  useEffect(() => {
+    if (store.botEvents.length === 0) return
+    const t = setInterval(() => bump((n) => n + 1), 300)
+    return () => clearInterval(t)
+  }, [store.botEvents.length > 0 ? store.botEvents[store.botEvents.length - 1]!.id : 0])
+  if (events.length === 0) return null
+
+  const known = new Set(state.board.systems)
+  return (
+    <g className="bot-events">
+      {events.map((e) => (
+        <BotEventMark key={e.id} state={state} event={e} known={known} />
+      ))}
+    </g>
+  )
+}
+
+function BotEventMark({
+  state,
+  event,
+  known,
+}: {
+  state: GameState
+  event: BotEvent
+  known: ReadonlySet<string>
+}): JSX.Element | null {
+  const place = derivePlacement(event.action)
+  if (place === null) return null
+  const at = place.kind === 'arrow' ? place.to : place.system
+  if (at === undefined || !known.has(at)) return null
+  const { cx, cy } = centreOf(state, at)
+  const battle = place.kind === 'battle'
+  const text = caption(event)
+  // Clamped to the map: a caption for an edge system flips above it / slides in from the sides.
+  const half = text.length * 8.4 + 14
+  const capX = Math.min(Math.max(cx, half + 8), MAP_SIZE.width - half - 8)
+  const below = cy + RETICLE_R + 46
+  const capY = below + 19 > MAP_SIZE.height - 8 ? cy - RETICLE_R - 46 : below
+  return (
+    <g className={`bot-event${battle ? ' battle' : ''}`}>
+      {place.kind === 'arrow' && place.from !== undefined && known.has(place.from) ? (
+        <Route from={centreOf(state, place.from)} to={centreOf(state, at)} />
+      ) : null}
+      <Reticle cx={cx} cy={cy} kind={battle ? 'battle' : 'dest'} />
+      <circle className="evt-pulse" cx={cx} cy={cy} r={RETICLE_R} />
+      <g className="evt-caption" transform={`translate(${capX}, ${capY})`}>
+        <rect x={-half} y={-25} width={half * 2} height={44} rx={22} />
+        <text x={0} y={7}>{text}</text>
+      </g>
+    </g>
+  )
+}
+
 export function Board({ state, cont, highlight }: Props): JSX.Element {
   const systems = state.board.systems.map(systemInfo)
   const { origins, onward } = moveGraph(cont)
@@ -552,6 +619,7 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
               </g>
             )
           })}
+        <BotEventLayer state={state} />
       </svg>
       {highlight ? <div className="board-turn">Turn: {highlight}</div> : null}
       {fleet !== null ? (
