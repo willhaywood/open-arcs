@@ -15,7 +15,9 @@ import { CourtPile, contentsOf, courtSlots } from '@arcs/engine'
 import type { GameState } from '@arcs/engine'
 import { useState } from 'react'
 
+import { courtFlashSlot, liveFlash } from '../bot-events.js'
 import { readSlot } from '../court-slot.js'
+import { store, useBotUi } from '../store.js'
 import { colorOf, figureArt } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
 import { asset } from '../assets.js'
@@ -24,6 +26,9 @@ export function CourtPanel({ state }: { state: GameState }): JSX.Element {
   const slots = courtSlots(state.factions.length).map((n) => readSlot(state, n))
   const deckLeft = contentsOf(state.courtCards, CourtPile.deck()).length
   const [open, setOpen] = useState<number | null>(null)
+  // A bot influencing, securing or ransacking flashes the slot it acted on (see bot-events.ts).
+  useBotUi()
+  const flash = liveFlash(store.botEvents, performance.now(), courtFlashSlot)
 
   const zoomed = open === null ? undefined : slots.find((s) => s.n === open)
 
@@ -54,9 +59,11 @@ export function CourtPanel({ state }: { state: GameState }): JSX.Element {
 
       {slots.map((s) => (
         <button
-          key={s.n}
+          key={flash?.value === s.n ? `${s.n}-evt-${flash.id}` : s.n}
           type="button"
-          className={`court-slot${s.cardId === undefined ? ' empty' : ''}`}
+          className={`court-slot${s.cardId === undefined ? ' empty' : ''}${
+            flash?.value === s.n ? ' evt-flash' : ''
+          }`}
           style={s.leader ? { borderColor: colorOf(s.leader) } : undefined}
           disabled={s.cardId === undefined}
           onClick={() => setOpen(s.n)}

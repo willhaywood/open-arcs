@@ -10,7 +10,6 @@ import { CourtPanel } from './components/CourtPanel.js'
 import { DraftScreen } from './components/DraftScreen.js'
 import { LearnedScreen } from './components/LearnedScreen.js'
 import { ActionTray } from './components/ActionTray.js'
-import { BotPanel } from './components/BotPanel.js'
 import { PreludeScreen } from './components/PreludeScreen.js'
 import { SlotBoard } from './components/SlotBoard.js'
 import { CardShelf } from './components/CardShelf.js'
@@ -152,8 +151,6 @@ export function App(): JSX.Element {
             {/* The action phase, on the same terms as the Prelude: over the hand, map still visible. */}
             <ActionTray state={state} cont={cont} />
           </Watching>
-          {/* Bot turns: the banner while one plays, the diagnostics behind it. */}
-          <BotPanel state={state} cont={cont} />
           <PlayerBoards state={state} current={current} />
         </section>
         <aside className="side-col">

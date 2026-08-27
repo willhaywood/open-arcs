@@ -23,7 +23,6 @@ import {
 import type {
   Action,
   AskedThisTurn,
-  BotDecision,
   FactionId,
   NewGameOptions,
   RuleResult,
@@ -34,8 +33,12 @@ import { Session } from './multiplayer/session.js'
 import type { SeatView } from './multiplayer/seat.js'
 import { remember } from './multiplayer/link.js'
 import type { GameLink } from './multiplayer/link.js'
+import type { BotEvent } from './bot-events.js'
 
 type Listener = () => void
+
+/** Milliseconds between bot actions — slow enough that each on-board event reads. */
+const BOT_PACE = 1500
 
 class GameStore {
   private result: RuleResult | null = null
@@ -72,26 +75,14 @@ class GameStore {
   // --- bot seats ------------------------------------------------------------
 
   /**
-   * How bot turns are driven.
-   *
-   * `run` plays them paced so a human can follow (docs/19 section 2a); `step` waits for you to
-   * advance each one; `off` hands the turn back so you can play the seat yourself (section 2e).
-   * Presentation only — none of it reaches the journal, so a paced game and a skipped one produce
-   * identical saves.
+   * Bot turns always run, paced so a human can follow (docs/19 section 2a) — the step/take-over
+   * panel is gone; the pacing plus the on-board event visuals (`bot-events.ts`) are the whole
+   * presentation. Presentation only — none of it reaches the journal, so a paced game and a
+   * skipped one produce identical saves.
    */
-  botMode: 'run' | 'step' | 'off' = 'run'
-  /** Milliseconds between bot actions in `run`. */
-  botPace = 800
-  /** The last decision a bot made, for the banner and the diagnostic panel. */
-  lastDecision: BotDecision | null = null
-  /**
-   * Decisions a human took over instead of the bot.
-   *
-   * Counted because the journal cannot tell afterwards who chose an action, so a game where you
-   * played half the bot's turns is indistinguishable from one it played alone. Tuning against that
-   * would be tuning against yourself — docs/19 section 2e.
-   */
-  overrides = 0
+  /** The last few bot actions, drawn on the board and the side surfaces as they happen. */
+  botEvents: BotEvent[] = []
+  private nextEventId = 1
 
   private timer: ReturnType<typeof setTimeout> | null = null
 
@@ -110,7 +101,7 @@ class GameStore {
   }
 
   /**
-   * Bumped whenever bot *presentation* state changes — mode, pace, the last decision, overrides.
+   * Bumped whenever bot *presentation* state changes — the event feed the surfaces draw.
    *
    * `getSnapshot` returns `this.result`, so `useSyncExternalStore` compares object identity and
    * bails out when the position has not moved. Every one of those fields can change without the
@@ -133,19 +124,6 @@ class GameStore {
     return botToAct(this.result, this.options?.bots)
   }
 
-  setBotMode(mode: 'run' | 'step' | 'off'): void {
-    this.botMode = mode
-    this.clearBotTimer()
-    this.emitBotUi()
-    if (mode === 'run') this.scheduleBot()
-  }
-
-  setBotPace(ms: number): void {
-    this.botPace = ms
-    this.emitBotUi()
-  }
-
-  /** Take exactly one bot action now — the Step button, and the engine of `run`. */
   /**
    * Whether bot seats may run at all.
    *
@@ -171,12 +149,23 @@ class GameStore {
     if (this.result === null || !this.botsAvailable()) return
     const faction = this.botTurn()
     if (faction === undefined) return
+    // The log lines appended by this one action are the event's own narration (bot-events.ts).
+    const logBefore = this.result.state.log.length
     const out = stepBot(this.result, botForLevel(this.options?.botLevel), faction, this.registry, this.botAsked)
     this.result = out.result
     this.botAsked = out.asked
-    this.lastDecision = out.decision
+    this.botEvents = [
+      ...this.botEvents.slice(-7),
+      {
+        id: this.nextEventId++,
+        faction,
+        action: out.decision.action,
+        lines: out.result.state.log.slice(logBefore),
+        at: performance.now(),
+      },
+    ]
     this.emitBotUi()
-    if (this.botMode === 'run') this.scheduleBot()
+    this.scheduleBot()
   }
 
   /**
@@ -186,15 +175,15 @@ class GameStore {
    * position it was not scheduled for — the bug that turns a paced bot into one that plays a move
    * you already took back.
    */
-  private scheduleBot(): void {
+  private scheduleBot(delay: number = BOT_PACE): void {
     this.clearBotTimer()
     // See `botsAvailable` — a bot seat in a joined game would diverge silently.
     if (!this.botsAvailable()) return
-    if (this.botMode !== 'run' || this.botTurn() === undefined) return
+    if (this.botTurn() === undefined) return
     this.timer = setTimeout(() => {
       this.timer = null
       this.stepBotOnce()
-    }, this.botPace)
+    }, delay)
   }
 
   private clearBotTimer(): void {
@@ -218,7 +207,7 @@ class GameStore {
         this.options = options
         this.result = result
         this.generation += 1
-        this.lastDecision = null
+        this.botEvents = []
         this.emit()
       },
       applyRemote: (action) => {
@@ -300,8 +289,7 @@ class GameStore {
     this.options = options
     this.generation += 1
     this.result = startGame(options, this.registry)
-    this.lastDecision = null
-    this.overrides = 0
+    this.botEvents = []
     this.emit()
     this.scheduleBot()
   }
@@ -309,15 +297,6 @@ class GameStore {
   apply(action: Action): void {
     if (this.result === null) return
     if (!this.mayAct(action)) return
-    /*
-     * A human answering an Ask addressed to a bot seat is a *take-over*, and it is counted. The
-     * journal records the action either way, so nothing downstream can tell — which is precisely
-     * why the count has to be kept here, at the only moment it is knowable.
-     */
-    if (this.botTurn() !== undefined) {
-      this.overrides += 1
-      this.botUiVersion += 1
-    }
     this.clearBotTimer()
     /*
      * The first hook. Read the length *before* applying: that is what the server compares against,
@@ -338,16 +317,17 @@ class GameStore {
   undo(): void {
     if (this.result === null || this.options === null) return
     /*
-     * Undo stops the bot rather than stepping back and letting it immediately replay the action you
-     * just took back. Resuming is an explicit choice, which is what makes undo usable for inspecting
-     * a bot's turn at all.
+     * Undo must not let the bot immediately replay the action you just took back. With no panel to
+     * resume from, stopping outright would deadlock a bot turn instead — so the next bot step is
+     * rescheduled with a grace delay: long enough to undo again (each undo re-arms it), no button
+     * needed.
      */
     this.clearBotTimer()
     this.forgetBotTurn()
-    this.botMode = 'step'
     this.result = engineUndo(this.options, this.result, this.registry)
-    this.lastDecision = null
+    this.botEvents = []
     this.emit()
+    this.scheduleBot(BOT_PACE * 2)
   }
 
   canUndo(): boolean {
@@ -367,22 +347,20 @@ class GameStore {
     const { options, result } = loadGame(json, this.registry)
     this.options = options
     this.result = result
-    this.lastDecision = null
-    this.overrides = 0
+    this.botEvents = []
     /*
-     * A loaded game starts stepped, not running. `options.bots` means the seats resume as bots, but
-     * firing off a paced turn the instant a file opens is startling — and if the save was parked on
-     * a bot's decision to inspect, running would destroy the thing you opened it to look at.
+     * Firing off a bot move the instant a file opens is startling — a save parked on a bot's
+     * decision is usually opened to look at it. The grace delay gives a beat to look (and Undo
+     * re-arms the same delay) without needing a resume button.
      */
-    this.botMode = 'step'
     this.emit()
+    this.scheduleBot(BOT_PACE * 2)
   }
 
   reset(): void {
     this.clearBotTimer()
     this.forgetBotTurn()
-    this.lastDecision = null
-    this.overrides = 0
+    this.botEvents = []
     this.result = null
     this.options = null
     this.emit()

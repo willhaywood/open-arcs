@@ -580,15 +580,9 @@ button {
     clamp(104px, 9.5vw, 148px);
   grid-template-areas:
     "court play map ambitions"
-    "bot   bot  bot bot"
     "hand  hand hand hand"
     "boards boards boards boards";
-  /*
-   * The `bot` row is `auto`, so it is zero-height whenever no tray is up and costs the map only the
-   * grid gap. It exists because the compact tray used to sit *inside* the map cell at its bottom
-   * edge, which put it over the ships and cities on the lower board.
-   */
-  grid-template-rows: minmax(0, 1fr) auto auto auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 10px;
 }
 .board-cell {
@@ -2208,11 +2202,80 @@ button {
   }
 }
 
+/* --- bot events: the bot's last actions, drawn where they happened --- */
+.bot-events {
+  pointer-events: none;
+}
+/* An expanding, fading ring — the "something just landed here" gesture. Runs once per event. */
+.evt-pulse {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 5;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: evt-pulse 2.2s ease-out forwards;
+}
+.bot-event.battle .evt-pulse {
+  stroke: #e0604e;
+}
+@keyframes evt-pulse {
+  from {
+    transform: scale(0.35);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+/* The caption pill: the engine's own log line, parked under the pulse. */
+.evt-caption rect {
+  fill: rgba(8, 10, 15, 0.85);
+  stroke: rgba(201, 169, 97, 0.55);
+  stroke-width: 1.5;
+}
+.evt-caption text {
+  fill: var(--parchment, #e8dcc0);
+  font-size: 30px;
+  text-anchor: middle;
+  paint-order: stroke;
+}
+.bot-event.battle .evt-caption rect {
+  stroke: rgba(224, 96, 78, 0.6);
+}
+/*
+ * Off-board surfaces (court slots, ambition rows, the played card) borrow the same gesture in
+ * HTML: a glow that swells and fades over the event's life.
+ */
+.evt-flash {
+  animation: evt-flash 2s ease-out forwards;
+}
+@keyframes evt-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(201, 169, 97, 0);
+  }
+  15% {
+    box-shadow: 0 0 0 3px rgba(201, 169, 97, 0.9), 0 0 22px 6px rgba(201, 169, 97, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 169, 97, 0);
+  }
+}
+
 /* Motion is decoration here; the reticles still read by colour and weight without it. */
 @media (prefers-reduced-motion: reduce) {
   .ret-sweep,
   .route-flow {
     animation: none;
+  }
+  /* The event ring holds at full size and just unmounts; the flash is a steady outline instead. */
+  .evt-pulse {
+    animation: none;
+    opacity: 0.55;
+  }
+  .evt-flash {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(201, 169, 97, 0.7);
   }
   /* The deal still resolves face up; it just does not spin to get there. */
   .dc-inner {
@@ -2402,10 +2465,9 @@ button {
     grid-template-columns: clamp(80px, 9vw, 104px) minmax(0, 1fr) clamp(92px, 10vw, 116px);
     grid-template-areas:
       "court map ambitions"
-      "bot   bot bot"
       "hand  hand hand"
       "boards boards boards";
-    grid-template-rows: minmax(0, 1fr) auto auto auto;
+    grid-template-rows: minmax(0, 1fr) auto auto;
   }
   .play-rail {
     display: none;
@@ -2426,11 +2488,10 @@ button {
     grid-template-columns: minmax(0, 1fr) clamp(84px, 12vw, 104px);
     grid-template-areas:
       "map ambitions"
-      "bot bot"
       "court court"
       "hand hand"
       "boards boards";
-    grid-template-rows: minmax(0, 1fr) auto auto auto auto;
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
   }
   .court-rail {
     flex-direction: row;
@@ -4748,215 +4809,15 @@ button {
 .amb-wrap {
   position: relative;
 }
-
-/* --- bot turns: the banner, and the diagnostics behind it ------------------ */
-
-/* Shares the hand's grid area with the Prelude and action trays; only one is up at a time. */
-.bot-tray {
-  grid-area: hand;
-  align-self: end;
-  z-index: 46;
+/* A bot's declaration — the same row geometry as the claim strip, worn briefly as a glow. */
+.amb-evt {
+  position: absolute;
+  left: 4%;
+  width: 92%;
+  height: 15%;
+  transform: translateY(-50%);
+  border-radius: 4px;
   pointer-events: none;
-}
-/*
- * Taken over: out of the hand's cell entirely, onto the map's bottom edge.
- *
- * Sharing the hand area is correct while a bot is playing, because nothing else is up. It is wrong
- * the moment the seat is handed back — the cards are in that cell, the tray is drawn over them, and
- * `pointer-events: auto` on `.bot-inner` means it takes the clicks meant for a card.
- */
-/*
- * Below the map rather than over it. `align-self: end` inside the map cell looked right in a
- * screenshot and covered the southern systems in play — the pieces you most need to see while a bot
- * is moving them.
- */
-/*
- * Right-aligned and small once the seat is a human's again.
- *
- * Centered, it was a 522px bar spanning the middle of the row the hand's play buttons open into —
- * so choosing a card meant reading LEAD / SURPASS / COPY through it. The tray at that moment is
- * only reporting what a bot already did and offering the run controls, so it is the thing that
- * should yield. Out to the right edge it clears the fan, which is centered, and the diagnostics it
- * drops in compact mode are what let it shrink rather than merely move.
- */
-.bot-tray.compact {
-  grid-area: bot;
-  align-self: center;
-  justify-self: end;
-  padding-bottom: 0;
-  padding-right: 12px;
-}
-.bot-tray.compact .bot-inner {
-  gap: 10px;
-  font-size: 11px;
-}
-/*
- * `margin-left: auto` pushes the modes to the far edge, which is what makes the full-width tray a
- * bar. Compact is a chip, so the parts sit together and the whole thing is what moves right.
- */
-.bot-tray.compact .bot-modes {
-  margin-left: 0;
-}
-/* The pace only matters while a bot is actually running; compact is mostly the report after one. */
-.bot-tray.compact .bot-pace input {
-  width: 56px;
-}
-.bot-tray.compact .bot-mode {
-  padding: 3px 7px;
-}
-.bot-tray.compact .bot-inner {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  padding: 6px 14px;
-}
-.bot-tray.compact .bot-head {
-  padding-bottom: 0;
-  border-bottom: none;
-}
-.bot-tray.compact .bot-waiting {
-  padding-top: 0;
-}
-.bot-inner {
-  pointer-events: auto;
-  background: linear-gradient(rgba(14, 17, 24, 0.94), rgba(10, 12, 18, 0.97));
-  border: 1px solid rgba(120, 160, 210, 0.45);
-  border-radius: 12px;
-  padding: 9px 14px 10px;
-  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.6);
-}
-.bot-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(120, 160, 210, 0.16);
-}
-.bot-who {
-  font-family: var(--font-display);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 3px;
-}
-.bot-title {
-  font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: rgba(150, 190, 235, 0.9);
-}
-.bot-modes {
-  display: inline-flex;
-  gap: 4px;
-  margin-left: auto;
-}
-.bot-mode {
-  font-family: var(--font-display);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 4px;
-  padding: 3px 9px;
-  cursor: pointer;
-}
-.bot-mode.on {
-  color: var(--text);
-  border-color: rgba(120, 160, 210, 0.8);
-  background: rgba(120, 160, 210, 0.16);
-}
-.bot-pace {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  color: var(--muted);
-}
-.bot-pace input {
-  width: 90px;
-}
-/* Loud on purpose: a game with overrides is not clean tuning evidence. */
-.bot-overrides {
-  font-size: 10px;
-  color: #e0a33a;
-  border: 1px solid rgba(224, 163, 58, 0.5);
-  border-radius: 4px;
-  padding: 2px 8px;
-}
-.bot-said {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 9px 0 2px;
-}
-.bot-action {
-  font-size: 14px;
-  color: var(--text);
-}
-.bot-because {
-  font-size: 12px;
-  color: rgba(150, 190, 235, 0.85);
-}
-.bot-waiting {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 8px;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-.bot-step {
-  font-family: var(--font-display);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: rgba(150, 190, 235, 0.95);
-  background: none;
-  border: 1px solid rgba(120, 160, 210, 0.7);
-  border-radius: 5px;
-  padding: 4px 14px;
-  cursor: pointer;
-}
-.bot-step:hover {
-  background: rgba(120, 160, 210, 0.18);
-}
-.bot-diag {
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.bot-diag summary {
-  cursor: pointer;
-}
-.bot-diag table {
-  width: 100%;
-  margin-top: 6px;
-  border-collapse: collapse;
-}
-.bot-diag td {
-  padding: 2px 8px 2px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-.bot-diag tr.chosen td {
-  color: var(--text);
-}
-.bot-diag-score,
-.bot-diag-gap {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-.bot-diag-note {
-  color: rgba(255, 255, 255, 0.35);
 }
 
 /* Bot seats on the start screen. */

@@ -10,6 +10,8 @@
 
 import type { GameState, RoundPlay } from '@arcs/engine'
 
+import { liveFlash, playedCardFlash } from '../bot-events.js'
+import { store, useBotUi } from '../store.js'
 import { colorOf } from '../theme.js'
 import { CardFace } from './CardFace.js'
 import { asset } from '../assets.js'
@@ -20,10 +22,14 @@ export function PlayedCards({ state }: { state: GameState }): JSX.Element {
   // Declaring an ambition zeroes the played card; the zero marker goes on top of it.
   const zeroedCard = state.lead?.zeroed === true ? state.lead.cardId : undefined
 
+  // A bot's lead, surpass, copy or pivot flashes the card it just laid down (see bot-events.ts).
+  useBotUi()
+  const flash = liveFlash(store.botEvents, performance.now(), playedCardFlash)
+
   return (
     <div className="play-rail">
-      <Slot label="Surpass, Copy or Pivot" plays={follows} tall zeroedCard={zeroedCard} />
-      <Slot label="Lead" plays={lead ? [lead] : []} zeroedCard={zeroedCard} />
+      <Slot label="Surpass, Copy or Pivot" plays={follows} tall zeroedCard={zeroedCard} flash={flash} />
+      <Slot label="Lead" plays={lead ? [lead] : []} zeroedCard={zeroedCard} flash={flash} />
     </div>
   )
 }
@@ -33,11 +39,13 @@ function Slot({
   plays,
   tall = false,
   zeroedCard,
+  flash,
 }: {
   label: string
   plays: RoundPlay[]
   tall?: boolean
   zeroedCard?: string | undefined
+  flash?: { value: string; id: number } | undefined
 }): JSX.Element {
   return (
     <div className={`play-slot${tall ? ' tall' : ''}`}>
@@ -48,8 +56,12 @@ function Slot({
         ) : (
           plays.map((p) => (
             <div
-              key={`${p.faction}-${p.cardId}`}
-              className="slot-card"
+              key={
+                flash?.value === p.cardId
+                  ? `${p.faction}-${p.cardId}-evt-${flash.id}`
+                  : `${p.faction}-${p.cardId}`
+              }
+              className={`slot-card${flash?.value === p.cardId ? ' evt-flash' : ''}`}
               style={{ borderColor: colorOf(p.faction) }}
               title={`${p.faction} — ${p.kind}`}
             >

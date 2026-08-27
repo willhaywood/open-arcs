@@ -7,13 +7,17 @@
  * dependencies, and driving it directly is the only way to test its wiring rather than a copy.
  */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { store } from '../src/store.js'
 
+// Bots always run now (the step/run toggle went with the BotPanel), so the pacing timer is armed
+// by `start` itself. Fake timers keep it inert: the test still drives exactly one step.
+beforeEach(() => vi.useFakeTimers())
+afterEach(() => vi.useRealTimers())
+
 /** One bot step under a level, read back through the journal in the save file. */
 function firstBotAction(botLevel?: 'easy' | 'normal' | 'hard' | 'brutal'): string {
-  store.setBotMode('step') // no timers: the test drives explicitly
   store.start({
     board: 'Board3Frontiers',
     factions: ['red', 'yellow', 'blue'],
