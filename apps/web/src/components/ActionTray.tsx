@@ -8,9 +8,13 @@
  * adjacent buttons those look like the same kind of thing, and the card that grants the second is
  * nowhere on screen. A player cannot weigh an option whose source and cost are invisible.
  *
- * So the tray has a row per source. The left rail names it; lore and court rows carry the card
- * itself as a `CardPill`, which opens the reader in place — the same pill the player boards and the
- * Railgun note use, so "where did this come from" has one answer everywhere.
+ * So the tray still groups by source — but only the **pip row** lives in the band. Every other
+ * source (a leader trait, a guild or lore card granting alts) is a *chip*: clicking it opens the
+ * card at readable size with that source's actions on it, and picking one acts. Card sources used
+ * to be full rows in the band, and a hand holding two or three such cards stacked rows until the
+ * band scrolled — the chip → modal → action shape keeps the band one line no matter how many
+ * cards are offering, and puts the decision on the card itself, which is the house pattern
+ * (CardShelf, RaidModal).
  *
  * Three things it says that the list could not:
  *
@@ -30,12 +34,15 @@
  */
 
 import { SUIT_ACTIONS, courtCard, guildAlt } from '@arcs/engine'
-import type { Action, Continue, GameState, StandardAction, Suit } from '@arcs/engine'
+import type { Action, Continue, FactionId, GameState, StandardAction, Suit } from '@arcs/engine'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
+import { asset } from '../assets.js'
 import { store } from '../store.js'
 import { owns } from '../surfaces.js'
 import { colorOf } from '../theme.js'
-import { CardPill } from './LeaderCardReader.js'
+import { cardArt, cardName } from './LeaderCardReader.js'
 
 /** The ways out of a menu, which belong in the tray's footer rather than among the choices. */
 const ESCAPES = ['turn/end', 'action/skip', 'action/cancel', 'battle/cancel']
@@ -80,6 +87,18 @@ interface Entry {
   cost: string | undefined
 }
 
+/** What the chip's modal shows: the card the source is, at readable size. */
+function sourceArt(row: Row): string {
+  if (row.card !== undefined) return cardArt(row.card.id, row.card.kind)
+  // A card-less source row is a court card named on the rail; its key is the card id.
+  return asset(`game-assets/court/${row.key}.webp`)
+}
+
+function sourceName(row: Row): string {
+  if (row.card !== undefined) return cardName(row.card.id, row.card.kind)
+  return row.note ?? row.rail
+}
+
 export function ActionTray({
   state,
   cont,
@@ -87,6 +106,13 @@ export function ActionTray({
   state: GameState
   cont: Continue
 }): JSX.Element | null {
+  /*
+   * Which source chip's modal is open, by row key. Applying an action changes the Ask and the
+   * rebuilt rows may no longer contain the key, so the modal is derived per render — a stale key
+   * simply finds no row and nothing shows.
+   */
+  const [openSource, setOpenSource] = useState<string | null>(null)
+
   if (cont.kind !== 'ask' || !trayOwns(cont)) return null
 
   const asked = cont.actions
@@ -233,6 +259,11 @@ export function ActionTray({
   }
 
 
+  // The band draws the pip row; every other source collapses to a chip and its modal.
+  const pipRow = rows[0]!
+  const sources = rows.slice(1)
+  const opened = sources.find((r) => r.key === openSource)
+
   /*
    * One horizontal band: identity rail | rows | the way out. The head used to be its own line and
    * the End button lived in a footer with a standing hint — three stacked strips whose height
@@ -269,40 +300,53 @@ export function ActionTray({
         </div>
 
         <div className="at-rows">
-          {rows.map((row) => (
-            <div className="at-row" key={row.key}>
-              <div className="at-rail">
-                <span className="at-rail-name">{row.rail}</span>
-                {row.card !== undefined ? (
-                  <CardPill id={row.card.id} kind={row.card.kind} owner={faction} />
-                ) : row.note !== undefined ? (
-                  <span className="at-rail-note">{row.note}</span>
-                ) : null}
-              </div>
-              <div className="at-entries">
-                {row.entries.map((e, i) => (
-                  <span className="at-entry" key={`${e.label}-${i}`}>
-                    <button
-                      type="button"
-                      className={`at-btn${e.action === undefined ? ' off' : ''}`}
-                      disabled={e.action === undefined}
-                      title={
-                        e.action === undefined
-                          ? `${e.label} — this suit allows it, but nothing on the board can be ${e.label.toLowerCase()}ed right now`
-                          : undefined
-                      }
-                      onClick={() => {
-                        if (e.action !== undefined) store.apply(e.action)
-                      }}
-                    >
-                      {e.label}
-                    </button>
-                    {e.cost !== undefined ? <span className="at-cost">{e.cost}</span> : null}
-                  </span>
-                ))}
-              </div>
+          <div className="at-row" key={pipRow.key}>
+            <div className="at-rail">
+              <span className="at-rail-name">{pipRow.rail}</span>
+              {pipRow.note !== undefined ? (
+                <span className="at-rail-note">{pipRow.note}</span>
+              ) : null}
             </div>
-          ))}
+            <div className="at-entries">
+              {pipRow.entries.map((e, i) => (
+                <span className="at-entry" key={`${e.label}-${i}`}>
+                  <button
+                    type="button"
+                    className={`at-btn${e.action === undefined ? ' off' : ''}`}
+                    disabled={e.action === undefined}
+                    title={
+                      e.action === undefined
+                        ? `${e.label} — this suit allows it, but nothing on the board can be ${e.label.toLowerCase()}ed right now`
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (e.action !== undefined) store.apply(e.action)
+                    }}
+                  >
+                    {e.label}
+                  </button>
+                  {e.cost !== undefined ? <span className="at-cost">{e.cost}</span> : null}
+                </span>
+              ))}
+              {/*
+                * The other sources, as chips on the same line: click to open the card with its
+                * actions. Rows here are what used to stack the band past its fixed height.
+                */}
+              {sources.map((row) => (
+                <button
+                  key={row.key}
+                  type="button"
+                  className="at-src"
+                  title={`${sourceName(row)} — ${row.entries.length} action${row.entries.length === 1 ? '' : 's'}, click to choose`}
+                  onClick={() => setOpenSource(row.key)}
+                >
+                  <span className="at-src-kind">{row.rail}</span>
+                  <span className="at-src-name">{sourceName(row)}</span>
+                  {row.entries.length > 1 ? <span className="at-src-n">{row.entries.length}</span> : null}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {escape !== undefined ? (
@@ -311,7 +355,77 @@ export function ActionTray({
           </button>
         ) : null}
       </div>
+
+      {opened !== undefined ? (
+        <SourceModal row={opened} faction={faction} onClose={() => setOpenSource(null)} />
+      ) : null}
     </div>
+  )
+}
+
+/**
+ * The chip's modal: the source card at readable size, its actions beside it.
+ *
+ * The same shape as the court shelf — the card is the decision surface, the buttons act, and
+ * cancelling costs nothing (the pip is only committed by choosing). Portalled for the usual
+ * stacking-context reason (CardZoom.tsx explains it).
+ */
+function SourceModal({
+  row,
+  faction,
+  onClose,
+}: {
+  row: Row
+  faction: FactionId
+  onClose: () => void
+}): JSX.Element {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return createPortal(
+    <div className="da-backdrop" onClick={onClose} role="presentation">
+      <div className="da-modal src-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="da-head">
+          <span className="da-title">{sourceName(row)}</span>
+          <span className="da-prompt">
+            <span style={{ color: colorOf(faction) }}>{faction}</span> — {row.rail.toLowerCase()}{' '}
+            action
+          </span>
+        </div>
+        <div className="srcm-body">
+          <img className="srcm-art" src={sourceArt(row)} alt={sourceName(row)} />
+          <div className="srcm-actions">
+            {row.entries.map((e, i) => (
+              <button
+                key={`${e.label}-${i}`}
+                type="button"
+                className="srcm-act"
+                disabled={e.action === undefined}
+                onClick={() => {
+                  if (e.action === undefined) return
+                  onClose()
+                  store.apply(e.action)
+                }}
+              >
+                <span className="srcm-act-label">{e.label}</span>
+                {e.cost !== undefined ? <span className="srcm-act-cost">{e.cost}</span> : null}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="da-actions">
+          <button className="da-ghost" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
