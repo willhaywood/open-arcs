@@ -30,6 +30,9 @@ export function ActionPanel({ cont, onNewGame }: Props): JSX.Element | null {
           <button className="primary" onClick={onNewGame}>
             New game
           </button>
+          <button className="ghost" onClick={() => store.reopenGameOver()}>
+            View summary
+          </button>
         </div>
       </div>
     )
