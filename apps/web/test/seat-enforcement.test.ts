@@ -378,6 +378,25 @@ describe('whose hand is on screen', () => {
     expect(handOwner(mine, 'red')).toBe('red')
     expect(handOwner(mine, 'yellow')).toBe('red')
   })
+
+  /*
+   * Bot seats are not the browser's players. Their hands are as private as a rival's in a joined
+   * game, and fanning one face-up during the bot's paced turn was a leak: the hotseat branch
+   * showed "whoever is asked" without asking whether anyone at this keyboard is playing that seat.
+   */
+  it('never fans a bot hand: the lone human keeps their own cards while bots play', () => {
+    const hotseat: SeatView = { kind: 'hotseat' }
+    // A human asked among humans is unchanged.
+    expect(handOwner(hotseat, 'red', ['red'])).toBe('red')
+    // A bot asked: the one human's cards stay on the table.
+    expect(handOwner(hotseat, 'yellow', ['red'])).toBe('red')
+    // Several humans: no one "you" to pick, so nobody's cards while the bot plays.
+    expect(handOwner(hotseat, 'yellow', ['red', 'blue'])).toBeNull()
+    // Every seat a bot: nothing to show at all.
+    expect(handOwner(hotseat, 'yellow', [])).toBeNull()
+    // No bot information (old callers): the plain hotseat rule.
+    expect(handOwner(hotseat, 'yellow')).toBe('yellow')
+  })
 })
 
 /**
