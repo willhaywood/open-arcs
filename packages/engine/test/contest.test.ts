@@ -31,7 +31,7 @@ const fresh = (): GameState =>
 
 const declare = (s: GameState, a: Ambition, high: number): GameState => ({
   ...s,
-  declared: [...s.declared, { ambition: a, marker: { high, low: 0 } }],
+  declared: [...s.declared, { ambition: a, marker: { high, low: 0 }, round: 0 }],
 })
 
 /**

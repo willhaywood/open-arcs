@@ -863,12 +863,19 @@ describe('Galactic Bards (bc25) — a free declaration before the seize', () => 
     expect(labels(c).join()).not.toMatch(/Galactic Bards/)
   })
 
-  it('is off once anyone has declared', () => {
+  /*
+   * The window is per **round**, not per chapter — "if an ambition has not been declared yet
+   * this round" (printed text). This used to be one test, `is off once anyone has declared`,
+   * pinning `declared.length === 0`: a chapter-wide gate that killed the card for every later
+   * round the moment anyone declared, which is what made Bards look dead in real games.
+   */
+  it('is off once anyone has declared this round', () => {
+    const base = withCard2(fresh(), 'red', 'bc25')
     const state = {
-      ...withCard2(fresh(), 'red', 'bc25'),
+      ...base,
       roundPlays: [played],
       ambitionable: [{ high: 5, low: 3 }],
-      declared: [{ ambition: 'Tycoon' as const, marker: { high: 9, low: 4 } }],
+      declared: [{ ambition: 'Tycoon' as const, marker: { high: 9, low: 4 }, round: base.round }],
     }
     const c = advance(
       stoppable(state),
@@ -876,6 +883,43 @@ describe('Galactic Bards (bc25) — a free declaration before the seize', () => 
       terminal,
     ).continue
     expect(labels(c).join()).not.toMatch(/Galactic Bards/)
+  })
+
+  it('a declaration in an earlier round of the chapter does not close the window', () => {
+    const base = withCard2(fresh(), 'red', 'bc25')
+    expect(base.round).toBeGreaterThan(0) // the crafted declaration below is genuinely earlier
+    const state = {
+      ...base,
+      roundPlays: [played],
+      ambitionable: [{ high: 5, low: 3 }],
+      declared: [{ ambition: 'Tycoon' as const, marker: { high: 9, low: 4 }, round: base.round - 1 }],
+    }
+    const c = advance(
+      stoppable(state),
+      { type: 'turn/check-seize', faction: 'red', pips: 2, suit: 'Aggression' },
+      terminal,
+    ).continue
+    const offered = labels(c).filter((l) => l.includes('Galactic Bards') && l.startsWith('Declare'))
+    expect(offered.length).toBeGreaterThan(0)
+  })
+
+  it('a pivoted 7 offers every ambition, even after an earlier round declared one', () => {
+    // The reported shape: pivot a 7 mid-chapter, an ambition already on the track from an
+    // earlier round. FAQ: "For '7' action cards, you may declare any ambition."
+    const base = withCard2(fresh(), 'red', 'bc25')
+    const state = {
+      ...base,
+      roundPlays: [{ faction: 'red' as const, cardId: 'Aggression-7', kind: 'pivot' as const }],
+      ambitionable: [{ high: 5, low: 3 }],
+      declared: [{ ambition: 'Tycoon' as const, marker: { high: 9, low: 4 }, round: base.round - 1 }],
+    }
+    const c = advance(
+      stoppable(state),
+      { type: 'turn/check-seize', faction: 'red', pips: 1, suit: 'Construction' },
+      terminal,
+    ).continue
+    const offered = labels(c).filter((l) => l.includes('Galactic Bards') && l.startsWith('Declare'))
+    expect(offered.length).toBe(5)
   })
 })
 
@@ -1371,7 +1415,7 @@ describe("the Cartels' supply clauses (bc03 / bc06)", () => {
       ...state,
       power: { red: 0, yellow: 0, blue: 0 },
       ambitions: ['Keeper'],
-      declared: [{ ambition: 'Keeper', marker: { high: 6, low: 3 } }],
+      declared: [{ ambition: 'Keeper', marker: { high: 6, low: 3 }, round: 0 }],
     }
     const after = advance(staged, { type: 'ambition/score' }, registry).state
     const fuelOf = (s: GameState, f: 'red' | 'yellow' | 'blue') =>
@@ -1399,7 +1443,7 @@ describe("the Cartels' supply clauses (bc03 / bc06)", () => {
       ...state,
       power: { red: 0, yellow: 0, blue: 0 },
       ambitions: ['Keeper'],
-      declared: [{ ambition: 'Keeper', marker: { high: 6, low: 3 } }],
+      declared: [{ ambition: 'Keeper', marker: { high: 6, low: 3 }, round: 0 }],
     }
     const after = advance(staged, { type: 'ambition/score' }, registry).state
     const count = (f: 'red' | 'yellow', r: Resource) =>

@@ -144,7 +144,7 @@ weighs the phantom exactly as it weighs a human holding the same pile.
 
   | Card | When | Implemented in |
   | --- | --- | --- |
-  | **Galactic Bards** (bc25, guild) | from any play, before anyone else has declared, once a turn | `performBardsDeclare`, in the seize path |
+  | **Galactic Bards** (bc25, guild) | from any play, before anyone has declared **this round**, once a turn | `performBardsDeclare`, in the seize path |
   | **Populist Demands** (bc27, vox) | on securing it, free | `populistDemands` in `rules/vox.ts` |
 
   Neither zeroes a played card. Zeroing is a consequence of declaring *off your action card*, not

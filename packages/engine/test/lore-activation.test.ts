@@ -48,7 +48,7 @@ const holding = (state: GameState, ...ids: readonly string[]): GameState => ({
 /** Declared by *someone* — the cards do not say "you declared it". */
 const declaring = (state: GameState, ambition: Ambition): GameState => ({
   ...state,
-  declared: [...state.declared, { ambition, marker: { high: 4, low: 2 } }],
+  declared: [...state.declared, { ambition, marker: { high: 4, low: 2 }, round: 0 }],
 })
 
 const featuresFor = (state: GameState) => {

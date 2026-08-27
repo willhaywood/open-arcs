@@ -531,14 +531,19 @@ function performPivot(state: GameState, faction: FactionId, cardIdStr: string, s
 function performCheckSeize(state: GameState, faction: FactionId, pips: number, suit: Suit): RuleResult {
   /**
    * Galactic Bards (bc25) gets first refusal, ahead of the seize itself
-   * (`game-common.scala:1550`): before anyone has declared, declare an ambition matching your
-   * played card's strength — or any ambition if you played a 7. Once per turn.
+   * (`game-common.scala:1550`): declare an ambition matching your played card's strength — or
+   * any ambition if you played a 7. Once per turn.
+   *
+   * The window is "if an ambition has not been declared yet **this round**" (printed text) —
+   * not this chapter. The gate used to be `declared.length === 0`, which killed the card for
+   * the rest of the chapter the moment anyone declared; HRF clears its per-faction `declared`
+   * flags in round-end cleanup (`game-common.scala:2226`), which is the same round scope.
    */
   const played = state.roundPlays.filter((p) => p.faction === faction).at(-1)
   if (
     hasGuild(state, faction, GALACTIC_BARDS) &&
     !state.usedThisTurn.includes(GALACTIC_BARDS) &&
-    state.declared.length === 0 &&
+    !state.declared.some((d) => d.round === state.round) &&
     state.ambitionable.length > 0 &&
     played !== undefined
   ) {

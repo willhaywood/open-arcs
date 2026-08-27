@@ -208,7 +208,7 @@ describe('scoring Warlord or Tyrant empties the pile it counted', () => {
 
   const declaring = (state: GameState, ...ambitions: readonly Ambition[]): GameState => ({
     ...state,
-    declared: ambitions.map((ambition) => ({ ambition, marker: { high: 4, low: 2 } })),
+    declared: ambitions.map((ambition) => ({ ambition, marker: { high: 4, low: 2 }, round: 0 })),
   })
 
   const pileSizes = (state: GameState, which: 'trophies' | 'captives') =>
@@ -598,7 +598,7 @@ describe('scoring ambitions', () => {
     s = citiesLeft(s, 'yellow', yellowCities)
     return {
       ...s,
-      declared: markers.map((m) => ({ ambition: 'Empath' as const, marker: m })),
+      declared: markers.map((m) => ({ ambition: 'Empath' as const, marker: m, round: 0 })),
       power: { red: 0, yellow: 0, blue: 0 },
     }
   }

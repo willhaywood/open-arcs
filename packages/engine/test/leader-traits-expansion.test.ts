@@ -259,7 +259,7 @@ describe('Proud (Noble, leader12) — Power only for an outright first place', (
       ...state,
       power: { red: 0, yellow: 0, blue: 0 },
       ambitions: ['Tyrant'],
-      declared: [{ ambition: 'Tyrant', marker }],
+      declared: [{ ambition: 'Tyrant', marker, round: 0 }],
     }
     return advance(staged, { type: 'ambition/score' }, registry).state.power
   }
@@ -922,7 +922,7 @@ describe('Noble (leader12) — Connected secures on a fresh declaration', () => 
     const base = withLeader(fresh(), 'red', 'leader12')
     const already: GameState = {
       ...base,
-      declared: [{ ambition: 'Tycoon', marker: { high: 6, low: 3 } }],
+      declared: [{ ambition: 'Tycoon', marker: { high: 6, low: 3 }, round: 0 }],
     }
     expect(securedCards(declare(already, 'red', 'Tycoon'), 'red')).toHaveLength(0)
     // A *different* ambition is still fresh, so it still pays.

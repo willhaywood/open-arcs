@@ -91,7 +91,7 @@ describe('scoring against the phantom', () => {
   /** A 2-player game with `ambition` declared and nothing else going on. */
   const declaring = (state: GameState, ambition: Ambition): GameState => ({
     ...state,
-    declared: [{ ambition, marker: { high: 4, low: 2 } }],
+    declared: [{ ambition, marker: { high: 4, low: 2 }, round: 0 }],
   })
 
   /** Give `faction` `n` trophies, so Warlord has something real to compare against. */
