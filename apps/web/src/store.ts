@@ -24,6 +24,7 @@ import type {
   Action,
   AskedThisTurn,
   FactionId,
+  GameState,
   NewGameOptions,
   RuleResult,
 } from '@arcs/engine'
@@ -34,8 +35,21 @@ import type { SeatView } from './multiplayer/seat.js'
 import { remember } from './multiplayer/link.js'
 import type { GameLink } from './multiplayer/link.js'
 import type { BotEvent } from './bot-events.js'
+import { buildChapterReport, buildGameHistory, chapterEnded } from './chapter-report.js'
+import type { ChapterReport, GameHistory } from './chapter-report.js'
 
 type Listener = () => void
+
+/**
+ * The full-screen moment between chapters or at the game's end, when one is showing.
+ *
+ * `prevState` rides along with the chapter report because the scoring step destroys its own
+ * evidence — the pre-scoring holdings the screen draws (resource tokens, trophies) exist only
+ * in the snapshot from before the boundary.
+ */
+export type Interlude =
+  | { kind: 'chapter'; report: ChapterReport; prevState: GameState }
+  | { kind: 'gameOver' }
 
 /** Milliseconds between bot actions — slow enough that each on-board event reads. */
 const BOT_PACE = 1500
@@ -129,6 +143,88 @@ class GameStore {
     return this.options?.bots ?? []
   }
 
+  // --- interludes -----------------------------------------------------------
+
+  /*
+   * Chapter scoring happens inside a single engine step — the milestone never surfaces as a
+   * continue — so the store watches for the boundary itself: every path that moves the position
+   * hands its before/after pair to `detectInterlude`. Presentation only, like the bot events:
+   * nothing here reaches the journal.
+   */
+  interlude: Interlude | null = null
+  private interludeVersion = 0
+  getInterludeSnapshot = (): number => this.interludeVersion
+
+  private openInterlude(v: Interlude): void {
+    this.interlude = v
+    this.interludeVersion += 1
+    this.emit()
+  }
+
+  private clearInterlude(): void {
+    if (this.interlude === null) return
+    this.interlude = null
+    this.interludeVersion += 1
+  }
+
+  /** Close the screen and, after a beat, let the bots play on. */
+  dismissInterlude(): void {
+    this.clearInterlude()
+    this.emit()
+    this.scheduleBot(BOT_PACE * 2)
+  }
+
+  /** The "View summary" path: a finished game's screen can always be brought back. */
+  reopenGameOver(): void {
+    if (this.result?.state.isOver === true) this.openInterlude({ kind: 'gameOver' })
+  }
+
+  /** Whether every seat is a bot — the interlude auto-dismisses then, so the show keeps rolling. */
+  allBots(): boolean {
+    const bots = this.botSeats()
+    return this.result !== null && this.result.state.factions.every((f) => bots.includes(f))
+  }
+
+  /** Every chapter's scoring, rebuilt from the journal. Only meaningful once the game is over. */
+  history(): GameHistory | null {
+    if (this.result === null || this.options === null || !this.result.state.isOver) return null
+    return buildGameHistory(this.options, this.result.state.journal, this.registry)
+  }
+
+  /**
+   * Open the right screen for the boundary just crossed, if one was. Returns true when a chapter
+   * interlude opened — the caller must then *not* re-arm the bot timer, so play holds under the
+   * screen; `dismissInterlude` re-arms it.
+   *
+   * Game over needs no pause (there is no next bot move) and takes precedence: the final
+   * chapter's scoring never bumps the counter and appears inside the game-over history instead
+   * of as a second stacked screen.
+   */
+  private detectInterlude(prev: RuleResult): boolean {
+    const next = this.result
+    if (next === null) return false
+    if (next.state.isOver && !prev.state.isOver) {
+      this.openInterlude({ kind: 'gameOver' })
+      return false
+    }
+    /*
+     * `prev.chapter >= 1` guards the draft: a Leaders & Lore game sits at chapter 0 until the
+     * last pick, so the 0 -> 1 bump is the game *starting*, not a chapter ending.
+     */
+    if (prev.state.chapter >= 1 && chapterEnded(prev.state, next.state)) {
+      // The hold is enforced here, not left to the caller: any timer already armed when the
+      // boundary is crossed would play a move under the screen.
+      this.clearBotTimer()
+      this.openInterlude({
+        kind: 'chapter',
+        report: buildChapterReport(prev.state, next.state),
+        prevState: prev.state,
+      })
+      return true
+    }
+    return false
+  }
+
   /**
    * Whether bot seats may run at all.
    *
@@ -154,9 +250,10 @@ class GameStore {
     if (this.result === null || !this.botsAvailable()) return
     const faction = this.botTurn()
     if (faction === undefined) return
+    const prev = this.result
     // The log lines appended by this one action are the event's own narration (bot-events.ts).
-    const logBefore = this.result.state.log.length
-    const out = stepBot(this.result, botForLevel(this.options?.botLevel), faction, this.registry, this.botAsked)
+    const logBefore = prev.state.log.length
+    const out = stepBot(prev, botForLevel(this.options?.botLevel), faction, this.registry, this.botAsked)
     this.result = out.result
     this.botAsked = out.asked
     this.botEvents = [
@@ -170,7 +267,8 @@ class GameStore {
       },
     ]
     this.emitBotUi()
-    this.scheduleBot()
+    // A chapter interlude holds the game: the timer re-arms when it is dismissed.
+    if (!this.detectInterlude(prev)) this.scheduleBot()
   }
 
   /**
@@ -213,7 +311,10 @@ class GameStore {
         this.result = result
         this.generation += 1
         this.botEvents = []
+        this.clearInterlude()
         this.emit()
+        // Adopting a finished game shows its summary, same as loading one.
+        if (result.state.isOver) this.openInterlude({ kind: 'gameOver' })
       },
       applyRemote: (action) => {
         if (this.result === null) return
@@ -221,8 +322,11 @@ class GameStore {
          * The second hook. Identical to `apply` except that it does **not** publish — an action that
          * arrived from the server must not be sent back to it, which would append it twice.
          */
-        this.result = applyExternal(this.result, action, this.registry)
+        const prev = this.result
+        this.result = applyExternal(prev, action, this.registry)
         this.emit()
+        // Screens show for every client; dismissal is local. Bots are off in joined games.
+        this.detectInterlude(prev)
       },
     })
     this.session = session
@@ -295,6 +399,7 @@ class GameStore {
     this.generation += 1
     this.result = startGame(options, this.registry)
     this.botEvents = []
+    this.clearInterlude()
     this.emit()
     this.scheduleBot()
   }
@@ -308,7 +413,8 @@ class GameStore {
      * and it is what makes a double-tap or a stale tab a no-op rather than a duplicated action.
      */
     const expectedLength = this.result.state.journal.length
-    this.result = applyExternal(this.result, action, this.registry)
+    const prev = this.result
+    this.result = applyExternal(prev, action, this.registry)
     this.emit()
     /*
      * Published without waiting. The move is already on screen, and the only outcome needing a
@@ -316,7 +422,8 @@ class GameStore {
      * journal, so there is nothing here to await or unwind.
      */
     void this.session?.publish(action, expectedLength)
-    this.scheduleBot()
+    // A human's own action can end the chapter too; the interlude then holds the bots.
+    if (!this.detectInterlude(prev)) this.scheduleBot()
   }
 
   undo(): void {
@@ -331,6 +438,7 @@ class GameStore {
     this.forgetBotTurn()
     this.result = engineUndo(this.options, this.result, this.registry)
     this.botEvents = []
+    this.clearInterlude()
     this.emit()
     this.scheduleBot(BOT_PACE * 2)
   }
@@ -353,12 +461,15 @@ class GameStore {
     this.options = options
     this.result = result
     this.botEvents = []
+    this.clearInterlude()
     /*
      * Firing off a bot move the instant a file opens is startling — a save parked on a bot's
      * decision is usually opened to look at it. The grace delay gives a beat to look (and Undo
      * re-arms the same delay) without needing a resume button.
      */
     this.emit()
+    // A finished save opens on its summary.
+    if (result.state.isOver) this.openInterlude({ kind: 'gameOver' })
     this.scheduleBot(BOT_PACE * 2)
   }
 
@@ -366,6 +477,7 @@ class GameStore {
     this.clearBotTimer()
     this.forgetBotTurn()
     this.botEvents = []
+    this.clearInterlude()
     this.result = null
     this.options = null
     this.emit()
@@ -386,6 +498,11 @@ export const store = new GameStore()
  */
 export function useBotUi(): number {
   return useSyncExternalStore(store.subscribe, store.getBotUiSnapshot, store.getBotUiSnapshot)
+}
+
+/** Subscribe to the interlude — the chapter/game-over screen state, separate from the position. */
+export function useInterlude(): number {
+  return useSyncExternalStore(store.subscribe, store.getInterludeSnapshot, store.getInterludeSnapshot)
 }
 
 export function useGame(): RuleResult | null {

@@ -5,6 +5,8 @@ import { ActionPanel } from './components/ActionPanel.js'
 import { AmbitionTrack } from './components/AmbitionTrack.js'
 import { Attribution } from './components/Attribution.js'
 import { Battle } from './components/Battle.js'
+import { ChapterInterlude } from './components/ChapterInterlude.js'
+import { GameOverScreen } from './components/GameOverScreen.js'
 import { Board } from './components/Board.js'
 import { CourtPanel } from './components/CourtPanel.js'
 import { DraftScreen } from './components/DraftScreen.js'
@@ -154,12 +156,28 @@ export function App(): JSX.Element {
           <PlayerBoards state={state} current={current} />
         </section>
         <aside className="side-col">
-          <Watching canAct={acting}>
+          {/*
+            * A finished game has no actions to guard, and its panel block (New game, View
+            * summary) must work for every seat and for spectators — `canAct` is false for a
+            * gameOver continue, so inside `Watching` those buttons were inert in joined games.
+            */}
+          {cont.kind === 'gameOver' ? (
             <ActionPanel cont={cont} onNewGame={() => store.reset()} />
-          </Watching>
+          ) : (
+            <Watching canAct={acting}>
+              <ActionPanel cont={cont} onNewGame={() => store.reset()} />
+            </Watching>
+          )}
           <LogPanel log={state.log} />
         </aside>
       </main>
+
+      {/*
+        * The interludes: chapter scoring and the game's end. Presentation, not decisions — every
+        * seat and spectator sees them and dismisses their own — so they live outside `Watching`.
+        */}
+      <ChapterInterlude />
+      <GameOverScreen state={state} cont={cont} />
 
       <Watching canAct={acting}>
         {/*

@@ -5173,3 +5173,406 @@ button {
   width: auto;
   padding-inline: 22px;
 }
+
+/* --- interludes: the end-of-chapter screen and the game-over screen ------------------------- */
+/*
+ * Both wear the `.draft` full-screen shell (fixed inset, arcs-bg backdrop, under the topbar so
+ * Undo/Save stay live) with a centred reading column: these are reports, not tables of cards.
+ * z 350: over every decision modal (300), under the topbar (400).
+ */
+.draft.interlude {
+  z-index: 350;
+  display: block;
+}
+.il-col {
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.il-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.il-chapter-art {
+  width: 150px;
+  height: auto;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+}
+.il-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.il-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.il-ambition-row {
+  display: grid;
+  grid-template-columns: 172px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 2px;
+  border-bottom: 1px solid rgba(201, 169, 97, 0.16);
+}
+.il-ambition {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.il-ambition-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+/* One marker per declaration, slightly overlapped when the ambition was declared twice. */
+.il-markers {
+  display: inline-flex;
+}
+.il-markers img {
+  width: 44px;
+  height: auto;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+}
+.il-markers img + img {
+  margin-left: -14px;
+}
+.il-awards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+.il-award {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.il-leader-thumb {
+  width: 144px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+.il-chip {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 4px;
+}
+.il-place {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.il-power {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.il-demoted {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--muted);
+}
+.il-phantom {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.il-none {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.il-holdings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+.il-holding {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.il-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.il-res {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text);
+}
+.il-res img {
+  width: 18px;
+  height: 18px;
+}
+.il-cleanup {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+.il-power-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 22px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: rgba(8, 10, 15, 0.5);
+  border: 1px solid rgba(201, 169, 97, 0.28);
+  border-radius: 10px;
+}
+.il-power-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.il-power-nums {
+  font-size: 14px;
+  color: var(--muted);
+}
+.il-delta {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--gold);
+}
+.il-goal {
+  width: 42px;
+  height: auto;
+  margin-left: auto;
+}
+.il-foot {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 0 20px;
+}
+.il-continue {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #14100a;
+  background: var(--gold);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 12px 30px;
+  cursor: pointer;
+}
+.il-continue:hover {
+  filter: brightness(1.08);
+}
+.il-close {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: none;
+  border: 1px solid rgba(201, 169, 97, 0.55);
+  border-radius: 8px;
+  padding: 12px 24px;
+  cursor: pointer;
+}
+.il-close:hover {
+  background: rgba(201, 169, 97, 0.14);
+}
+
+/*
+ * The leader-art crop: the illustration band of a leader card, without the document below it.
+ * The card is 744x1039 with the picture in roughly the top 46%, so the frame's aspect is
+ * 744 x 478 and the image anchors to its own top edge.
+ */
+.leader-art {
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  aspect-ratio: 744 / 478;
+}
+.leader-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+
+/* The game-over screen's own dress on the same shell. */
+.gos-banner {
+  text-align: center;
+  padding: 10px 0 4px;
+  border-bottom: 1px solid rgba(201, 169, 97, 0.35);
+}
+.gos-banner .draft-title {
+  font-size: 34px;
+}
+.gos-hero-row {
+  display: flex;
+  gap: 26px;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10px 0 6px;
+}
+.gos-portrait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.gos-leader {
+  width: 240px;
+}
+.gos-leader.hero {
+  width: 340px;
+}
+/* The crop takes the card's own name band away, so the name comes back as a caption. */
+.gos-leader-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.gos-portrait.hero .gos-leader-name {
+  font-size: 19px;
+}
+.gos-plaque {
+  width: 220px;
+  aspect-ratio: 744 / 1039;
+  border-radius: 8px;
+  background: linear-gradient(rgba(14, 17, 24, 0.9), rgba(10, 12, 18, 0.95));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.gos-plaque.hero {
+  width: 300px;
+}
+.gos-plaque img {
+  width: 55%;
+}
+.gos-plaque span {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.gos-hero-story {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 380px;
+  padding-top: 12px;
+}
+.gos-final-power {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1;
+}
+.gos-final-power em {
+  font-size: 15px;
+  font-style: normal;
+  color: var(--muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.gos-wins {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.gos-wins.compact {
+  font-size: 11px;
+  gap: 2px;
+  color: var(--muted);
+}
+.gos-ch {
+  color: var(--gold);
+  font-variant: small-caps;
+}
+.gos-wins-none {
+  margin: 0;
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--muted);
+}
+.gos-holdings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+.gos-card-pill {
+  font-size: 11px;
+  color: var(--gold);
+  border: 1px solid rgba(201, 169, 97, 0.45);
+  border-radius: 10px;
+  padding: 2px 9px;
+}
+.gos-runners {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(201, 169, 97, 0.16);
+}
+.gos-runner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  max-width: 180px;
+}
+.gos-runner .gos-leader {
+  width: 180px;
+}
+.gos-runner .gos-leader-name {
+  font-size: 11px;
+}
+.gos-runner .gos-plaque {
+  width: 140px;
+}
+.gos-rank {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.gos-runner-power {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--gold);
+}
