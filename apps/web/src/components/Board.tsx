@@ -118,6 +118,47 @@ function uprisingSystems(
 }
 
 /**
+ * Repair, as click targets on the damaged pieces themselves.
+ *
+ * The ask lists one action per damaged figure, which as buttons read as entity ids — no answer
+ * to "which ship is being repaired?". The pieces are already drawn on the map wearing their
+ * damaged art, so the pick goes there: one target per damaged *stack* (identical pieces in the
+ * same system are interchangeable — repairing any one of them is the same repair), positioned
+ * with the same layout functions that placed the tokens.
+ */
+function repairTargets(
+  state: GameState,
+  cont: Continue,
+): { system: string; piece: string; at: readonly [number, number]; action: Action }[] {
+  if (cont.kind !== 'ask') return []
+  const repairs = cont.actions.filter((a) => a.type === 'action/repair')
+  if (repairs.length === 0) return []
+  const byGroup = new Map<string, { system: string; piece: string; action: Action }>()
+  for (const a of repairs) {
+    const id = String(a['figure'])
+    const loc = state.figures.at.get(id)
+    if (loc === undefined || !loc.startsWith('system:')) continue
+    const system = loc.slice('system:'.length)
+    const piece = parseFigureId(id).piece
+    const key = `${system}/${piece}`
+    if (!byGroup.has(key)) byGroup.set(key, { system, piece, action: a })
+  }
+  return [...byGroup.values()].map((t) => {
+    const s = systemInfo(t.system)
+    const items = slotsAndPieces(state, t.system, groupPieces(state, t.system))
+    const pos = positionsFor(s, items)
+    const i = items.findIndex(
+      (it) =>
+        it.kind === 'piece' &&
+        it.group.damaged &&
+        it.group.piece === t.piece &&
+        it.group.color === cont.faction,
+    )
+    return { ...t, at: i >= 0 ? pos[i]! : s.render.anchor }
+  })
+}
+
+/**
  * Moves offered by the current decision, as a map of origin -> destination -> action.
  *
  * The board does not invent moves: it is an alternative *renderer* for whatever `Ask` the
@@ -399,6 +440,11 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
   const battleSys = battleSystems(cont)
   const rifles = riflesSystems(cont)
   const uprising = uprisingSystems(state, cont)
+  const repairs = repairTargets(state, cont)
+  const repairOut =
+    cont.kind === 'ask' && repairs.length > 0
+      ? cont.actions.find((a) => a.type === 'action/skip')
+      : undefined
   // The place bucket serves three cards' asks, so the hint names whichever is actually up.
   const placeType = [...uprising.map.values()][0]?.type
   const voxOut =
@@ -572,6 +618,19 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
             )
           })}
 
+        {/* Repair — the damaged pieces themselves, ringed: click one to fix it. */}
+        {repairs.map((t) => (
+          <g
+            key={`repair-${t.system}-${t.piece}`}
+            className="sys-hit repair"
+            onClick={() => store.apply(t.action)}
+          >
+            <title>{`Repair ${t.piece} in ${t.system}`}</title>
+            <Reticle cx={t.at[0]} cy={t.at[1]} kind="dest" />
+            <circle className="sys-target" cx={t.at[0]} cy={t.at[1]} r={110} />
+          </g>
+        ))}
+
         {/* Battle — systems you may fight in: click the system to attack there. */}
         {battleSys.size > 0 &&
           [...battleSys.entries()].map(([id, action]) => {
@@ -628,6 +687,15 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
         </div>
       ) : battleSys.size > 0 ? (
         <div className="board-hint battle">Battle — click a system to attack there</div>
+      ) : repairs.length > 0 ? (
+        <div className="board-hint">
+          Repair — click the damaged piece to fix it
+          {repairOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(repairOut)}>
+              {String(repairOut['label'] ?? 'Cancel')}
+            </button>
+          ) : null}
+        </div>
       ) : uprising.map.size > 0 ? (
         <div className="board-hint battle">
           {uprising.kind === 'cluster'
