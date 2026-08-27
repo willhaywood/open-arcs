@@ -233,6 +233,12 @@ export function ActionTray({
   }
 
 
+  /*
+   * One horizontal band: identity rail | rows | the way out. The head used to be its own line and
+   * the End button lived in a footer with a standing hint — three stacked strips whose height
+   * outgrew the fixed hand row and resized the map every time the tray came up. The hint is not
+   * lost: every greyed button already carries it as its tooltip.
+   */
   return (
     <div className="at-tray">
       <div className="at-inner">
@@ -240,7 +246,6 @@ export function ActionTray({
           <span className="at-who" style={{ color: colorOf(faction) }}>
             {faction}
           </span>
-          <span className="at-title">Actions</span>
           {pips === undefined ? (
             /*
              * No `turn/pips` in the chain means no pip is being spent — a Prelude resource bought
@@ -300,14 +305,11 @@ export function ActionTray({
           ))}
         </div>
 
-        <div className="at-foot">
-          <span className="at-hint">Greyed actions have no legal target right now</span>
-          {escape !== undefined ? (
-            <button className="at-end" onClick={() => store.apply(escape)}>
-              {String(escape['label'] ?? 'Done')}
-            </button>
-          ) : null}
-        </div>
+        {escape !== undefined ? (
+          <button className="at-end" onClick={() => store.apply(escape)}>
+            {String(escape['label'] ?? 'Done')}
+          </button>
+        ) : null}
       </div>
     </div>
   )
