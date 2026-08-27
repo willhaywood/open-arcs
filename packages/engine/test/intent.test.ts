@@ -35,7 +35,7 @@ const intent = (s: GameState, f: FactionId = 'red') => intentFor(observe(s, f), 
 
 const declare = (s: GameState, a: Ambition, high: number, low = 0): GameState => ({
   ...s,
-  declared: [...s.declared, { ambition: a, marker: { high, low } }],
+  declared: [...s.declared, { ambition: a, marker: { high, low }, round: 0 }],
 })
 
 describe('chapter intent', () => {

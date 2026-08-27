@@ -41,7 +41,7 @@ const withLore = (s: GameState, f: 'red' | 'yellow', ...ids: string[]): GameStat
 
 const declared = (s: GameState, a: Ambition): GameState => ({
   ...s,
-  declared: [...s.declared, { ambition: a, marker: { high: 6, low: 3 } }],
+  declared: [...s.declared, { ambition: a, marker: { high: 6, low: 3 }, round: 0 }],
 })
 
 const ask = (c: Continue): Extract<Continue, { kind: 'ask' }> => {

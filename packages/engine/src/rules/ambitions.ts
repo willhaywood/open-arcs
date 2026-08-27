@@ -295,7 +295,7 @@ export function takeAmbitionMarker(
   const taken: GameState = {
     ...state,
     ambitionable: state.ambitionable.filter((_, i) => i !== idx),
-    declared: [...state.declared, { ambition, marker: best }],
+    declared: [...state.declared, { ambition, marker: best, round: state.round }],
     log: [...state.log, `${faction} declared ${ambition} (${best.high}/${best.low})`],
   }
   return wasFresh ? connected(taken, faction) : taken

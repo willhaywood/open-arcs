@@ -52,6 +52,7 @@ describe('the undeclaredThreat feature', () => {
         ...base.ambitionable.map((m, i) => ({
           ambition: (['Tycoon', 'Tyrant', 'Warlord', 'Keeper', 'Empath'] as const)[i]!,
           marker: m,
+          round: 0,
         })),
       ],
       ambitionable: [],
@@ -101,7 +102,7 @@ describe('the undeclaredThreat feature', () => {
     expect(features(armed, 'red').undeclaredThreat).toBe(armed.ambitionable[0]!.high)
     const declared: GameState = {
       ...armed,
-      declared: [...armed.declared, { ambition: 'Warlord', marker: armed.ambitionable[0]! }],
+      declared: [...armed.declared, { ambition: 'Warlord', marker: armed.ambitionable[0]!, round: 0 }],
       ambitionable: armed.ambitionable.slice(1),
     }
     expect(features(declared, 'red').undeclaredThreat).toBeLessThan(

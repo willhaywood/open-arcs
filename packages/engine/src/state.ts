@@ -46,6 +46,12 @@ export interface AmbitionMarker {
 export interface Declaration {
   readonly ambition: Ambition
   readonly marker: AmbitionMarker
+  /**
+   * The round (within the chapter) it was declared in. Galactic Bards' window is "an ambition has
+   * not been declared yet **this round**" (bc25, printed text), so the gate needs to tell this
+   * round's declarations from an earlier round's — the list itself lives for the whole chapter.
+   */
+  readonly round: number
 }
 
 /**

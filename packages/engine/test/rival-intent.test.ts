@@ -47,7 +47,7 @@ const fresh = (seed = 1): GameState =>
 function yellowWarlike(base: GameState): GameState {
   let s: GameState = {
     ...base,
-    declared: [...base.declared, { ambition: 'Warlord', marker: { high: 6, low: 3 } }],
+    declared: [...base.declared, { ambition: 'Warlord', marker: { high: 6, low: 3 }, round: 0 }],
   }
   const spare = contentsOf(s.figures, Location.reserve('blue')).slice(0, 6)
   for (const id of spare) s = { ...s, figures: move(s.figures, id, Location.trophies('yellow')) }

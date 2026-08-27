@@ -164,7 +164,7 @@ reaches the same set of outcomes without the combinatorics.
 | Sworn Guardians | passive | nothing of yours is stealable — blocks battle raids and guild-card theft |
 | Secret Order | passive | declaring **Keeper or Empath** does not zero your played card |
 | Lattice Spies | seize | seize the initiative by discarding **this card** instead of one from hand |
-| Galactic Bards | seize | before anyone has declared, declare an ambition matching your card's strength (any on a 7) — once per turn |
+| Galactic Bards | seize | before anyone has declared **this round**, declare an ambition matching your card's strength (any on a 7) — once per turn. The gate was chapter-wide until the round-scope fix; `Declaration.round` is what tells the rounds apart |
 | Relic Fence | Prelude | spend any resource to gain a Relic |
 | Silver Tongues | Prelude | steal a resource **or** a guild card from a rival |
 | Farseers | Prelude | discard your hand and draw as many again |
