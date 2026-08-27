@@ -7,7 +7,8 @@
  * whether a Fuel is worth a Move depends on where your ships are.
  *
  * That is why it is a sibling of `.hand-row` rather than a child: the hand row clips its children
- * to hide the fan's overhang, and the tray is taller than the row it covers.
+ * to hide the fan's overhang. The tray fits the row's fixed height — the map must not resize when
+ * it opens — with the tiles scrolling inside the band on the rare menu that cannot.
  *
  * The most-used decision in the game, and it used to read as a list of sentences —
  * `Fuel: Move`, `Weapon: add Battle option`, `Discard Relic (no effect)`. But the choice is
@@ -132,25 +133,19 @@ export function PreludeScreen({
       })),
   }))
 
+  /*
+   * One horizontal band: identity rail | tiles | the way on. The head used to be its own line
+   * above the tiles, which pushed the tray past the fixed hand row and resized the map whenever
+   * the Prelude opened. The sub-line ("spend resources before acting") is the rail's tooltip now.
+   */
   return (
     <div className="pr-tray">
       <div className="pr-inner">
-        <div className="pr-head">
+        <div className="pr-head" title="Spend resources before acting">
           <span className="da-title">Prelude</span>
           <span className="pr-who" style={{ color: colorOf(faction as FactionId) }}>
             {faction}
           </span>
-          <span className="pr-sub">spend resources before acting</span>
-          <div className="pr-head-actions">
-            {arrange === undefined ? null : (
-              <button className="pr-arrange" onClick={() => store.apply(arrange)}>
-                Arrange slots
-              </button>
-            )}
-            <button className="sb-done" onClick={() => store.apply(done)}>
-              {String(done['label'])}
-            </button>
-          </div>
         </div>
 
         <div className="pr-body">
@@ -226,6 +221,16 @@ export function PreludeScreen({
         ) : null}
         </div>
 
+        <div className="pr-head-actions">
+          {arrange === undefined ? null : (
+            <button className="pr-arrange" onClick={() => store.apply(arrange)}>
+              Arrange slots
+            </button>
+          )}
+          <button className="sb-done" onClick={() => store.apply(done)}>
+            {String(done['label'])}
+          </button>
+        </div>
       </div>
 
       {reading !== null ? (
