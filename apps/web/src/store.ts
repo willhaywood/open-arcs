@@ -124,6 +124,11 @@ class GameStore {
     return botToAct(this.result, this.options?.bots)
   }
 
+  /** The seats played by bots, for surfaces that must not treat them as local players. */
+  botSeats(): readonly FactionId[] {
+    return this.options?.bots ?? []
+  }
+
   /**
    * Whether bot seats may run at all.
    *

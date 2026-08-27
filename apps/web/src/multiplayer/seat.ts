@@ -103,12 +103,25 @@ export function viewFor(cont: Continue, view: SeatView): Continue {
 /**
  * Whose hand to fan along the bottom, or `null` for nobody's.
  *
- * Hotseat shows whoever is being asked — that is what hotseat is. A seat shows its **own** cards,
- * on its turn and off it, which is both the fix for the leak and closer to the tabletop: you hold
- * your cards the whole time. A spectator holds none and is shown none.
+ * Hotseat shows whoever is being asked — that is what hotseat is — **among the humans**. A bot's
+ * seat is not one of the browser's players: its hand is exactly as private as a rival's in a
+ * joined game, and fanning it face-up during its paced turn was a leak. So while a bot is being
+ * asked, a lone human keeps their own cards on the table (you hold your cards while others play),
+ * and with several humans nobody's are shown — there is no one "you" to pick.
+ *
+ * A seat shows its **own** cards, on its turn and off it, which is both the fix for the original
+ * leak and closer to the tabletop. A spectator holds none and is shown none. `humans` only
+ * matters for hotseat; joined games already refuse bot seats (`botsAvailable`).
  */
-export function handOwner(view: SeatView, asked: FactionId): FactionId | null {
-  if (view.kind === 'hotseat') return asked
+export function handOwner(
+  view: SeatView,
+  asked: FactionId,
+  humans?: readonly FactionId[],
+): FactionId | null {
+  if (view.kind === 'hotseat') {
+    if (humans === undefined || humans.includes(asked)) return asked
+    return humans.length === 1 ? humans[0]! : null
+  }
   if (view.kind === 'seat') return view.faction
   return null
 }

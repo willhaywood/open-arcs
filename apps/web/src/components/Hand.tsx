@@ -42,8 +42,13 @@ export function Hand({ state, cont }: Props): JSX.Element | null {
    * list), so this is the whole of the visible half. It is not a *guarantee*: every client holds the
    * seed and can replay the journal, which docs/17 section 2 records as a known boundary of the
    * shared-journal design. This stops shoulder-surfing and mis-clicks, not devtools.
+   *
+   * Bot seats are excluded from "the browser's players": while a bot is asked, the lone human's
+   * own hand stays on the table instead of the bot's — see `handOwner`.
    */
-  const faction = handOwner(store.seatView(), cont.faction)
+  const bots = store.botSeats()
+  const humans = state.factions.filter((f) => !bots.includes(f))
+  const faction = handOwner(store.seatView(), cont.faction, humans)
   if (faction === null) return null // watching: nobody's hand is yours to see
   const yourTurn = cont.faction === faction
 
