@@ -19,10 +19,13 @@
  *     made it blind to every goal-layer fix the other levels have rather than merely worse at
  *     using them — see `easy.ts` for why that reads as broken instead of beatable. 5% wins against
  *     normal's 48%.
- *   - **normal** — `standardBot`, what the game ships. The default, and what an absent `botLevel`
- *     means. It now also spends Weapons for their Prelude battle option, which measured as a null
- *     on strength and took Weapon spending from 1% to 26% (docs/19 section 9) — shipped for the
- *     same reason `leadZeroed` was, that hoarding them looks broken.
+ *   - **normal** — `mobileBot`: `standardBot` plus the move-reversal penalty. Before it, the
+ *     evaluator could not separate Move destinations, ties fell to offer order, and the fleet
+ *     walked the adjacency lists in circles — 14% of all moves were same-round A-to-B-to-A
+ *     reversals, which looks broken the way Weapon-hoarding did. The penalty zeroed the
+ *     reversals in probe games and measured at parity with `standardBot` over 240 arena games
+ *     (33/31/35 against a 2-point twin gap) — shipped on the same looks-broken argument as
+ *     `leadZeroed` and the Prelude Weapon spend (docs/19 section 9).
  *   - **hard** — the reply search (`search-v4`): every card play searched to the end of the turn it
  *     buys, and the strongest lines re-ranked by what the position looks like after the rivals
  *     reply from sampled hands. 63%-37% over normal at two players against a zero twin floor, and
@@ -50,14 +53,16 @@
  */
 
 import { easyBot } from './easy.js'
-import { standardBot } from './goal.js'
+import { MOBILE_WEIGHTS, mobileBot } from './mobile.js'
 import { searchBot } from './search.js'
 import type { Bot } from './bot.js'
 
 export const BOT_LEVELS = ['easy', 'normal', 'hard'] as const
 export type BotLevel = (typeof BOT_LEVELS)[number]
 
-const HARD = searchBot({ width: 3, depth: 14, replies: { roots: 1, deals: 1 } })
+// Hard carries the same anti-circling weights: its beam only searches card plays, so every
+// pip-level move is the delegate's one-ply choice — the circling lived there too.
+const HARD = searchBot({ width: 3, depth: 14, replies: { roots: 1, deals: 1 }, weights: MOBILE_WEIGHTS })
 
 /** The bot a level names. `undefined` — no level chosen — is normal, which keeps old saves intact. */
 export function botForLevel(level: BotLevel | undefined): Bot {
@@ -68,6 +73,6 @@ export function botForLevel(level: BotLevel | undefined): Bot {
       return HARD
     case 'normal':
     case undefined:
-      return standardBot
+      return mobileBot
   }
 }

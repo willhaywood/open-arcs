@@ -32,6 +32,8 @@ import {
   slotKeys,
   slotsOf,
 } from '../index.js'
+import { connectedSystems, planetResource } from '../control.js'
+import { system as systemInfo } from '../board.js'
 import type { FactionId } from '../ids.js'
 import type { ObservedState } from '../observe.js'
 import type { Resource } from '../resources.js'
@@ -136,6 +138,9 @@ export const FEATURES = [
   'starports',
   'shipsFresh',
   'shipsDamaged',
+  'gatesHeld',
+  'fleetThreat',
+  'moveReversal',
   'courtSecured',
   'courtClaimAhead',
   'courtClaimLevel',
@@ -210,6 +215,20 @@ export const WEIGHTS: Weights = {
   starports: 1.2,
   shipsFresh: 0.35,
   shipsDamaged: 0.1,
+  /*
+   * Positional signals, weighted 0 everywhere — dormant, deliberately, with the measurement
+   * that parked them recorded in `mobile.ts`. Note for whoever picks them up: a Move *pick*
+   * does not move the ships (the fleet-size step after it does), so scoring these on move
+   * candidates also needs the probe to peek through that step — the peek was built, worked,
+   * and was removed along with the weights because it let `battleUnlocked` see positions and
+   * shifted the standard drive. The anti-circling fix that shipped is `moveReversal` below.
+   */
+  gatesHeld: 0,
+  fleetThreat: 0,
+  // Action-level: the penalty for exactly undoing this turn's own movement leg. Carried in
+  // Weights so the baseline stays at zero; applied in the heuristic loop off `probe.undoes`,
+  // since no state feature can see where the fleet came from.
+  moveReversal: 0,
   courtSecured: 1,
   courtClaimAhead: 0.25,
   courtClaimLevel: 0.12,
@@ -418,6 +437,72 @@ export function featuresOf(
   const ships = pieces(observed, self, 'Ship')
   x.shipsFresh = ships.filter((id) => !observed.damaged.includes(id)).length
   x.shipsDamaged = ships.length - x.shipsFresh
+
+  /*
+   * Where the fleet stands, not just how big it is. Two cheap signals of purposeful movement:
+   *
+   *   - `gatesHeld` — gate systems holding at least one fresh Loyal ship. A ship on a gate
+   *     blocks rival catapults and anchors the cluster.
+   *   - `fleetThreat` — a graded proximity field: each fresh Loyal **ship** scores by how
+   *     close its system is to one worth being at (a rival stands there, or the planet has a
+   *     resource and no Loyal building yet): 3 on it, 2 beside it, 1 two hops out, 0 beyond.
+   *     A move *toward* a target strictly raises the sum, the reverse leg strictly lowers it —
+   *     which is what breaks the tie the circling bug lived in. Two normalisations both proved
+   *     necessary by measurement: graded, because a binary "adjacent or not" left one-hop moves
+   *     inside a neighbourhood tied and barely dented the reversal rate; and per *ship* rather
+   *     than per occupied system, because a per-system sum paid the bot to shatter its fleet
+   *     one ship per system and catapult-spam the map (1,172 chains in six probe games).
+   */
+  const shipStands = new Set<string>()
+  for (const s of observed.board.systems) {
+    for (const id of contentsOf(observed.figures, Location.system(s))) {
+      const f = parseFigureId(id)
+      if (f.color === self && f.piece === 'Ship' && !observed.damaged.includes(id)) {
+        shipStands.add(s)
+        break
+      }
+    }
+  }
+  x.gatesHeld = [...shipStands].filter((s) => systemInfo(s).isGate).length
+
+  // Multi-source BFS from every worthwhile system, to distance 2.
+  const dist = new Map<string, number>()
+  for (const s of observed.board.systems) {
+    const here = contentsOf(observed.figures, Location.system(s))
+    const rival = here.some((id) => parseFigureId(id).color !== self)
+    const unexploited =
+      planetResource(observed, s) !== undefined &&
+      !here.some((id) => {
+        const f = parseFigureId(id)
+        return f.color === self && (f.piece === 'City' || f.piece === 'Starport')
+      })
+    if (rival || unexploited) dist.set(s, 0)
+  }
+  let frontier = [...dist.keys()]
+  for (let d = 1; d <= 2; d++) {
+    const next: string[] = []
+    for (const s of frontier) {
+      for (const n of connectedSystems(observed.board, s)) {
+        if (!dist.has(n)) {
+          dist.set(n, d)
+          next.push(n)
+        }
+      }
+    }
+    frontier = next
+  }
+  let threat = 0
+  for (const s of observed.board.systems) {
+    const near = 3 - (dist.get(s) ?? 3)
+    if (near === 0) continue
+    for (const id of contentsOf(observed.figures, Location.system(s))) {
+      const f = parseFigureId(id)
+      if (f.color === self && f.piece === 'Ship' && !observed.damaged.includes(id)) threat += near
+    }
+  }
+  x.fleetThreat = threat
+  // Action-level (see the weight's note): always 0 as a state feature.
+  x.moveReversal = 0
 
   /*
    * The court, in two halves: what is held, and what is being contested. Securing needs *more*

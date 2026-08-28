@@ -92,6 +92,13 @@ export interface Probe {
    */
   readonly repeats: boolean
   /**
+   * The action is a movement leg that exactly reverses one this faction already made this turn —
+   * A to B after B to A. Absent (undefined) where the harness has no turn memory. Weighted by
+   * `moveReversal`, zero everywhere but the movement-aware bots: undoing your own move burns the
+   * pip twice, and nothing in the position can say so.
+   */
+  readonly undoes?: boolean
+  /**
    * Action pips this turn still has to spend, once the position settles.
    *
    * **Here rather than in `ObservedState` because it is not in the state.** Pips live on the
