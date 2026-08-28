@@ -16,7 +16,8 @@
 
 import { AMBITIONS, FUEL_CARTEL, MATERIAL_CARTEL, RESOURCES, ResourceSlot, contentsOf, courtCard, phantomHolding, securedCards, supplyOf } from '@arcs/engine'
 import type { Action, Ambition, AmbitionMarker, Continue, GameState } from '@arcs/engine'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { ambitionFlash, liveFlash } from '../bot-events.js'
 import { store, useBotUi } from '../store.js'
@@ -30,6 +31,14 @@ const ROW_Y: Record<Ambition, string> = {
   Warlord: '60.5%',
   Keeper: '77%',
   Empath: '93.5%',
+}
+/** The same centres as numbers, for the declare flags measured off the live panel rect. */
+const ROW_FRAC: Record<Ambition, number> = {
+  Tycoon: 0.275,
+  Tyrant: 0.44,
+  Warlord: 0.605,
+  Keeper: 0.77,
+  Empath: 0.935,
 }
 
 /** Centres of the three hex slots for undeclared markers. */
@@ -101,6 +110,29 @@ export function AmbitionTrack({
     }
   }
 
+  /*
+   * The declare flags hang to the LEFT of the track, each pointing at the row it would claim.
+   * The old treatment laid a labelled strip over the row itself — text over the board's own
+   * printed text. The flags need to escape the track's `overflow-y: auto` clipping, so they are
+   * fixed-position portals anchored to the panel's live rect, the same trick the chip tooltips
+   * use (see the note above) — re-measured on render, resize and scroll.
+   */
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [anchor, setAnchor] = useState<DOMRect | null>(null)
+  useLayoutEffect(() => {
+    const measure = (): void => {
+      setAnchor(panelRef.current?.getBoundingClientRect() ?? null)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
+    }
+    // Re-measure when the ask changes: the flags only exist during a declare moment.
+  }, [cont])
+
   const declaredByAmbition = new Map<Ambition, AmbitionMarker[]>()
   for (const d of state.declared) {
     const list = declaredByAmbition.get(d.ambition) ?? []
@@ -118,26 +150,32 @@ export function AmbitionTrack({
    * branch inside the owner happens to draw it.
    */
   const claims =
-    declarable.size === 0 ? null : (
-      <>
-        {[...declarable.entries()].map(([a, action]) => (
-          <button
-            key={`declare-${a}`}
-            type="button"
-            className="amb-claim"
-            style={{ top: ROW_Y[a] }}
-            title={`Declare ${a}`}
-            onClick={() => store.apply(action)}
-          >
-            <span>Declare {a}</span>
-          </button>
-        ))}
-      </>
-    )
+    declarable.size === 0 || anchor === null
+      ? null
+      : createPortal(
+          <>
+            {[...declarable.entries()].map(([a, action]) => (
+              <button
+                key={`declare-${a}`}
+                type="button"
+                className="amb-flag"
+                style={{
+                  top: anchor.top + anchor.height * ROW_FRAC[a],
+                  left: anchor.left - 10,
+                }}
+                title={String(action['label'] ?? `Declare ${a}`)}
+                onClick={() => store.apply(action)}
+              >
+                Declare {a}
+              </button>
+            ))}
+          </>,
+          document.body,
+        )
 
   if (artBroken) {
     return (
-      <div className="amb-wrap">
+      <div className="amb-wrap" ref={panelRef}>
         <AmbitionFallback state={state} threshold={threshold} />
         {claims}
       </div>
@@ -151,7 +189,7 @@ export function AmbitionTrack({
           {tip.text}
         </div>
       )}
-      <div className="ambition-panel">
+      <div className="ambition-panel" ref={panelRef}>
         <img
           className="ambition-art"
           src={asset('game-assets/ambitions.webp')}

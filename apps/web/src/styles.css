@@ -2303,7 +2303,8 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .ret-sweep,
   .route-flow,
-  .log-drawer {
+  .log-drawer,
+  .amb-flag {
     animation: none;
   }
   /* The event ring holds at full size and just unmounts; the flash is a steady outline instead. */
@@ -5095,29 +5096,47 @@ button {
   background: rgba(201, 169, 97, 0.14);
 }
 
-/* Populist Demands — the ambition row you may claim, on the track that already shows all five. */
-.amb-claim {
-  position: absolute;
-  left: 4%;
-  width: 92%;
-  height: 15%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/*
+ * The declare flags: one per claimable ambition, hanging to the LEFT of the track and pointing
+ * at the row it would take. Fixed-position portals (the track clips horizontal overflow), so
+ * `top`/`left` come inline from the panel's measured rect; the arrow is the flag's right tip.
+ */
+.amb-flag {
+  position: fixed;
+  transform: translate(-100%, -50%);
+  z-index: 280; /* over the board and trays, under the decision modals (300) and topbar (400) */
   font-family: var(--font-display);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--gold);
-  background: rgba(201, 169, 97, 0.1);
+  white-space: nowrap;
+  color: #14100a;
+  background: var(--gold);
   border: 1px solid var(--gold);
-  border-radius: 4px;
+  border-radius: 5px;
+  padding: 6px 12px;
   cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  animation: amb-flag-in 180ms ease-out;
 }
-.amb-claim:hover {
-  background: rgba(201, 169, 97, 0.26);
+.amb-flag::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 7px solid transparent;
+  border-left-color: var(--gold);
+}
+.amb-flag:hover {
+  filter: brightness(1.1);
+}
+@keyframes amb-flag-in {
+  from {
+    opacity: 0;
+    transform: translate(calc(-100% - 8px), -50%);
+  }
 }
 /* Wrapper so the claim strip can position against the fallback track too. */
 .amb-wrap {
