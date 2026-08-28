@@ -4953,6 +4953,13 @@ button {
 
 /* A way out inside a board hint, for map-owned decisions the action panel steps aside for. */
 .board-hint .hint-out {
+  /*
+   * The hint bar itself is pointer-inert so it never blocks the map behind it — which silently
+   * made every button inside it unclickable too, since pointer-events inherits. Found the hard
+   * way ("still cant click Keep Cards"): synthetic test clicks bypass hit-testing, so only a
+   * real mouse showed it. The re-enable below is what makes every hint button work.
+   */
+  pointer-events: auto;
   margin-left: 12px;
   font-family: var(--font-display);
   font-size: 9.5px;
