@@ -784,6 +784,87 @@ describe('the raid spends keys on a choice', () => {
     expect(takes).toHaveLength(0)
   })
 
+  /*
+   * A steal is a gain, so the full-board rule applies: "you may rearrange any resources in your
+   * resource slots, but you must discard resources you cannot hold" — the raider chooses what
+   * goes, and may keep the stolen token by discarding one held. Before the fix the token went
+   * straight back to the supply ("no room, lost"), spending the keys on nothing.
+   */
+  describe('a steal with no room goes through the arrange board, not the bin', () => {
+    /** loot(3), with every one of red's usable slots filled so the Fuel must overflow. */
+    function fullBoardLoot() {
+      const { state, ctx } = loot(3)
+      let resources = state.resources
+      const row = slotsOf(state, 'red')
+      row.forEach((slot, i) => {
+        if (contentsOf(resources, slot).length === 0) {
+          // Alternate types: the supply holds only five of each, and Keeper cards are not in play.
+          resources = gain(resources, [slot], i % 2 === 0 ? 'Material' : 'Weapon').tracker
+        }
+      })
+      return { state: { ...state, resources }, ctx }
+    }
+
+    function stealFuel() {
+      const { state, ctx } = fullBoardLoot()
+      const first = advance(state, { type: 'battle/finish', ctx }, reg3)
+      if (first.continue.kind !== 'ask') throw new Error('expected a raid ask')
+      const take = first.continue.actions.find((a) => String(a['label']).startsWith('Take Fuel'))!
+      expect(take).toBeDefined()
+      return advance(first.state, take, reg3)
+    }
+
+    it('parks the stolen token in overflow and opens the arrange board', () => {
+      const after = stealFuel()
+      expect(contentsOf(after.state.resources, 'overflow:red')).toHaveLength(1)
+      if (after.continue.kind !== 'ask') throw new Error('expected the arrange ask')
+      expect(after.continue.faction).toBe('red')
+      // Both halves of the choice are on the table: land it over something held, or let it go.
+      const acts = after.continue.actions
+      expect(acts.some((a) => a.type === 'resources/arrange-move' && a['eject'] !== undefined)).toBe(true)
+      expect(acts.some((a) => a.type === 'resources/arrange-discard')).toBe(true)
+      expect(after.state.log.join('\n')).not.toContain('no room, lost')
+    })
+
+    it('keeps the steal by discarding a held token, then the raid shops on', () => {
+      const after = stealFuel()
+      if (after.continue.kind !== 'ask') throw new Error('expected the arrange ask')
+      const fuel = contentsOf(after.state.resources, 'overflow:red')[0]!
+      const land = after.continue.actions.find(
+        (a) => a.type === 'resources/arrange-move' && a['token'] === fuel && a['eject'] !== undefined,
+      )!
+      const ejected = String(land['eject'])
+      const landed = advance(after.state, land, reg3)
+      if (landed.continue.kind !== 'ask') throw new Error('expected the arrange board to re-offer')
+      const done = landed.continue.actions.find((a) => a.type === 'resources/arrange-done')!
+      const resumed = advance(landed.state, done, reg3)
+
+      // The raider holds the Fuel where the ejected token stood, which went home to its supply.
+      expect(slotsOf(resumed.state, 'red').some((s) => contentsOf(resumed.state.resources, s)[0] === fuel)).toBe(true)
+      expect(String(resumed.state.resources.at.get(ejected))).toContain('supply:')
+      // battle/raid-resume re-enters the raid with the two keys left — the guild card still shows.
+      if (resumed.continue.kind !== 'ask') throw new Error('expected the raid to carry on')
+      const labels = resumed.continue.actions.map((a) => String(a['label']))
+      expect(labels).toContain('Stop raiding (2 key(s) left)')
+      expect(labels.some((l) => l.includes('Mining Interest'))).toBe(true)
+    })
+
+    it('refusing the steal is still allowed — discard the arrival itself', () => {
+      const after = stealFuel()
+      if (after.continue.kind !== 'ask') throw new Error('expected the arrange ask')
+      const fuel = contentsOf(after.state.resources, 'overflow:red')[0]!
+      const drop = after.continue.actions.find(
+        (a) => a.type === 'resources/arrange-discard' && a['token'] === fuel,
+      )!
+      const dropped = advance(after.state, drop, reg3)
+      if (dropped.continue.kind !== 'ask') throw new Error('expected the arrange board to re-offer')
+      const done = dropped.continue.actions.find((a) => a.type === 'resources/arrange-done')!
+      const resumed = advance(dropped.state, done, reg3)
+      expect(String(resumed.state.resources.at.get(fuel))).toBe('supply:Fuel')
+      expect(slotsOf(resumed.state, 'red').every((s) => contentsOf(resumed.state.resources, s)[0] !== fuel)).toBe(true)
+    })
+  })
+
   it('Sworn Guardians narrows the raid to exactly itself (docs/20 B2)', () => {
     /*
      * This used to assert the whole menu vanished — the over-block the audit found. The card's

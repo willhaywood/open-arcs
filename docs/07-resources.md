@@ -185,9 +185,13 @@ offered at all while the row is illegal.
 
 **Most gains cannot overflow**, which is worth knowing before hunting for missing wiring: every
 Prelude ability that gains first *spends* something, freeing a slot. The exceptions are Tax (and
-its leader bonuses), the two guild alts that gain outright, Ambitious, the trade swap, and Elder
-Broker's gain-three. Setup passes no overflow location at all, since its slots are empty by
-construction.
+its leader bonuses), the two guild alts that gain outright, Ambitious, the trade swap, Elder
+Broker's gain-three, and the **raid steal** — the token comes off the victim's board rather than
+from the supply, but it is a gain all the same: it waits in overflow when the raider's row is
+full, and the raid resumes shopping (`battle/raid-resume`) once the slots settle. The raid was
+found missing from this inventory after a report — the stolen token went straight back to the
+supply, silently costing the raider the full key price. Setup passes no overflow location at all,
+since its slots are empty by construction.
 
 **Capacity used to only grow — it does not any more.** A city destroyed *in battle* goes to the
 attacker's trophies rather than back to its owner's board, and trophy return at cleanup is still

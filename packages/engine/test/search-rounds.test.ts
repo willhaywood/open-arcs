@@ -21,6 +21,16 @@
  * longer reproduces in this game — the feature's discriminating evidence stays in docs/19
  * sections 18-19; this test is its regression floor: the shipped cross-round bot must keep
  * choosing an oracle-winning move.
+ *
+ * **Re-derived a third time** for the raid-overflow rules fix (a raided resource stolen into a
+ * full row now waits in overflow instead of vanishing to the supply). Game 44 stopped holding any
+ * adjudicable position at all: its one remaining late menu is lost whatever red leads (0/12
+ * across the board), and its chapter-2 menus are contested middlegames (best option 16/48) where
+ * a standard-bot rollout oracle is not an authority — near-decided positions are the only ones
+ * whose adjudication is continuation-policy-proof. The same protocol swept the neighboring
+ * arena games and found the pin in **game 41: step 283, chapter 3, the hard seat is yellow**
+ * (seat rotation), where the menu splits cleanly at 48 salts — `Lead Construction-5` 40/48 and
+ * `Pass` 40/48 against `Lead Aggression-6` and `Lead Aggression-4` at 3/48 each.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -41,14 +51,14 @@ import type { FactionId, RuleResult } from '../src/index.js'
 const registry = defaultRegistry()
 const TWO: readonly FactionId[] = ['red', 'yellow']
 
-/** The re-derived oracle position: arena game 44, step 429, red (hard) to lead in chapter 4. */
+/** The re-derived oracle position: arena game 41, step 283, yellow (hard) to lead in chapter 3. */
 function gamePosition(): { cur: RuleResult; asked: AskedThisTurn; f: FactionId } {
   const hard = searchBot({ width: 3, depth: 14, replies: { roots: 1, deals: 1 } })
-  const seats = seatsForGame([hard, standardBot], TWO, 44)
-  const seed = seedForGame(1, 44, TWO.length)
+  const seats = seatsForGame([hard, standardBot], TWO, 41)
+  const seed = seedForGame(1, 41, TWO.length)
   let cur: RuleResult = startGame({ board: 'Board2Frontiers', factions: [...TWO], seed }, registry)
   let asked: AskedThisTurn = NO_ASKS
-  for (let step = 0; step < 429; step++) {
+  for (let step = 0; step < 283; step++) {
     const f = botToAct(cur, TWO)
     expect(f, `the drive reached step ${step} with a bot to act`).toBeDefined()
     const s = stepBot(cur, (seats as never as Record<FactionId, typeof hard>)[f!], f!, registry, asked)
@@ -56,7 +66,7 @@ function gamePosition(): { cur: RuleResult; asked: AskedThisTurn; f: FactionId }
     asked = s.asked
   }
   const f = botToAct(cur, TWO)
-  expect(f).toBe('red')
+  expect(f).toBe('yellow')
   return { cur, asked, f: f! }
 }
 
@@ -78,17 +88,17 @@ describe('rounds defaults to the reply horizon', () => {
 })
 
 describe('the cross-round horizon', () => {
-  it('chooses the oracle-winning lead at the re-derived game-44 position', () => {
+  it('chooses the oracle-winning lead at the re-derived game-41 position', () => {
     /*
-     * Adjudicated by rollout, not by taste: from this position `Lead Mobilization-2` and
-     * `Lead Administration-4` each won 12 of 12 salted standard-bot continuations and `Pass`
-     * 11 of 12 (re-run for docs/22 — see the file docstring). The shipped cross-round bot must
-     * keep picking one of the oracle-winning moves.
+     * Adjudicated by rollout, not by taste: from this position `Lead Construction-5` and `Pass`
+     * each won 40 of 48 salted standard-bot continuations while both Aggression leads won 3 of
+     * 48 (re-run for the raid-overflow fix — see the file docstring). The shipped cross-round
+     * bot must keep picking one of the oracle-winning moves.
      */
     const { cur, asked, f } = gamePosition()
     const v5 = searchBot({ width: 3, depth: 14, replies: { roots: 3, deals: 2, rounds: 2 } })
     const decision = stepBot(cur, v5, f, registry, asked).decision
-    expect(['Lead Mobilization-2', 'Lead Administration-4']).toContain(String(decision.action['label']))
+    expect(['Lead Construction-5', 'Pass']).toContain(String(decision.action['label']))
   })
 
   it('is deterministic: the same position decides the same way twice', () => {
