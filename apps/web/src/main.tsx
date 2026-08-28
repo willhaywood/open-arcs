@@ -20,6 +20,14 @@ const link = parseLink(window.location.hash)
 if (link !== null && link !== undefined && MULTIPLAYER_URL !== null) {
   const seatToken = link.seatToken ?? recall(link.gameId)
   void store.joinSession(MULTIPLAYER_URL, seatToken === undefined ? link : { ...link, seatToken })
+} else if (link === null || link === undefined) {
+  /*
+   * No game link in the address bar: this boot is a local game's, so the autosave (if any)
+   * comes back before anything renders — a refresh continues the game. A game-link hash with
+   * multiplayer disabled deliberately restores nothing: the URL claims a joined game, and a
+   * local game must not appear underneath it.
+   */
+  store.restoreAutosave()
 }
 
 createRoot(document.getElementById('root')!).render(

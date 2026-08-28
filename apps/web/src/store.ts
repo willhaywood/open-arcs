@@ -36,6 +36,7 @@ import { remember } from './multiplayer/link.js'
 import type { GameLink } from './multiplayer/link.js'
 import type { BotEvent } from './bot-events.js'
 import { buildChapterReport, buildGameHistory, chapterEnded } from './chapter-report.js'
+import { clearAutosave, readAutosave, saveAutosave } from './persist.js'
 import type { ChapterReport, GameHistory } from './chapter-report.js'
 
 type Listener = () => void
@@ -267,6 +268,7 @@ class GameStore {
       },
     ]
     this.emitBotUi()
+    this.persist()
     // A chapter interlude holds the game: the timer re-arms when it is dismissed.
     if (!this.detectInterlude(prev)) this.scheduleBot()
   }
@@ -401,6 +403,7 @@ class GameStore {
     this.botEvents = []
     this.clearInterlude()
     this.emit()
+    this.persist()
     this.scheduleBot()
   }
 
@@ -422,6 +425,7 @@ class GameStore {
      * journal, so there is nothing here to await or unwind.
      */
     void this.session?.publish(action, expectedLength)
+    this.persist()
     // A human's own action can end the chapter too; the interlude then holds the bots.
     if (!this.detectInterlude(prev)) this.scheduleBot()
   }
@@ -440,11 +444,40 @@ class GameStore {
     this.botEvents = []
     this.clearInterlude()
     this.emit()
+    this.persist()
     this.scheduleBot(BOT_PACE * 2)
   }
 
   canUndo(): boolean {
     return (this.result?.state.journal.length ?? 0) > 0
+  }
+
+  /**
+   * Keep the local game across refreshes. Local only: a joined game is the server's to keep,
+   * and its journal must never masquerade as a hotseat save. Called at the tail of every local
+   * mutator; `reset` clears instead — New game is the explicit discard.
+   */
+  private persist(): void {
+    if (this.session !== null) return
+    const json = this.toJSON()
+    if (json !== null) saveAutosave(json)
+  }
+
+  /**
+   * Boot-time restore of the autosave, when there is one. `load` gives the right semantics for
+   * free — the bot grace delay, and the game-over screen for a finished save. A blob that fails
+   * to load is cleared, so a corrupt autosave costs one boot, not every boot.
+   */
+  restoreAutosave(): boolean {
+    const json = readAutosave()
+    if (json === null) return false
+    try {
+      this.load(json)
+      return true
+    } catch {
+      clearAutosave()
+      return false
+    }
   }
 
   /** JSON for a save file, or null if no game is in progress. */
@@ -468,6 +501,7 @@ class GameStore {
      * re-arms the same delay) without needing a resume button.
      */
     this.emit()
+    this.persist()
     // A finished save opens on its summary.
     if (result.state.isOver) this.openInterlude({ kind: 'gameOver' })
     this.scheduleBot(BOT_PACE * 2)
@@ -478,6 +512,7 @@ class GameStore {
     this.forgetBotTurn()
     this.botEvents = []
     this.clearInterlude()
+    clearAutosave()
     this.result = null
     this.options = null
     this.emit()
