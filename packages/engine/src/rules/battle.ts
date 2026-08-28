@@ -85,6 +85,9 @@ import {
 import type { Resource } from '../resources.js'
 import type { GameState } from '../state.js'
 import type { PipReturn } from './standard-actions.js'
+// Value import back into standard-actions is a cycle, but both sides only touch the other's
+// exports inside function bodies, so neither hits a half-evaluated module.
+import { overflowThen } from './standard-actions.js'
 import { contentsOf, move } from '../tracker.js'
 
 // --- action constructors ---------------------------------------------------
@@ -1197,19 +1200,27 @@ function performRaidTake(
       log: [...next.log, `${ctx.faction} raided ${courtCard(target).name} from ${victim}`],
     }
   } else {
-    // Into an open slot of the raider's if there is one; otherwise it is simply taken off them.
+    /*
+     * The steal is a gain, so the full-board rule applies: "you may rearrange any resources in
+     * your resource slots, but you must discard resources you cannot hold" — with no open slot
+     * the raider chooses what goes, and keeping the stolen token by discarding a held one is
+     * the point of the choice. So it waits in overflow and the arrange board settles it before
+     * the raid shops on. An earlier version returned it straight to the supply, silently
+     * costing the raider the full key price.
+     */
     const open = openSlots(next.resources, slotsOf(next, ctx.faction))[0]
     const r = parseResourceToken(target).resource
     next = {
       ...next,
-      resources:
-        open === undefined
-          ? spendToken(next.resources, target)
-          : move(next.resources, target, open),
-      log: [
-        ...next.log,
-        `${ctx.faction} raided ${r} from ${victim}${open === undefined ? ' (no room, lost)' : ''}`,
-      ],
+      resources: move(next.resources, target, open ?? ResourceSlot.overflow(ctx.faction)),
+      log: [...next.log, `${ctx.faction} raided ${r} from ${victim}`],
+    }
+    if (open === undefined) {
+      const paid: Resolve = { ...ctx, keys: ctx.keys - cost }
+      return {
+        state: next,
+        continue: overflowThen(next, ctx.faction, { type: 'battle/raid-resume', ctx: paid }),
+      }
     }
   }
   const spent: Resolve = { ...ctx, keys: ctx.keys - cost }
@@ -1609,6 +1620,9 @@ export const BattleModule: RuleModule = {
           action['target'] as string,
           action['cost'] as number,
         )
+      case 'battle/raid-resume':
+        // Back from the arrange board after a stolen resource overflowed: keep shopping.
+        return { state, continue: offerRaid(state, action['ctx'] as Resolve) }
       case 'battle/settle':
         return performSettle(state, action['ctx'] as Resolve)
       case 'battle/finish':

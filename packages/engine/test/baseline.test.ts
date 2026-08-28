@@ -137,8 +137,16 @@ describe('the frozen baseline', () => {
  * that makes future pile refactors unable to move a deal again). The usual rules-fix exception;
  * `weightsMatchBaseline` still passes. Values before: [39,27,17], [28,27,24], [9,37,7].
  */
+/*
+ * Re-recorded for the raid-overflow rules fix — the usual rules-fix exception;
+ * `weightsMatchBaseline` still passes. A raided resource stolen into a full row used to go
+ * straight back to the supply ("no room, lost"); it now waits in overflow and the raider chooses
+ * what to discard, like every other gain. Only seed 2 moved — the only golden game where a
+ * baseline bot raided a resource with its own row full. Values before: [35,16,18], [41,9,23],
+ * [21,18,37].
+ */
 const GOLDEN = [
   [35, 16, 18],
-  [41, 9, 23],
+  [47, 13, 19],
   [21, 18, 37],
 ]
