@@ -74,7 +74,10 @@ reverted; Save downloaded a file with no error; the Load control is wired on bot
 ## 6. Not yet
 
 - **Redo** — trivial to add (keep the truncated tail), not built.
-- **Autosave / localStorage** — the save string is ready; persisting it across reloads is a
-  few lines when wanted.
+- ~~**Autosave / localStorage**~~ — built (`apps/web/src/persist.ts`): every local mutation
+  writes the save string to `localStorage` under `arcs:autosave`, boot restores it when the
+  address bar carries no game link, and New game discards it. Local games only — a joined
+  game is the server's to keep. localStorage over IndexedDB deliberately: universal support,
+  a full game is under 100KB, and Safari's storage eviction hits both alike.
 - **Undo across a full game with bots** — once bots drive some seats, "undo" needs to decide
   whether it steps back one decision or one full player turn. A product question for later.
