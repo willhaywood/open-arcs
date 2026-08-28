@@ -132,19 +132,25 @@ function repairTargets(
   if (cont.kind !== 'ask') return []
   const repairs = cont.actions.filter((a) => a.type === 'action/repair')
   if (repairs.length === 0) return []
-  const byGroup = new Map<string, { system: string; piece: string; action: Action }>()
+  const byGroup = new Map<string, { system: string; piece: string; figure?: string; action: Action }>()
   for (const a of repairs) {
     const id = String(a['figure'])
     const loc = state.figures.at.get(id)
     if (loc === undefined || !loc.startsWith('system:')) continue
     const system = loc.slice('system:'.length)
     const piece = parseFigureId(id).piece
-    const key = `${system}/${piece}`
-    if (!byGroup.has(key)) byGroup.set(key, { system, piece, action: a })
+    // Buildings sit one per slot, so each damaged one is its own target; a ship stack is one.
+    const building = piece === 'City' || piece === 'Starport'
+    const key = building ? id : `${system}/${piece}`
+    if (!byGroup.has(key)) {
+      byGroup.set(key, { system, piece, ...(building ? { figure: id } : {}), action: a })
+    }
   }
   return [...byGroup.values()].map((t) => ({
-    ...t,
-    at: stackPosition(state, t.system, cont.faction, t.piece, true),
+    system: t.system,
+    piece: t.piece,
+    action: t.action,
+    at: stackPosition(state, t.system, cont.faction, t.piece, true, t.figure),
   }))
 }
 
@@ -158,6 +164,8 @@ function stackPosition(
   color: string,
   piece: string,
   damaged: boolean,
+  /** For a building, the exact token — buildings are singleton groups carrying their figure id. */
+  figure?: string,
 ): readonly [number, number] {
   const s = systemInfo(system)
   const items = slotsAndPieces(state, system, groupPieces(state, system))
@@ -165,9 +173,9 @@ function stackPosition(
   const i = items.findIndex(
     (it) =>
       it.kind === 'piece' &&
-      it.group.piece === piece &&
-      it.group.color === color &&
-      it.group.damaged === damaged,
+      (figure !== undefined
+        ? it.group.figure === figure
+        : it.group.piece === piece && it.group.color === color && it.group.damaged === damaged),
   )
   return i >= 0 ? pos[i]! : s.render.anchor
 }
@@ -205,8 +213,10 @@ function piecePickTargets(
     try {
       const f = parseFigureId(id)
       const damaged = state.damaged.includes(id)
-      key = `${a.type}/${system}/${f.color}/${f.piece}/${damaged}`
-      at = stackPosition(state, system, f.color, f.piece, damaged)
+      const building = f.piece === 'City' || f.piece === 'Starport'
+      // A building is its own token in its own slot, so every one gets its own ring.
+      key = building ? `${a.type}/${id}` : `${a.type}/${system}/${f.color}/${f.piece}/${damaged}`
+      at = stackPosition(state, system, f.color, f.piece, damaged, building ? id : undefined)
     } catch {
       // Not a figure (an Inspiring slot): anchor the target to the system itself.
       key = `${a.type}/${system}/slot`
@@ -1178,6 +1188,8 @@ interface PieceGroup {
   piece: string
   damaged: boolean
   count: number
+  /** Set for buildings, which never stack — each City/Starport is its own token in its own slot. */
+  figure?: string
 }
 
 /**
@@ -1282,8 +1294,17 @@ function groupPieces(state: GameState, systemId: string): PieceGroup[] {
   for (const id of ids) {
     const f = parseFigureId(id)
     const damaged = state.damaged.includes(id)
-    const key = `${f.color}/${f.piece}/${damaged ? 'dmg' : 'ok'}`
-    const g = map.get(key) ?? { key, color: f.color, piece: f.piece, damaged, count: 0 }
+    /*
+     * Buildings do not stack. The planet prints one slot per building, so each City and
+     * Starport is its own token standing in its own slot — two Cities drawn as one token with a
+     * x2 badge left a printed slot looking empty. Ships and agents keep stacking: a fleet is a
+     * pile, a building is an address.
+     */
+    const single = f.piece === 'City' || f.piece === 'Starport'
+    const key = single ? id : `${f.color}/${f.piece}/${damaged ? 'dmg' : 'ok'}`
+    const g =
+      map.get(key) ??
+      ({ key, color: f.color, piece: f.piece, damaged, count: 0, ...(single ? { figure: id } : {}) } as PieceGroup)
     g.count++
     map.set(key, g)
   }
