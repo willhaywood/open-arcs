@@ -35,6 +35,7 @@ import type { Continue } from '@arcs/engine'
 /** The surfaces that can draw an Ask. `strip` is the bottom band's fallback list of buttons. */
 export type Surface =
   | 'strip'
+  | 'modal'
   | 'hand'
   | 'draft'
   | 'learned'
@@ -197,10 +198,36 @@ const MAP = [
 ]
 
 /** The action phase, grouped by the card or pip each option comes from. */
-/** Declaring an ambition is done to the ambition track, which draws the five rows. */
-const AMBITIONS_SURFACE = ['vox/populist']
+/**
+ * Declaring an ambition is done to the ambition track, which draws the five rows. Phase 4 sent
+ * every declare there: the standard lead-card declare, Populist Demands' free one, and Galactic
+ * Bards' — the row being claimed is on screen in all three, and the board's hint bar carries
+ * "Do not declare".
+ */
+const AMBITIONS_SURFACE = [
+  'vox/populist',
+  'ambition/declare',
+  'ambition/skip-declare',
+  'turn/bards-declare',
+  'turn/bards-skip',
+]
 
 const TRAY = ['action/take', 'action/guild-alt']
+
+/**
+ * Decisions that want a focused dialog: resource-tile picks (Outrage Spreads, Press Gang,
+ * Mythic's reshaping) and card-with-recipient picks (Guild Struggle's steal, Generous' gift,
+ * Elder Broker's trade). Each is a short, self-contained matrix that neither the map nor the
+ * band can carry — `AskModal` draws them, one layout per family, draggable like every dialog.
+ */
+const MODAL = [
+  'vox/outrage',
+  'action/pressgang',
+  'leaders/mythic-place',
+  'vox/steal-guild',
+  'leaders/generous-give',
+  'action/trade',
+]
 
 /**
  * What the bottom band's AskStrip draws as a row of labelled buttons.
@@ -214,14 +241,9 @@ const STRIP = [
   'action/guide-pick',
   'action/guide-move',
   'action/martyr',
-  'action/pressgang',
   'action/execute',
-  'action/trade',
   'action/lore-sprint',
   'action/lore-sprint-stop',
-  'ambition/declare',
-  'ambition/skip-declare',
-  'turn/bards-declare',
   /*
    * The Farseers flows (docs/20 A3): the discard picker and the declare-time peek. Lists of
    * labelled options, which is exactly what the strip renders; the peek's swap options
@@ -234,18 +256,14 @@ const STRIP = [
   'turn/prelude',
   'turn/pips',
   // Two leader prompts that are genuinely a yes/no — docs/15 S6 wants a confirm strip for these.
-  'leaders/mythic-place',
   'leaders/ruthless-hit',
   'leaders/bold',
-  'leaders/generous-give',
   /*
    * The Vox cards. Every one of these was unclaimed until the sweep named it, and several want a
    * real surface rather than a list — docs/15 S2, S3 name their eventual homes.
    */
   'vox/done',
   'vox/free-seize',
-  'vox/outrage',
-  'vox/steal-guild',
 ]
 
 const TABLE: readonly (readonly [Surface, readonly string[]])[] = [
@@ -257,6 +275,9 @@ const TABLE: readonly (readonly [Surface, readonly string[]])[] = [
   ['raid', RAID],
   ['shelf', SHELF],
   ['battle', BATTLE],
+  // Before the tray and the track: a Generous ask's forfeit rider can be ambitions-listed, and
+  // the gift matrix, not the forfeit, is the decision.
+  ['modal', MODAL],
   /*
    * The tray outranks the map deliberately. A Build or Move ask that carries a guild alt
    * (`withAlts`) must resolve to the tray, which draws every plain option *and* the card chips —
