@@ -1,7 +1,7 @@
 import { isWaiting } from '@arcs/engine'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { ActionPanel } from './components/ActionPanel.js'
+import { AskStrip } from './components/AskStrip.js'
 import { AmbitionTrack } from './components/AmbitionTrack.js'
 import { Attribution } from './components/Attribution.js'
 import { Battle } from './components/Battle.js'
@@ -30,6 +30,20 @@ import { store, useGame } from './store.js'
 export function App(): JSX.Element {
   const result = useGame()
   const fileInput = useRef<HTMLInputElement>(null)
+  /*
+   * The log drawer. Local state, deliberately: nothing else reads it, and it must not entangle
+   * with saves or undo. No backdrop either — the point of the drawer is reading the log while
+   * the game stays playable behind it.
+   */
+  const [logOpen, setLogOpen] = useState(false)
+  useEffect(() => {
+    if (!logOpen) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setLogOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [logOpen])
 
   function saveGame(): void {
     const json = store.toJSON()
@@ -117,6 +131,9 @@ export function App(): JSX.Element {
           <button className="ghost" onClick={saveGame}>
             Save
           </button>
+          <button className="ghost" onClick={() => setLogOpen((v) => !v)}>
+            Log
+          </button>
           {loadControl}
           <button className="ghost" onClick={() => store.reset()}>
             New game
@@ -144,32 +161,39 @@ export function App(): JSX.Element {
             * `Watching` is `display: contents`, so `.hand-row` and its siblings stay grid items of
             * `.board-col` exactly as before.
             */}
-          <Watching canAct={acting}>
-            <div className="hand-row">
-              <Hand state={state} cont={cont} />
-            </div>
-            {/* Shares the hand's grid area, as a sibling: `.hand-row` clips its own children. */}
-            <PreludeScreen state={state} cont={cont} />
-            {/* The action phase, on the same terms as the Prelude: over the hand, map still visible. */}
-            <ActionTray state={state} cont={cont} />
-          </Watching>
-          <PlayerBoards state={state} current={current} />
-        </section>
-        <aside className="side-col">
           {/*
-            * A finished game has no actions to guard, and its panel block (New game, View
-            * summary) must work for every seat and for spectators — `canAct` is false for a
-            * gameOver continue, so inside `Watching` those buttons were inert in joined games.
+            * A finished game has no actions to guard, and the strip's game-over band (New game,
+            * View summary) must work for every seat and for spectators — `canAct` is false for a
+            * gameOver continue, so inside `Watching` those buttons would be inert in joined games.
             */}
           {cont.kind === 'gameOver' ? (
-            <ActionPanel cont={cont} onNewGame={() => store.reset()} />
+            <AskStrip cont={cont} onNewGame={() => store.reset()} />
           ) : (
             <Watching canAct={acting}>
-              <ActionPanel cont={cont} onNewGame={() => store.reset()} />
+              <div className="hand-row">
+                <Hand state={state} cont={cont} />
+              </div>
+              {/* Shares the hand's grid area, as a sibling: `.hand-row` clips its own children. */}
+              <PreludeScreen state={state} cont={cont} />
+              {/* The action phase, on the same terms as the Prelude: over the hand, map still visible. */}
+              <ActionTray state={state} cont={cont} />
+              {/* Every decision without a bespoke surface, in the same band — see AskStrip. */}
+              <AskStrip cont={cont} onNewGame={() => store.reset()} />
             </Watching>
           )}
-          <LogPanel log={state.log} />
-        </aside>
+          <PlayerBoards state={state} current={current} />
+        </section>
+        {logOpen ? (
+          <div className="log-drawer" role="complementary" aria-label="Game log">
+            <div className="log-drawer-head">
+              <span>Log</span>
+              <button className="ghost" onClick={() => setLogOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <LogPanel log={state.log} />
+          </div>
+        ) : null}
       </main>
 
       {/*

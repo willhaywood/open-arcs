@@ -124,7 +124,7 @@ export function Battle({ state, cont }: Props): JSX.Element | null {
   /*
    * The table says this window owns the Ask, and no branch above matched.
    *
-   * **Returning null here is what deadlocked the game once already.** `ActionPanel` steps aside for
+   * **Returning null here is what deadlocked the game once already.** The fallback strip steps aside for
    * anything this window claims, so a claim it cannot draw leaves the Ask with no surface at all and
    * the turn cannot be advanced. Railgun Arrays reached exactly this state: an assignment with no
    * roll, which every branch declined.

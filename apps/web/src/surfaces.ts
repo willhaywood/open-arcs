@@ -32,9 +32,9 @@
 
 import type { Continue } from '@arcs/engine'
 
-/** The surfaces that can draw an Ask. `panel` is the fallback list of labelled buttons. */
+/** The surfaces that can draw an Ask. `strip` is the bottom band's fallback list of buttons. */
 export type Surface =
-  | 'panel'
+  | 'strip'
   | 'hand'
   | 'draft'
   | 'learned'
@@ -106,7 +106,7 @@ const RAID = ['battle/raid-take', 'battle/settle']
  * `turn/bards-declare` picks an ambition rather than a card, and `leaders/generous-give` picks a
  * card *and* a recipient. See the header of `CardShelf.tsx`.
  *
- * `leaders/bold` stays in the panel because it is only the door — the picks it leads to are
+ * `leaders/bold` stays in the strip because it is only the door — the picks it leads to are
  * ordinary `action/influence` actions, which this surface already claims.
  */
 export const SHELF = ['action/influence', 'action/secure', 'action/ransack']
@@ -114,9 +114,9 @@ export const SHELF = ['action/influence', 'action/secure', 'action/ransack']
 /**
  * The battle window owns the engagement from target through to the last hit.
  *
- * `battle/system` is **not** here: choosing which system to fight in is still a list of labelled
- * buttons until the map targets it, so the panel keeps it. `battle/cancel` is not here either — it
- * goes with whichever surface is up, so it is resolved by `ownerOf` rather than listed.
+ * `battle/system` is **not** here: choosing which system to fight in is a map click, so the map
+ * claims it. `battle/cancel` is not here either — it goes with whichever surface is up, so it is
+ * resolved by `ownerOf` rather than listed.
  */
 const BATTLE = [
   'battle/target',
@@ -147,6 +147,20 @@ const MAP = [
   'vox/uprising-place',
   'turn/gates-place',
   'turn/ships-place',
+  /*
+   * The board drew all of these long before it owned them — reticles for battle targets, the
+   * origin/destination graph and fleet rows for moves, rings on the damaged pieces for repair —
+   * while ownership still said "panel", so the same options rendered twice. The claim moved here
+   * when the side panel was retired; the board's hint bar carries each ask's way out.
+   */
+  'battle/system',
+  'action/move-pick',
+  'action/move-ships',
+  'action/move-more',
+  'action/move-more-go',
+  'action/repair',
+  // Rulebook p22 no-elimination placement. Mandatory (no escape); the gates light up.
+  'turn/reinforce',
 ]
 
 /** The action phase, grouped by the card or pip each option comes from. */
@@ -156,22 +170,16 @@ const AMBITIONS_SURFACE = ['vox/populist']
 const TRAY = ['action/take', 'action/guild-alt']
 
 /**
- * What the panel draws as a list of labelled buttons.
+ * What the bottom band's AskStrip draws as a row of labelled buttons.
  *
  * A real surface with a real claim, not a catch-all. Most of these are genuinely a yes/no or a
  * short list where a label carries the whole decision (docs/15 S6). Being a list is *not* a licence
- * to leave a decision that needs a picture as text — the reroll lived here for months.
+ * to leave a decision that needs a picture as text — the reroll lived here for months, and the
+ * whole move family lived here until the map claimed it.
  */
-const PANEL = [
-  'battle/system',
-  // `rifles/from` opens the flow and carries no choice; the two picks are on the map.
-  'rifles/from',
+const STRIP = [
   'action/build',
-  'action/move-pick',
-  'action/move-ships',
-  'action/move-more',
   'action/tax-city',
-  'action/repair',
   'action/guide-pick',
   'action/guide-move',
   'action/martyr',
@@ -179,11 +187,8 @@ const PANEL = [
   'action/pressgang',
   'action/execute',
   'action/trade',
-  'action/trade-give',
-  'action/prune',
   'action/lore-sprint',
   'action/lore-sprint-stop',
-  'action/arrange-open',
   'ambition/declare',
   'ambition/skip-declare',
   'turn/seize',
@@ -200,8 +205,8 @@ const PANEL = [
   'turn/bards-declare',
   /*
    * The Farseers flows (docs/20 A3): the discard picker and the declare-time peek. Lists of
-   * labelled options, which is exactly what the action panel renders; the peek's swap options
-   * carry the rival's card names in their labels, so the panel is the "look".
+   * labelled options, which is exactly what the strip renders; the peek's swap options
+   * carry the rival's card names in their labels, so the strip is the "look".
    */
   'turn/farseers-pick',
   'turn/farseers-done',
@@ -211,23 +216,16 @@ const PANEL = [
   'ambition/farseers-skip',
   'turn/prelude',
   'turn/pips',
-  'turn/lead-main',
   'action/lore-prune',
-  'action/move-more-go',
   // Two leader prompts that are genuinely a yes/no — docs/15 S6 wants a confirm strip for these.
   'leaders/mythic-place',
   'leaders/ruthless-hit',
-  'leaders/beloved',
   'leaders/bold',
   'leaders/generous-give',
-  'leaders/may-follow',
-  'leaders/must-follow',
   /*
    * The Vox cards. Every one of these was unclaimed until the sweep named it, and several want a
-   * real surface rather than a list — Mass Uprising picks a *cluster*, which nothing on the map
-   * highlights, and Populist Demands picks an ambition marker (docs/15 S2, S3).
+   * real surface rather than a list — docs/15 S2, S3 name their eventual homes.
    */
-  'vox/choose',
   'vox/done',
   'vox/free-city',
   'vox/free-seize',
@@ -247,28 +245,28 @@ const TABLE: readonly (readonly [Surface, readonly string[]])[] = [
   ['map', MAP],
   ['ambitions', AMBITIONS_SURFACE],
   ['tray', TRAY],
-  ['panel', PANEL],
+  ['strip', STRIP],
 ]
 
 /** Ways out of a menu. They belong to whoever drew the menu, so they never decide ownership. */
-const ESCAPES = ['action/skip', 'action/cancel', 'battle/cancel', 'turn/end', 'turn/pass']
+export const ESCAPES = ['action/skip', 'battle/cancel', 'turn/end', 'turn/pass']
 
 /**
  * The surface that draws this Ask, or `undefined` if none would.
  *
  * Ownership is decided by the Ask's **non-escape** actions, because an escape tells you nothing:
  * `battle/cancel` appears beside the dice gather and beside the system choice, which different
- * surfaces draw. An Ask offering nothing but escapes is owned by the panel, which is the only
+ * surfaces draw. An Ask offering nothing but escapes is owned by the strip, which is the only
  * surface that can render a bare "cancel" meaningfully.
  *
- * `turn/end` counts as an escape, so a menu of nothing but "End turn" belongs to the panel rather
+ * `turn/end` counts as an escape, so a menu of nothing but "End turn" belongs to the strip rather
  * than leaving the tray to draw an empty grid.
  */
 export function surfaceFor(cont: Continue): Surface | undefined {
   if (cont.kind !== 'ask') return undefined
 
   const substantive = cont.actions.filter((a) => !ESCAPES.includes(a.type))
-  if (substantive.length === 0) return 'panel'
+  if (substantive.length === 0) return 'strip'
 
   /*
    * First claim wins, in table order, and the order is not arbitrary: an Ask can mix types, and the
@@ -283,13 +281,14 @@ export function surfaceFor(cont: Continue): Surface | undefined {
   /*
    * Unclaimed — and that is reported, not absorbed.
    *
-   * An earlier cut ended `return 'panel'` here, on the reasoning that the panel can render any
-   * action as a labelled button. True, and it made the invariant worthless: `surfaceFor` could never
-   * return undefined, so the test asserting "every Ask has an owner" passed no matter what. A check
-   * that cannot fail is worse than no check, because it reads as coverage.
+   * An earlier cut ended the fallback surface's claim here unconditionally, on the reasoning that
+   * a list of labelled buttons can render any action. True, and it made the invariant worthless:
+   * `surfaceFor` could never return undefined, so the test asserting "every Ask has an owner"
+   * passed no matter what. A check that cannot fail is worse than no check, because it reads as
+   * coverage.
    *
-   * So the panel claims a list like every other surface, and anything outside every list comes back
-   * undefined. The app still draws those — `ActionPanel` renders unclaimed Asks so a missing entry
+   * So the strip claims a list like every other surface, and anything outside every list comes back
+   * undefined. The app still draws those — `AskStrip` renders unclaimed Asks so a missing entry
    * is never an unplayable game — but the test fails, which is where the cost belongs.
    */
   return undefined
