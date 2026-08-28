@@ -569,6 +569,17 @@ export function Board({ state, cont }: Props): JSX.Element {
    * (or hand information) renders for them.
    */
   const handMode = modeOf(cont)
+  /*
+   * The declare asks light rows on the ambition track (to the right of the map); the hint bar
+   * says so and carries the decline, the same division of labour as the hand modes above.
+   */
+  const declareAsk =
+    cont.kind === 'ask' &&
+    cont.actions.some((a) => a.type === 'ambition/declare' || a.type === 'turn/bards-declare')
+  const declareOut =
+    cont.kind === 'ask' && declareAsk
+      ? cont.actions.find((a) => a.type === 'ambition/skip-declare' || a.type === 'turn/bards-skip')
+      : undefined
   const pieceOut =
     cont.kind === 'ask' && piecePicks.length > 0
       ? cont.actions.find((a) => a.type === 'action/skip' || a.type === 'vox/done')
@@ -858,6 +869,15 @@ export function Board({ state, cont }: Props): JSX.Element {
           {moveOut !== undefined ? (
             <button className="hint-out" onClick={() => store.apply(moveOut)}>
               {String(moveOut['label'] ?? 'Cancel')}
+            </button>
+          ) : null}
+        </div>
+      ) : declareAsk ? (
+        <div className="board-hint">
+          Declare an ambition — click its row on the track
+          {declareOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(declareOut)}>
+              {String(declareOut['label'] ?? 'Do not declare')}
             </button>
           ) : null}
         </div>

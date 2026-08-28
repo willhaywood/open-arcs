@@ -1,6 +1,7 @@
 import { isWaiting } from '@arcs/engine'
 import { useEffect, useRef, useState } from 'react'
 
+import { AskModal } from './components/AskModal.js'
 import { AskStrip } from './components/AskStrip.js'
 import { AmbitionTrack } from './components/AmbitionTrack.js'
 import { Attribution } from './components/Attribution.js'
@@ -235,6 +236,9 @@ export function App(): JSX.Element {
 
         {/* Influence, Secure and Ransack — the court decisions, as the cards themselves. */}
         <CardShelf state={state} cont={cont} />
+
+        {/* The focused matrices: resource picks, card gifts and steals, the Broker's trade. */}
+        <AskModal cont={cont} />
       </Watching>
     </div>
   )

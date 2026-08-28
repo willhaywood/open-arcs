@@ -86,7 +86,18 @@ export function AmbitionTrack({
   const declarable = new Map<Ambition, Action>()
   if (cont?.kind === 'ask') {
     for (const a of cont.actions) {
-      if (a.type === 'vox/populist') declarable.set(a['ambition'] as Ambition, a)
+      /*
+       * Every way an ambition gets declared claims its row here: Populist Demands' free one,
+       * the standard declare off the led card, and Galactic Bards'. Same gesture, same surface
+       * (Phase 4); the "do not declare" way out rides in the board's hint bar.
+       */
+      if (
+        a.type === 'vox/populist' ||
+        a.type === 'ambition/declare' ||
+        a.type === 'turn/bards-declare'
+      ) {
+        declarable.set(a['ambition'] as Ambition, a)
+      }
     }
   }
 
