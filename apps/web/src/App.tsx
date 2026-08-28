@@ -25,6 +25,7 @@ import { SeatBadge } from './components/SeatBadge.js'
 import { Watching } from './components/Watching.js'
 import { canAct, viewFor } from './multiplayer/seat.js'
 import { setupLabel } from './setups.js'
+import { colorOf } from './theme.js'
 import { store, useGame } from './store.js'
 
 export function App(): JSX.Element {
@@ -123,6 +124,14 @@ export function App(): JSX.Element {
         <span className="turn-meta">
           Act {state.act} · Chapter {state.chapter} · Round {state.round}
         </span>
+        {current !== undefined ? (
+          <span className="turn-badge">
+            <span className="turn-badge-label">Turn</span>
+            <span className="turn-badge-who" style={{ color: colorOf(current) }}>
+              {current}
+            </span>
+          </span>
+        ) : null}
         <SeatBadge view={seatView} current={current} />
         <div className="toolbar">
           <button className="ghost" onClick={() => store.undo()} disabled={!store.canUndo()}>
@@ -152,7 +161,7 @@ export function App(): JSX.Element {
               * watcher gets the board at full strength and simply cannot move anything on it.
               */}
             <Watching canAct={acting}>
-              <Board state={state} cont={cont} highlight={current} />
+              <Board state={state} cont={cont} />
             </Watching>
           </div>
           <AmbitionTrack state={state} cont={cont} />

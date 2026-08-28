@@ -32,7 +32,6 @@ import { asset } from '../assets.js'
 interface Props {
   state: GameState
   cont: Continue
-  highlight: string | undefined
 }
 
 /** Systems a battle may be declared in, from `battle/system` actions — click to fight there. */
@@ -398,7 +397,7 @@ function BotEventMark({
   )
 }
 
-export function Board({ state, cont, highlight }: Props): JSX.Element {
+export function Board({ state, cont }: Props): JSX.Element {
   const systems = state.board.systems.map(systemInfo)
   const { origins, onward } = moveGraph(cont)
   const [from, setFrom] = useState<string | null>(null)
@@ -693,7 +692,6 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
           })}
         <BotEventLayer state={state} />
       </svg>
-      {highlight ? <div className="board-turn">Turn: {highlight}</div> : null}
       {fleet !== null ? (
         <div className="board-hint">
           Click the ships that carry on to {fleet.to} — the rest stay behind

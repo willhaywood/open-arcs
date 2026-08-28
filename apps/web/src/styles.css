@@ -363,6 +363,41 @@ button {
  * to cover the toolbar, leaving Undo/Save/Load enabled but physically unclickable — which is how
  * a battle could become a dead end with no way back. The app's own chrome stays reachable.
  */
+/*
+ * Whose turn it is, dead centre of the topbar. It lived as a grey chip floating over the map's
+ * corner; the header is where the game's chrome says things, and the centre is the one slot
+ * nothing else occupies. Absolutely centred so the flex items either side cannot nudge it.
+ */
+.turn-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.turn-badge-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: rgba(201, 169, 97, 0.65);
+}
+.turn-badge-who {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+/* The centre slot vanishes before it can collide with the left cluster. */
+@media (max-width: 900px) {
+  .turn-badge {
+    display: none;
+  }
+}
+
 .topbar {
   position: relative;
   z-index: 400;
@@ -1029,16 +1064,6 @@ button {
   fill: var(--text);
   font-weight: 700;
 }
-.board-turn {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 4px 10px;
-  border-radius: 8px;
-  color: var(--muted);
-}
-
 /* --- round play area (left of the board, after the physical board's slots) --- */
 :root {
   --gold: #c9a961;
