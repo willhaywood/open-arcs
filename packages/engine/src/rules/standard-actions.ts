@@ -1795,11 +1795,21 @@ const RepairPiece = (faction: FactionId, figure: string, then: PipReturn): Actio
 /** Repair un-damages one of the faction's damaged pieces. Unblocked by the battle damage state. */
 function offerRepair(state: GameState, faction: FactionId, then: PipReturn): Continue {
   const mine = state.damaged.filter((id) => parseFigureId(id).color === faction)
-  const options: Action[] = mine.map((id) => ({
-    ...RepairPiece(faction, id, then),
-    faction,
-    label: `Repair ${id}`,
-  }))
+  const options: Action[] = mine.map((id) => {
+    /*
+     * The label names the piece and where it stands — `Repair red/Ship/3` told the player which
+     * *entity id* would heal, which is no answer to "which ship?". The map draws these picks on
+     * the damaged pieces themselves; this is the same answer for the list surfaces.
+     */
+    const at = state.figures.at.get(id)
+    const where =
+      at !== undefined && at.startsWith('system:') ? ` in ${at.slice('system:'.length)}` : ''
+    return {
+      ...RepairPiece(faction, id, then),
+      faction,
+      label: `Repair ${parseFigureId(id).piece}${where}`,
+    }
+  })
   const all = withAlts(state, faction, 'Repair', then, options)
   if (all.length === 0) return C.then(then as Action)
   return C.ask(faction, [...all, skip(faction, then)], 'Repair')
@@ -1811,11 +1821,15 @@ function performRepair(
   figure: string,
   then: PipReturn,
 ): RuleResult {
+  // Same translation as the offer's label: the log names the piece and its system, not the id.
+  const at = state.figures.at.get(figure)
+  const where =
+    at !== undefined && at.startsWith('system:') ? ` in ${at.slice('system:'.length)}` : ''
   return {
     state: {
       ...state,
       damaged: state.damaged.filter((id) => id !== figure),
-      log: [...state.log, `${faction} repaired ${figure}`],
+      log: [...state.log, `${faction} repaired a ${parseFigureId(figure).piece}${where}`],
     },
     continue: C.then(then as Action),
   }
