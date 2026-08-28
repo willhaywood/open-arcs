@@ -60,6 +60,10 @@ const COPY: Record<string, { title: string; note: string }> = {
     title: 'Ransack',
     note: 'Takes a card from the court outright, as spoils of the city you razed.',
   },
+  'action/abduct': {
+    title: 'Abduct',
+    note: 'Court Enforcers: every rival agent on the card becomes your captive.',
+  },
 }
 
 /**

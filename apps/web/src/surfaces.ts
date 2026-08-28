@@ -109,7 +109,12 @@ const RAID = ['battle/raid-take', 'battle/settle']
  * `leaders/bold` stays in the strip because it is only the door — the picks it leads to are
  * ordinary `action/influence` actions, which this surface already claims.
  */
-export const SHELF = ['action/influence', 'action/secure', 'action/ransack']
+/*
+ * `action/abduct` (Court Enforcers) joined later: it picks a court card too, carries the same
+ * `slot` field, and the agents standing on the card — which the shelf already draws — are the
+ * whole decision.
+ */
+export const SHELF = ['action/influence', 'action/secure', 'action/ransack', 'action/abduct']
 
 /**
  * The battle window owns the engagement from target through to the last hit.
@@ -161,6 +166,15 @@ const MAP = [
   'action/repair',
   // Rulebook p22 no-elimination placement. Mandatory (no escape); the gates light up.
   'turn/reinforce',
+  /*
+   * Phase 2: the picks whose subject is a system or a piece. Build rings the buildable systems
+   * (a popover offers the pieces where more than one could go up); Tax, Song of Freedom and
+   * Prune ring the city or building itself, the way Repair rings the damaged piece.
+   */
+  'action/build',
+  'action/tax-city',
+  'action/lore-prune',
+  'vox/free-city',
 ]
 
 /** The action phase, grouped by the card or pip each option comes from. */
@@ -178,12 +192,9 @@ const TRAY = ['action/take', 'action/guild-alt']
  * whole move family lived here until the map claimed it.
  */
 const STRIP = [
-  'action/build',
-  'action/tax-city',
   'action/guide-pick',
   'action/guide-move',
   'action/martyr',
-  'action/abduct',
   'action/pressgang',
   'action/execute',
   'action/trade',
@@ -216,7 +227,6 @@ const STRIP = [
   'ambition/farseers-skip',
   'turn/prelude',
   'turn/pips',
-  'action/lore-prune',
   // Two leader prompts that are genuinely a yes/no — docs/15 S6 wants a confirm strip for these.
   'leaders/mythic-place',
   'leaders/ruthless-hit',
@@ -227,7 +237,6 @@ const STRIP = [
    * real surface rather than a list — docs/15 S2, S3 name their eventual homes.
    */
   'vox/done',
-  'vox/free-city',
   'vox/free-seize',
   'vox/outrage',
   'vox/steal-guild',
@@ -242,9 +251,15 @@ const TABLE: readonly (readonly [Surface, readonly string[]])[] = [
   ['raid', RAID],
   ['shelf', SHELF],
   ['battle', BATTLE],
+  /*
+   * The tray outranks the map deliberately. A Build or Move ask that carries a guild alt
+   * (`withAlts`) must resolve to the tray, which draws every plain option *and* the card chips —
+   * the map's pickers still light up for it, since they scan action types rather than ownership,
+   * so the spatial click works either way. A pure map ask has no tray types and falls through.
+   */
+  ['tray', TRAY],
   ['map', MAP],
   ['ambitions', AMBITIONS_SURFACE],
-  ['tray', TRAY],
   ['strip', STRIP],
 ]
 
