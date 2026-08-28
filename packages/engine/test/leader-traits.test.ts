@@ -1015,6 +1015,9 @@ describe('Bold (Demagogue) and Generous (Feastbringer) — the declare-time trai
       expect(contentsOf(s.courtCards, CourtPile.secured('red'))).toHaveLength(0)
       const out = advance(s, DECLARE, registry)
       expect(labels(out.continue)).toEqual(['Forfeit declaring Tycoon'])
+      // The prompt says why the only button is Forfeit — a bare forfeit read as a bug to a
+      // player who did not know the FAQ's mandatory-cost ruling.
+      expect(ask(out.continue).prompt).toContain('no Guild card to give')
       // and forfeiting really does not declare
       const forfeit = ask(out.continue).actions[0]!
       expect(advance(s, forfeit, registry).state.declared).toEqual(s.declared)

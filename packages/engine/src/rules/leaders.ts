@@ -488,6 +488,18 @@ function offerGenerous(
       })
     }
   }
+  /*
+   * With nothing to give, the declare is simply impossible — the FAQ's "a mandatory cost for
+   * all declares" (docs/21 B2). The prompt says *why* the only button is Forfeit, because the
+   * bare forfeit read as a bug to a player who did not know the ruling.
+   */
+  if (options.length === 0) {
+    return C.ask(
+      faction,
+      [forfeit],
+      `${faction} has no Guild card to give — the declare is forfeit (their leader)`,
+    )
+  }
   return C.ask(
     faction,
     [...options, forfeit],
