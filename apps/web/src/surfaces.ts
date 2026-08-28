@@ -71,7 +71,26 @@ export function isPublicSurface(surface: Surface): boolean {
 }
 
 /** Card plays live in the fanned hand at the bottom of the screen. */
-const HAND = ['turn/lead', 'turn/surpass', 'turn/copy', 'turn/pivot']
+/*
+ * The card plays, and every other decision whose subject is *your own cards*: seizing by
+ * discarding one, the two-player mulligan, and Farseers' multi-discard. Phase 3 moved the last
+ * three here from the strip — the fan is the decision, so the fan takes the click. The hand is a
+ * private surface, which for seize and Farseers also **fixes a leak**: their option labels name
+ * hand cards, and on the public strip a joined watcher could read them.
+ */
+const HAND = [
+  'turn/lead',
+  'turn/surpass',
+  'turn/copy',
+  'turn/pivot',
+  'turn/seize',
+  'turn/skip-seize',
+  'turn/lattice-seize',
+  'turn/mulligan',
+  'turn/keep-hand',
+  'turn/farseers-pick',
+  'turn/farseers-done',
+]
 
 /** The Leaders and Lore draft, and the Archivist's post-setup draw, each have their own screen. */
 const DRAFT = ['leaders/take']
@@ -202,25 +221,12 @@ const STRIP = [
   'action/lore-sprint-stop',
   'ambition/declare',
   'ambition/skip-declare',
-  'turn/seize',
-  'turn/skip-seize',
-  /*
-   * The two-player mulligan (rulebook p19), a genuine yes/no — docs/15 S6.
-   *
-   * Unclaimed until a real 2-player game reached it, because every config in `surfaces.test.ts` was
-   * three or four players and this offer exists only at two. The invariant is only as wide as the
-   * games the sweep plays, so a 2-player config is added there alongside this.
-   */
-  'turn/mulligan',
-  'turn/keep-hand',
   'turn/bards-declare',
   /*
    * The Farseers flows (docs/20 A3): the discard picker and the declare-time peek. Lists of
    * labelled options, which is exactly what the strip renders; the peek's swap options
    * carry the rival's card names in their labels, so the strip is the "look".
    */
-  'turn/farseers-pick',
-  'turn/farseers-done',
   'ambition/farseers-look',
   'ambition/farseers-take',
   'ambition/farseers-give',
