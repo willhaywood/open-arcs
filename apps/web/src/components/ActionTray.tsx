@@ -40,19 +40,17 @@ import { createPortal } from 'react-dom'
 
 import { asset } from '../assets.js'
 import { store } from '../store.js'
-import { owns } from '../surfaces.js'
+import { useModalDrag } from '../modal-drag.js'
+import { ESCAPES, owns } from '../surfaces.js'
 import { colorOf } from '../theme.js'
 import { cardArt, cardName } from './LeaderCardReader.js'
-
-/** The ways out of a menu, which belong in the tray's footer rather than among the choices. */
-const ESCAPES = ['turn/end', 'action/skip', 'action/cancel', 'battle/cancel']
 
 /**
  * Does the tray draw this Ask?
  *
- * **Exported so `ActionPanel` can ask the same question**, because the two must never both answer
- * it. The battle window's deadlock came from exactly that kind of split: one component hid actions
- * believing another owned them, and on one path neither drew. One predicate, two readers.
+ * One predicate over the shared table, so no two surfaces can ever both answer it. The battle
+ * window's deadlock came from exactly that kind of split: one component hid actions believing
+ * another owned them, and on one path neither drew.
  *
  * The tray owns the pip menu, and any menu offering a **card alt** — those are the menus where
  * provenance is the whole point. Card alts turn out to live one level *down* from the pip menu:
@@ -379,6 +377,7 @@ function SourceModal({
   faction: FactionId
   onClose: () => void
 }): JSX.Element {
+  const drag = useModalDrag()
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
@@ -388,9 +387,18 @@ function SourceModal({
   }, [onClose])
 
   return createPortal(
-    <div className="da-backdrop" onClick={onClose} role="presentation">
-      <div className="da-modal src-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="da-head">
+    <div
+      className={`da-backdrop${drag.dragged ? ' aside' : ''}`}
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        ref={drag.ref}
+        className="da-modal src-modal"
+        style={drag.style}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="da-head" {...drag.handle}>
           <span className="da-title">{sourceName(row)}</span>
           <span className="da-prompt">
             <span style={{ color: colorOf(faction) }}>{faction}</span> — {row.rail.toLowerCase()}{' '}

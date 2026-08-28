@@ -32,7 +32,6 @@ import { asset } from '../assets.js'
 interface Props {
   state: GameState
   cont: Continue
-  highlight: string | undefined
 }
 
 /** Systems a battle may be declared in, from `battle/system` actions — click to fight there. */
@@ -398,7 +397,7 @@ function BotEventMark({
   )
 }
 
-export function Board({ state, cont, highlight }: Props): JSX.Element {
+export function Board({ state, cont }: Props): JSX.Element {
   const systems = state.board.systems.map(systemInfo)
   const { origins, onward } = moveGraph(cont)
   const [from, setFrom] = useState<string | null>(null)
@@ -443,6 +442,19 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
   const repairs = repairTargets(state, cont)
   const repairOut =
     cont.kind === 'ask' && repairs.length > 0
+      ? cont.actions.find((a) => a.type === 'action/skip')
+      : undefined
+  /*
+   * The ways out the side panel used to render alongside these picks. The map owns the asks now,
+   * so their escapes ride in the hint bar: battle's cancel, and the move family's skip — which is
+   * "Cancel" on the opening leg and "Stop here" on a catapult continuation.
+   */
+  const battleOut =
+    cont.kind === 'ask' && battleSys.size > 0
+      ? cont.actions.find((a) => a.type === 'battle/cancel')
+      : undefined
+  const moveOut =
+    cont.kind === 'ask' && (picking || fleet !== null)
       ? cont.actions.find((a) => a.type === 'action/skip')
       : undefined
   // The place bucket serves three cards' asks, so the hint names whichever is actually up.
@@ -680,13 +692,24 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
           })}
         <BotEventLayer state={state} />
       </svg>
-      {highlight ? <div className="board-turn">Turn: {highlight}</div> : null}
       {fleet !== null ? (
         <div className="board-hint">
           Click the ships that carry on to {fleet.to} — the rest stay behind
+          {moveOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(moveOut)}>
+              {String(moveOut['label'] ?? 'Cancel')}
+            </button>
+          ) : null}
         </div>
       ) : battleSys.size > 0 ? (
-        <div className="board-hint battle">Battle — click a system to attack there</div>
+        <div className="board-hint battle">
+          Battle — click a system to attack there
+          {battleOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(battleOut)}>
+              {String(battleOut['label'] ?? 'Cancel')}
+            </button>
+          ) : null}
+        </div>
       ) : repairs.length > 0 ? (
         <div className="board-hint">
           Repair — click the damaged piece to fix it
@@ -733,10 +756,15 @@ export function Board({ state, cont, highlight }: Props): JSX.Element {
       ) : picking ? (
         <div className="board-hint">
           {onward.size > 0
-            ? 'Catapult — click a system to continue, or Stop here'
+            ? 'Catapult — click a system to continue'
             : from === null
               ? 'Click a system to move from'
               : `Moving from ${from} — click a destination`}
+          {moveOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(moveOut)}>
+              {String(moveOut['label'] ?? 'Cancel')}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

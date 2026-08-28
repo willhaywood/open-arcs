@@ -18,6 +18,7 @@ import { createPortal } from 'react-dom'
 
 import { dieArt } from '../dice-art.js'
 import { store } from '../store.js'
+import { useModalDrag } from '../modal-drag.js'
 import { colorOf } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
 import { asset } from '../assets.js'
@@ -80,6 +81,7 @@ function Purse({ dice, keys }: { dice: readonly DieRoll[]; keys: number }): JSX.
 
 export function RaidModal({ cont }: { cont: Continue }): JSX.Element | null {
   const [reading, setReading] = useState<string | null>(null)
+  const drag = useModalDrag()
 
   const takes = cont.kind === 'ask' ? cont.actions.filter((a) => a.type === 'battle/raid-take') : []
   const stop = cont.kind === 'ask' ? cont.actions.find((a) => a.type === 'battle/settle') : undefined
@@ -103,9 +105,9 @@ export function RaidModal({ cont }: { cont: Continue }): JSX.Element | null {
     )
 
   return createPortal(
-    <div className="da-backdrop">
-      <div className="da-modal raid-modal">
-        <div className="da-head">
+    <div className={`da-backdrop${drag.dragged ? ' aside' : ''}`}>
+      <div ref={drag.ref} className="da-modal raid-modal" style={drag.style}>
+        <div className="da-head" {...drag.handle}>
           <span className="da-title">Raid</span>
           <span className="da-prompt">
             <span style={{ color: colorOf(ctx.faction as never) }}>{ctx.faction}</span> is raiding{' '}

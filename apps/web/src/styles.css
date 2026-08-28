@@ -363,6 +363,41 @@ button {
  * to cover the toolbar, leaving Undo/Save/Load enabled but physically unclickable — which is how
  * a battle could become a dead end with no way back. The app's own chrome stays reachable.
  */
+/*
+ * Whose turn it is, dead centre of the topbar. It lived as a grey chip floating over the map's
+ * corner; the header is where the game's chrome says things, and the centre is the one slot
+ * nothing else occupies. Absolutely centred so the flex items either side cannot nudge it.
+ */
+.turn-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.turn-badge-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: rgba(201, 169, 97, 0.65);
+}
+.turn-badge-who {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+/* The centre slot vanishes before it can collide with the left cluster. */
+@media (max-width: 900px) {
+  .turn-badge {
+    display: none;
+  }
+}
+
 .topbar {
   position: relative;
   z-index: 400;
@@ -544,11 +579,13 @@ button {
 }
 /* The side column gives ground first — it is text, and text survives being narrower than
    the board does. */
+/* One column: the side panel is gone, the board owns the width. The drawer anchors here. */
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(220px, 21vw, 300px);
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
+  position: relative;
 }
 /* Board area: play rail | map | ambitions, with the hand on its own row beneath, so
    nothing overlaps the map at rest. */
@@ -637,15 +674,6 @@ button {
   justify-content: safe center;
   gap: 10px;
 }
-/* Actions sized to content, log takes the rest and scrolls. */
-.side-col {
-  border-left: 1px solid var(--line);
-  background: var(--panel);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-height: 0;
-}
-
 /* --- court (left rail, beside the played cards) --- */
 .court-rail {
   grid-area: court;
@@ -1036,16 +1064,6 @@ button {
   fill: var(--text);
   font-weight: 700;
 }
-.board-turn {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 4px 10px;
-  border-radius: 8px;
-  color: var(--muted);
-}
-
 /* --- round play area (left of the board, after the physical board's slots) --- */
 :root {
   --gold: #c9a961;
@@ -2020,17 +2038,6 @@ button {
   margin-top: 6px;
 }
 
-/* --- actions --- */
-/* `overflow-y: auto` alone does nothing in an `auto` grid row — the panel just grows. A
-   long menu (a Move offers one option per origin-destination pair) then spills over the map
-   at narrow widths. The cap is what makes it actually scroll. */
-.actions {
-  padding: 12px;
-  max-height: 46vh;
-  overflow-y: auto;
-  border-bottom: 1px solid var(--line);
-}
-
 /* --- clicking the map to move ---
    One colour, not two. Blue-for-origin and gold-for-destination read as two unrelated
    systems of meaning on a map that already uses gold for its own frames and four faction
@@ -2271,7 +2278,8 @@ button {
 /* Motion is decoration here; the reticles still read by colour and weight without it. */
 @media (prefers-reduced-motion: reduce) {
   .ret-sweep,
-  .route-flow {
+  .route-flow,
+  .log-drawer {
     animation: none;
   }
   /* The event ring holds at full size and just unmounts; the flash is a steady outline instead. */
@@ -2363,64 +2371,101 @@ button {
   border-color: rgba(224, 96, 78, 0.55);
   color: #e8907f;
 }
-.ask-head {
+/*
+ * The AskStrip: the fallback decision surface, in the trays' band. The rail carries who and the
+ * engine's prompt; the middle wraps and scrolls like the tray rows; escapes sit on the right as
+ * the way-out button. The category tint the old panel wore survives as a coloured left edge.
+ */
+.ask-strip .at-head {
+  max-width: 220px;
+}
+.ask-strip .at-sub {
+  white-space: normal;
+  line-height: 1.35;
+}
+.strip-actions {
+  flex: 1;
+  min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 6px 10px;
+  max-height: 78px;
+  overflow-y: auto;
 }
-.prompt {
-  color: var(--muted);
-  font-size: 14px;
-}
-.action-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.action-btn {
+.strip-btn {
+  font-family: inherit;
   text-align: left;
-  padding: 9px 12px;
+  padding: 5px 10px;
   background: var(--panel-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--text);
-  font-size: 14px;
+  font-size: 12.5px;
+  cursor: pointer;
 }
-.action-btn:hover {
+.strip-btn:hover {
   border-color: var(--accent);
 }
-.action-btn.muted {
-  color: var(--muted);
-}
-.action-btn.card {
+.strip-btn.card {
   border-left: 3px solid #6ea8ff;
 }
-.action-btn.ambition {
+.strip-btn.ambition {
   border-left: 3px solid #e0a92e;
 }
-.action-btn.battle {
+.strip-btn.battle {
   border-left: 3px solid #d94b3f;
 }
-.action-btn.act {
+.strip-btn.act {
   border-left: 3px solid #5b8a44;
 }
-.game-over {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px 0;
+/* The strip's game-over band: the persistent result line after the summary screen closes. */
+.strip-over {
+  align-items: center;
 }
-.go-title {
-  font-size: 26px;
-  font-weight: 800;
+.strip-over-title {
+  color: var(--gold);
 }
-.go-reason {
+.strip-reason {
   color: var(--muted);
+  font-size: 13px;
+}
+.ask-strip .at-end.strip-primary {
+  color: #14100a;
+  background: var(--gold);
 }
 
-/* --- log --- */
+/* --- log: the toggle drawer the side column became --- */
+.log-drawer {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: clamp(260px, 24vw, 340px);
+  z-index: 260; /* over the boards (50) and trays (45); under decision modals (300+) and topbar (400) */
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.5);
+  animation: log-slide 160ms ease-out;
+}
+@keyframes log-slide {
+  from {
+    transform: translateX(100%);
+  }
+}
+.log-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
 .log {
   padding: 10px 12px;
   overflow-y: auto;
@@ -2723,6 +2768,11 @@ button {
 
 /* --- battle resolution modal (dice + both fleets) ------------------------- */
 
+/* Dragged aside to look at the board: the dim thins so the look is worth something. */
+.da-backdrop.aside {
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: none;
+}
 .da-backdrop {
   position: fixed;
   inset: 0;

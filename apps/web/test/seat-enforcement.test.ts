@@ -280,7 +280,7 @@ describe('acting and watching are different questions', () => {
    * file treated that as a reason to hide it — which reintroduced the original regression for every
    * action type the table had not got round to. `turn/mulligan` was one: offered only at two
    * players, so no sweep played it, so nobody claimed it, so a watcher sat on an empty prompt while
-   * the actor played on through `ActionPanel`, which draws unclaimed asks deliberately.
+   * the actor played on through the fallback strip, which draws unclaimed asks deliberately.
    *
    * Hiding is the dangerous default here, and the asymmetry is the argument: an unclaimed *public*
    * ask is the normal case and blanking it kills the screen, while an unclaimed *private* one
@@ -294,9 +294,9 @@ describe('acting and watching are different questions', () => {
   })
 
   it('draws the two-player mulligan for the player who is not being offered it', () => {
-    // The reported case, by its real action types — which are now claimed by the panel.
+    // The reported case, by its real action types — which are now claimed by the strip.
     const theirs = askOf('blue', 'turn/mulligan', 'turn/keep-hand')
-    expect(surfaceFor(theirs)).toBe('panel')
+    expect(surfaceFor(theirs)).toBe('strip')
     expect(viewFor(theirs, SEAT)).toBe(theirs)
     expect(canAct(theirs, SEAT)).toBe(false)
   })

@@ -76,7 +76,7 @@ export function viewFor(cont: Continue, view: SeatView): Continue {
      * The first cut treated `undefined` as private and blanked it, which reintroduced the very
      * regression this file was rewritten to fix — just narrowed to whatever `surfaces.ts` had not
      * got round to claiming. The two-player mulligan was exactly that: unclaimed, so a watcher sat
-     * on an empty prompt for it while the actor, whose `ActionPanel` draws unclaimed asks on
+     * on an empty prompt for it while the actor, whose `AskStrip` draws unclaimed asks on
      * purpose, played on.
      *
      * The two failure modes are not symmetric. Defaulting to hidden costs a dead-looking screen on
