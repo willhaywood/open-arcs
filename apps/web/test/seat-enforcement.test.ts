@@ -293,11 +293,17 @@ describe('acting and watching are different questions', () => {
     expect(viewFor(unclaimed, WATCHING)).toBe(unclaimed)
   })
 
-  it('draws the two-player mulligan for the player who is not being offered it', () => {
-    // The reported case, by its real action types — which are now claimed by the strip.
+  it('withholds the two-player mulligan from the player who is not being offered it', () => {
+    /*
+     * This test once asserted the opposite — a watcher's screen went blank on the then-unclaimed
+     * mulligan, and the fix was drawing it on the public fallback surface. Phase 3 moved it onto
+     * the **hand**, which is private: the mulligan is a judgment about the cards in your hand,
+     * and the fan it now renders over is exactly the zone a rival may not see. The rival loses
+     * only a yes/no spinner; the seat badge still says who is being waited on.
+     */
     const theirs = askOf('blue', 'turn/mulligan', 'turn/keep-hand')
-    expect(surfaceFor(theirs)).toBe('strip')
-    expect(viewFor(theirs, SEAT)).toBe(theirs)
+    expect(surfaceFor(theirs)).toBe('hand')
+    expect(viewFor(theirs, SEAT)).toEqual({ ...theirs, actions: [] })
     expect(canAct(theirs, SEAT)).toBe(false)
   })
 
