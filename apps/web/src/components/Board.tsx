@@ -132,29 +132,121 @@ function repairTargets(
   if (cont.kind !== 'ask') return []
   const repairs = cont.actions.filter((a) => a.type === 'action/repair')
   if (repairs.length === 0) return []
-  const byGroup = new Map<string, { system: string; piece: string; action: Action }>()
+  const byGroup = new Map<string, { system: string; piece: string; figure?: string; action: Action }>()
   for (const a of repairs) {
     const id = String(a['figure'])
     const loc = state.figures.at.get(id)
     if (loc === undefined || !loc.startsWith('system:')) continue
     const system = loc.slice('system:'.length)
     const piece = parseFigureId(id).piece
-    const key = `${system}/${piece}`
-    if (!byGroup.has(key)) byGroup.set(key, { system, piece, action: a })
+    // Buildings sit one per slot, so each damaged one is its own target; a ship stack is one.
+    const building = piece === 'City' || piece === 'Starport'
+    const key = building ? id : `${system}/${piece}`
+    if (!byGroup.has(key)) {
+      byGroup.set(key, { system, piece, ...(building ? { figure: id } : {}), action: a })
+    }
   }
-  return [...byGroup.values()].map((t) => {
-    const s = systemInfo(t.system)
-    const items = slotsAndPieces(state, t.system, groupPieces(state, t.system))
-    const pos = positionsFor(s, items)
-    const i = items.findIndex(
-      (it) =>
-        it.kind === 'piece' &&
-        it.group.damaged &&
-        it.group.piece === t.piece &&
-        it.group.color === cont.faction,
+  return [...byGroup.values()].map((t) => ({
+    system: t.system,
+    piece: t.piece,
+    action: t.action,
+    at: stackPosition(state, t.system, cont.faction, t.piece, true, t.figure),
+  }))
+}
+
+/**
+ * Where a colour's stack of `piece` (damaged or fresh) is drawn in a system — the token the
+ * player is looking at, resolved with the same layout functions that placed it.
+ */
+function stackPosition(
+  state: GameState,
+  system: string,
+  color: string,
+  piece: string,
+  damaged: boolean,
+  /** For a building, the exact token — buildings are singleton groups carrying their figure id. */
+  figure?: string,
+): readonly [number, number] {
+  const s = systemInfo(system)
+  const items = slotsAndPieces(state, system, groupPieces(state, system))
+  const pos = positionsFor(s, items)
+  const i = items.findIndex(
+    (it) =>
+      it.kind === 'piece' &&
+      (figure !== undefined
+        ? it.group.figure === figure
+        : it.group.piece === piece && it.group.color === color && it.group.damaged === damaged),
+  )
+  return i >= 0 ? pos[i]! : s.render.anchor
+}
+
+/**
+ * Tax, Song of Freedom and Prune: the pick is a specific city or building, so the click target
+ * is the piece itself — the same treatment Repair got. One target per visible stack: identical
+ * pieces of one colour draw as one token, and acting on any of them is the same act, so the
+ * first option of each stack stands for it.
+ *
+ * Inspiring's empty-slot tax names a slot rather than a figure; that target falls back to the
+ * system's anchor, which is where the empty slot markers sit.
+ */
+const PIECE_PICK_TYPES = ['action/tax-city', 'vox/free-city', 'action/lore-prune']
+
+function piecePickTargets(
+  state: GameState,
+  cont: Continue,
+): { key: string; type: string; at: readonly [number, number]; action: Action; title: string }[] {
+  if (cont.kind !== 'ask') return []
+  const picks = cont.actions.filter((a) => PIECE_PICK_TYPES.includes(a.type))
+  const out = new Map<
+    string,
+    { key: string; type: string; at: readonly [number, number]; action: Action; title: string }
+  >()
+  for (const a of picks) {
+    const id = String(a['city'] ?? a['figure'] ?? '')
+    const loc = state.figures.at.get(id)
+    const system = String(
+      a['system'] ?? (loc !== undefined && loc.startsWith('system:') ? loc.slice(7) : ''),
     )
-    return { ...t, at: i >= 0 ? pos[i]! : s.render.anchor }
-  })
+    if (system === '') continue
+    let key: string
+    let at: readonly [number, number]
+    try {
+      const f = parseFigureId(id)
+      const damaged = state.damaged.includes(id)
+      const building = f.piece === 'City' || f.piece === 'Starport'
+      // A building is its own token in its own slot, so every one gets its own ring.
+      key = building ? `${a.type}/${id}` : `${a.type}/${system}/${f.color}/${f.piece}/${damaged}`
+      at = stackPosition(state, system, f.color, f.piece, damaged, building ? id : undefined)
+    } catch {
+      // Not a figure (an Inspiring slot): anchor the target to the system itself.
+      key = `${a.type}/${system}/slot`
+      at = systemInfo(system).render.anchor
+    }
+    if (!out.has(key)) {
+      out.set(key, { key, type: a.type, at, action: a, title: String(a['label'] ?? a.type) })
+    }
+  }
+  return [...out.values()]
+}
+
+/** Build: the systems something could go up in, each carrying its options for the popover. */
+function buildPicks(cont: Continue): Map<string, Action[]> {
+  const m = new Map<string, Action[]>()
+  if (cont.kind !== 'ask') return m
+  for (const a of cont.actions) {
+    if (a.type !== 'action/build') continue
+    const s = String(a['system'])
+    m.set(s, [...(m.get(s) ?? []), a])
+  }
+  return m
+}
+
+/** The option's label without the system the popover is already standing on. */
+function buildChipLabel(a: Action): string {
+  return String(a['label'] ?? a['piece'])
+    .replace(/ (?:in|on) [-\w]+/, '')
+    .replace(/^Build /, '')
+    .replace(/^Summon /, '')
 }
 
 /**
@@ -431,7 +523,10 @@ export function Board({ state, cont }: Props): JSX.Element {
 
   // A new decision invalidates any half-made selection.
   const askKey = cont.kind === 'ask' ? `${cont.faction}:${cont.actions.length}` : cont.kind
-  useEffect(() => setFrom(null), [askKey])
+  useEffect(() => {
+    setFrom(null)
+    setBuildAt(null)
+  }, [askKey])
 
   const picking = origins.size > 0 || onward.size > 0
   const dests = from === null ? undefined : origins.get(from)
@@ -440,6 +535,10 @@ export function Board({ state, cont }: Props): JSX.Element {
   const rifles = riflesSystems(cont)
   const uprising = uprisingSystems(state, cont)
   const repairs = repairTargets(state, cont)
+  const piecePicks = piecePickTargets(state, cont)
+  const builds = buildPicks(cont)
+  // Which system's build popover is open. Reset with the ask, like `from`.
+  const [buildAt, setBuildAt] = useState<string | null>(null)
   const repairOut =
     cont.kind === 'ask' && repairs.length > 0
       ? cont.actions.find((a) => a.type === 'action/skip')
@@ -456,6 +555,14 @@ export function Board({ state, cont }: Props): JSX.Element {
   const moveOut =
     cont.kind === 'ask' && (picking || fleet !== null)
       ? cont.actions.find((a) => a.type === 'action/skip')
+      : undefined
+  const buildOut =
+    cont.kind === 'ask' && builds.size > 0
+      ? cont.actions.find((a) => a.type === 'action/skip')
+      : undefined
+  const pieceOut =
+    cont.kind === 'ask' && piecePicks.length > 0
+      ? cont.actions.find((a) => a.type === 'action/skip' || a.type === 'vox/done')
       : undefined
   // The place bucket serves three cards' asks, so the hint names whichever is actually up.
   const placeType = [...uprising.map.values()][0]?.type
@@ -643,6 +750,50 @@ export function Board({ state, cont }: Props): JSX.Element {
           </g>
         ))}
 
+        {/* Build — the systems something could go up in; the popover offers the pieces. */}
+        {[...builds.entries()].map(([id, opts]) => {
+          const { cx, cy, r } = centreOf(state, id)
+          return (
+            <g
+              key={`build-${id}`}
+              className={`sys-hit${buildAt === id ? ' selected' : ''}`}
+              onClick={() => {
+                if (opts.length === 1) {
+                  setBuildAt(null)
+                  store.apply(opts[0]!)
+                } else {
+                  setBuildAt(buildAt === id ? null : id)
+                }
+              }}
+            >
+              <title>{opts.length === 1 ? String(opts[0]!['label']) : `Build in ${id}…`}</title>
+              <Reticle cx={cx} cy={cy} kind={buildAt === id ? 'locked' : 'dest'} />
+              <circle className="sys-target" cx={cx} cy={cy} r={r} />
+            </g>
+          )
+        })}
+        {buildAt !== null && builds.has(buildAt) ? (
+          <ChoicePopover
+            state={state}
+            system={buildAt}
+            options={builds.get(buildAt)!.map((a) => ({ label: buildChipLabel(a), full: String(a['label'] ?? ''), action: a }))}
+            scale={unitsPerPx}
+            onPick={(a) => {
+              setBuildAt(null)
+              store.apply(a)
+            }}
+          />
+        ) : null}
+
+        {/* Tax, Song of Freedom, Prune — the city or building itself, ringed. */}
+        {piecePicks.map((t) => (
+          <g key={t.key} className="sys-hit" onClick={() => store.apply(t.action)}>
+            <title>{t.title}</title>
+            <Reticle cx={t.at[0]} cy={t.at[1]} kind="dest" />
+            <circle className="sys-target" cx={t.at[0]} cy={t.at[1]} r={110} />
+          </g>
+        ))}
+
         {/* Battle — systems you may fight in: click the system to attack there. */}
         {battleSys.size > 0 &&
           [...battleSys.entries()].map(([id, action]) => {
@@ -719,6 +870,30 @@ export function Board({ state, cont }: Props): JSX.Element {
             </button>
           ) : null}
         </div>
+      ) : builds.size > 0 ? (
+        <div className="board-hint">
+          {buildAt === null
+            ? 'Build — click a system'
+            : `Building in ${buildAt} — pick what goes up`}
+          {buildOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(buildOut)}>
+              {String(buildOut['label'] ?? 'Cancel')}
+            </button>
+          ) : null}
+        </div>
+      ) : piecePicks.length > 0 ? (
+        <div className="board-hint">
+          {piecePicks[0]!.type === 'action/tax-city'
+            ? 'Tax — click a city'
+            : piecePicks[0]!.type === 'vox/free-city'
+              ? 'Song of Freedom — click a city to free it'
+              : 'Prune — click the building to swap it'}
+          {pieceOut !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(pieceOut)}>
+              {String(pieceOut['label'] ?? 'Cancel')}
+            </button>
+          ) : null}
+        </div>
       ) : uprising.map.size > 0 ? (
         <div className="board-hint battle">
           {uprising.kind === 'cluster'
@@ -779,6 +954,79 @@ export function Board({ state, cont }: Props): JSX.Element {
  * make the trade-off visible, because the gap between the row you pick and the row above it
  * *is* the detachment you are leaving behind.
  */
+/**
+ * A short menu pinned to a system — Build's "which piece goes up here?".
+ *
+ * The FleetPicker's shape (a fixed-CSS-size panel beside the system, rows you click) with
+ * labelled chips instead of ship rows: build options are heterogeneous (City, Starport, a Cloud
+ * City with its price, an Annex), so words carry them better than icons would.
+ */
+function ChoicePopover({
+  state,
+  system,
+  options,
+  scale,
+  onPick,
+}: {
+  state: GameState
+  system: string
+  options: { label: string; full: string; action: Action }[]
+  scale: number
+  onPick: (a: Action) => void
+}): JSX.Element {
+  const target = centreOf(state, system)
+  const px = (n: number): number => n * scale
+  const ROW_H = px(30)
+  const PAD = px(9)
+  const CHAR_W = px(7.4)
+  const widest = Math.max(...options.map((o) => o.label.length))
+  const boxW = PAD * 2 + widest * CHAR_W + px(16)
+  const boxH = options.length * ROW_H + PAD * 2
+
+  let top = target.cy - target.r - boxH - px(12)
+  if (top < px(8)) top = target.cy + target.r + px(12)
+  const left = Math.min(Math.max(px(8), target.cx - boxW / 2), MAP_SIZE.width - boxW - px(8))
+
+  return (
+    <g className="choice-popover">
+      <rect
+        className="fp-box"
+        x={left}
+        y={top}
+        width={boxW}
+        height={boxH}
+        rx={px(10)}
+        style={{ strokeWidth: px(2) }}
+      />
+      {options.map((o, i) => {
+        const rowY = top + PAD + i * ROW_H
+        return (
+          <g key={i} className="cp-row" onClick={() => onPick(o.action)}>
+            <title>{o.full}</title>
+            <rect
+              className="cp-chip"
+              x={left + PAD}
+              y={rowY + px(2)}
+              width={boxW - PAD * 2}
+              height={ROW_H - px(6)}
+              rx={px(6)}
+              style={{ strokeWidth: px(1) }}
+            />
+            <text
+              className="cp-label"
+              x={left + PAD + px(8)}
+              y={rowY + ROW_H / 2 + px(4)}
+              style={{ fontSize: px(13) }}
+            >
+              {o.label}
+            </text>
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
 function FleetPicker({
   state,
   choice,
@@ -940,6 +1188,8 @@ interface PieceGroup {
   piece: string
   damaged: boolean
   count: number
+  /** Set for buildings, which never stack — each City/Starport is its own token in its own slot. */
+  figure?: string
 }
 
 /**
@@ -1044,8 +1294,17 @@ function groupPieces(state: GameState, systemId: string): PieceGroup[] {
   for (const id of ids) {
     const f = parseFigureId(id)
     const damaged = state.damaged.includes(id)
-    const key = `${f.color}/${f.piece}/${damaged ? 'dmg' : 'ok'}`
-    const g = map.get(key) ?? { key, color: f.color, piece: f.piece, damaged, count: 0 }
+    /*
+     * Buildings do not stack. The planet prints one slot per building, so each City and
+     * Starport is its own token standing in its own slot — two Cities drawn as one token with a
+     * x2 badge left a printed slot looking empty. Ships and agents keep stacking: a fleet is a
+     * pile, a building is an address.
+     */
+    const single = f.piece === 'City' || f.piece === 'Starport'
+    const key = single ? id : `${f.color}/${f.piece}/${damaged ? 'dmg' : 'ok'}`
+    const g =
+      map.get(key) ??
+      ({ key, color: f.color, piece: f.piece, damaged, count: 0, ...(single ? { figure: id } : {}) } as PieceGroup)
     g.count++
     map.set(key, g)
   }

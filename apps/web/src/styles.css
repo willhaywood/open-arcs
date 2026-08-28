@@ -2187,6 +2187,24 @@ button {
   stroke: rgba(224, 96, 78, 0.9);
 }
 
+/* The build popover's chips — the FleetPicker's panel with words instead of hulls. */
+.cp-row {
+  cursor: pointer;
+}
+.cp-chip {
+  fill: rgba(255, 255, 255, 0.04);
+  stroke: rgba(201, 169, 97, 0.45);
+  transition: fill 0.12s ease, stroke 0.12s ease;
+}
+.cp-row:hover .cp-chip {
+  fill: rgba(201, 169, 97, 0.16);
+  stroke: var(--gold);
+}
+.cp-label {
+  fill: var(--text);
+  pointer-events: none;
+}
+
 /* --- movement routes --- */
 .route {
   pointer-events: none;
