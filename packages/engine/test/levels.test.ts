@@ -18,6 +18,7 @@ import {
   easyBot,
   playGameAt,
   standardBot,
+  mobileBot,
   startGame,
 } from '../src/index.js'
 import { NO_ASKS, stepBot } from '../src/ai/play.js'
@@ -33,7 +34,8 @@ describe('the ladder', () => {
       expect(typeof botForLevel(level).decide, `${level} resolves`).toBe('function')
     }
     expect(botForLevel(undefined)).toBe(botForLevel('normal'))
-    expect(botForLevel('normal')).toBe(standardBot)
+    // Normal is standard plus the move-reversal penalty — the anti-circling rung (mobile.ts).
+    expect(botForLevel('normal')).toBe(mobileBot)
   })
 
   it('adjacent levels are different opponents on a real position', () => {

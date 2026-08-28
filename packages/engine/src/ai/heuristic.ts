@@ -221,7 +221,10 @@ export function heuristicBotWith(
             )
           : undefined
       const exposure = risk === undefined ? 0 : risk.chance * risk.hits * INTERCEPT_RISK
-      const score = gained + probe.actionsAhead * PIP_VALUE - exposure
+      // Undoing this turn's own movement leg pays twice for nothing; weighted, zero in the
+      // baseline, so the term is inert everywhere it has not been measured on.
+      const undo = probe.undoes === true ? (weights.moveReversal ?? 0) : 0
+      const score = gained + probe.actionsAhead * PIP_VALUE - exposure - undo
       /*
        * **A repeating action must strictly improve the position to be eligible at all.**
        *

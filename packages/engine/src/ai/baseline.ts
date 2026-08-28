@@ -53,6 +53,11 @@ export const BASELINE_WEIGHTS: Weights = {
   starports: 1.2,
   shipsFresh: 0.35,
   shipsDamaged: 0.1,
+  // Positional signals added after the freeze, at the same zero they carry in WEIGHTS — the
+  // baseline still cannot see position, exactly as frozen.
+  gatesHeld: 0,
+  fleetThreat: 0,
+  moveReversal: 0,
   courtSecured: 1,
   courtClaimAhead: 0.25,
   courtClaimLevel: 0.12,

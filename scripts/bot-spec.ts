@@ -10,7 +10,8 @@
  * measuring one thing and printing another, and nothing downstream could tell.
  */
 
-import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, easyBot, goalBot, handBot, threatBot, standardBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, searchBot, trivialBot, weaponBot } from '@arcs/engine'
+import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, easyBot, goalBot, handBot, threatBot, standardBot,
+  mobileBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, searchBot, trivialBot, weaponBot } from '@arcs/engine'
 import type { Bot, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
@@ -29,6 +30,7 @@ export type BotSpec =
   | { readonly kind: 'lore' }
   | { readonly kind: 'cost' }
   | { readonly kind: 'standard' }
+  | { readonly kind: 'mobile' }
   | { readonly kind: 'rival' }
   | { readonly kind: 'weapon' }
   | { readonly kind: 'easy' }
@@ -74,6 +76,8 @@ export function buildBot(spec: BotSpec): Bot {
       return declareCostBot
     case 'standard':
       return standardBot
+    case 'mobile':
+      return mobileBot
     case 'rival':
       return rivalBot
     case 'weapon':
@@ -127,6 +131,7 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'lore') return { kind: 'lore' }
   if (kind === 'cost') return { kind: 'cost' }
   if (kind === 'standard') return { kind: 'standard' }
+  if (kind === 'mobile') return { kind: 'mobile' }
   if (kind === 'rival') return { kind: 'rival' }
   if (kind === 'weapon') return { kind: 'weapon' }
   if (kind === 'easy') return { kind: 'easy' }

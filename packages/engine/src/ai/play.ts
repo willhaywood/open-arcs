@@ -106,9 +106,15 @@ export interface AskedThisTurn {
   readonly turn: string
   /** Prompt to the position it was first asked at, within this turn. */
   readonly prompts: ReadonlyMap<string, number>
+  /**
+   * Movement legs already taken this turn, oldest first. What a "don't undo your own move" term
+   * reads: the prompts above encode which *questions* were asked, never which systems the fleet
+   * came from, and the circling bug lived exactly in that blindness.
+   */
+  readonly moves: readonly { from: string; to: string }[]
 }
 
-export const NO_ASKS: AskedThisTurn = { turn: '', prompts: new Map() }
+export const NO_ASKS: AskedThisTurn = { turn: '', prompts: new Map(), moves: [] }
 
 /**
  * Which turn a position is in.
@@ -787,6 +793,10 @@ export function stepBot(
           ...settledSamples(result.state, action, faction, reg, resolve),
         ],
         repeats: at !== undefined && at >= depth,
+        undoes:
+          action.type === 'action/move-pick' &&
+          history === asked.prompts &&
+          asked.moves.some((m) => m.from === action['to'] && m.to === action['from']),
         actionsAhead: pipsAhead(settled.continue, faction),
       }
     } catch {
@@ -801,10 +811,18 @@ export function stepBot(
     explore,
     foresee,
   )
+  const moves = asked.turn === turn ? asked.moves : []
   return {
     result: applyExternal(result, decision.action, registry),
     decision,
-    asked: { turn, prompts: seen },
+    asked: {
+      turn,
+      prompts: seen,
+      moves:
+        decision.action.type === 'action/move-pick'
+          ? [...moves, { from: String(decision.action['from']), to: String(decision.action['to']) }]
+          : moves,
+    },
   }
 }
 
