@@ -36,6 +36,7 @@ import { asset } from '../assets.js'
 import { shelfParts } from '../court-slot.js'
 import type { CourtSlot } from '../court-slot.js'
 import { store } from '../store.js'
+import { useModalDrag } from '../modal-drag.js'
 import { owns } from '../surfaces.js'
 import { colorOf, figureArt } from '../theme.js'
 import { CardZoom } from './CardZoom.js'
@@ -78,6 +79,7 @@ function detail(faction: string, prompt: string | undefined, title: string): str
 
 export function CardShelf({ state, cont }: { state: GameState; cont: Continue }): JSX.Element | null {
   const [reading, setReading] = useState<string | null>(null)
+  const drag = useModalDrag()
 
   if (cont.kind !== 'ask' || !owns('shelf', cont)) return null
 
@@ -93,9 +95,9 @@ export function CardShelf({ state, cont }: { state: GameState; cont: Continue })
   const copy = COPY[items[0]!.action.type] ?? { title: 'Court', note: '' }
 
   return createPortal(
-    <div className="da-backdrop">
-      <div className="da-modal shelf-modal">
-        <div className="da-head">
+    <div className={`da-backdrop${drag.dragged ? ' aside' : ''}`}>
+      <div ref={drag.ref} className="da-modal shelf-modal" style={drag.style}>
+        <div className="da-head" {...drag.handle}>
           <span className="da-title">{copy.title}</span>
           <span className="da-prompt">
             <span style={{ color: colorOf(cont.faction) }}>{cont.faction}</span>

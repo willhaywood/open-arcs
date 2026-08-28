@@ -35,6 +35,7 @@ import { createPortal } from 'react-dom'
 import { CITIES_PER_FACTION, groupSlots, slotRow } from '../slots.js'
 import type { SlotInfo } from '../slots.js'
 import { store } from '../store.js'
+import { useModalDrag } from '../modal-drag.js'
 import { colorOf, figureArt } from '../theme.js'
 import { asset } from '../assets.js'
 
@@ -55,6 +56,7 @@ interface Move {
 
 export function SlotBoard({ state, cont }: { state: GameState; cont: Continue }): JSX.Element | null {
   /** The token in the air, if any, and where the pointer has dragged it — null until it moves. */
+  const drag = useModalDrag()
   const [held, setHeld] = useState<string | null>(null)
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
   // Pointer handlers are bound to the window and must read the current lift without re-binding.
@@ -165,9 +167,18 @@ export function SlotBoard({ state, cont }: { state: GameState; cont: Continue })
   const legal = (slot: string): boolean => held !== null && moveFor(held, slot) !== undefined
 
   return createPortal(
-    <div className="da-backdrop" onClick={() => put(null)} role="presentation">
-      <div className="da-modal sb-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="da-head">
+    <div
+      className={`da-backdrop${drag.dragged ? ' aside' : ''}`}
+      onClick={() => put(null)}
+      role="presentation"
+    >
+      <div
+        ref={drag.ref}
+        className="da-modal sb-modal"
+        style={drag.style}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="da-head" {...drag.handle}>
           <span className="da-title">Resource slots</span>
           <span className="da-prompt" style={{ color: colorOf(faction as FactionId) }}>
             {cont.prompt ?? faction}

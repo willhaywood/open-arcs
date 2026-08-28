@@ -2768,6 +2768,11 @@ button {
 
 /* --- battle resolution modal (dice + both fleets) ------------------------- */
 
+/* Dragged aside to look at the board: the dim thins so the look is worth something. */
+.da-backdrop.aside {
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: none;
+}
 .da-backdrop {
   position: fixed;
   inset: 0;

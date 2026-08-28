@@ -40,6 +40,7 @@ import { createPortal } from 'react-dom'
 
 import { asset } from '../assets.js'
 import { store } from '../store.js'
+import { useModalDrag } from '../modal-drag.js'
 import { ESCAPES, owns } from '../surfaces.js'
 import { colorOf } from '../theme.js'
 import { cardArt, cardName } from './LeaderCardReader.js'
@@ -376,6 +377,7 @@ function SourceModal({
   faction: FactionId
   onClose: () => void
 }): JSX.Element {
+  const drag = useModalDrag()
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
@@ -385,9 +387,18 @@ function SourceModal({
   }, [onClose])
 
   return createPortal(
-    <div className="da-backdrop" onClick={onClose} role="presentation">
-      <div className="da-modal src-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="da-head">
+    <div
+      className={`da-backdrop${drag.dragged ? ' aside' : ''}`}
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        ref={drag.ref}
+        className="da-modal src-modal"
+        style={drag.style}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="da-head" {...drag.handle}>
           <span className="da-title">{sourceName(row)}</span>
           <span className="da-prompt">
             <span style={{ color: colorOf(faction) }}>{faction}</span> — {row.rail.toLowerCase()}{' '}

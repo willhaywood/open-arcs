@@ -25,6 +25,7 @@ import { useMemo, useState } from 'react'
 
 import { dieArt } from '../dice-art.js'
 import { store } from '../store.js'
+import { useModalDrag } from '../modal-drag.js'
 import { colorOf, textOn } from '../theme.js'
 import { owns } from '../surfaces.js'
 import { DamageAssign, Forces } from './DamageAssign.js'
@@ -162,10 +163,11 @@ function Shell({
   enemy: string | undefined
   children: React.ReactNode
 }): JSX.Element {
+  const drag = useModalDrag()
   return (
-    <div className="da-backdrop">
-      <div className="da-modal">
-        <div className="da-head">
+    <div className={`da-backdrop${drag.dragged ? ' aside' : ''}`}>
+      <div ref={drag.ref} className="da-modal" style={drag.style}>
+        <div className="da-head" {...drag.handle}>
           <span className="da-title">{system === undefined ? 'Battle' : `Battle in ${system}`}</span>
           <span className="da-vs">
             {faction !== undefined ? <Swatch color={faction} /> : null}
