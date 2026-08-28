@@ -1331,58 +1331,6 @@ button {
   pointer-events: auto;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
 }
-/*
- * The mode banner: the prompt and the way out for a hand-shaped ask (seize, mulligan,
- * Farseers), pinned over the top of the fan. Above resting cards, below a hover-raised one
- * (z 100), so studying a card still brings it clear of the chrome.
- */
-.hand-banner {
-  position: absolute;
-  top: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-  background: linear-gradient(rgba(14, 17, 24, 0.94), rgba(10, 12, 18, 0.97));
-  border: 1px solid rgba(201, 169, 97, 0.55);
-  border-radius: 8px;
-  padding: 6px 14px;
-  z-index: 60;
-}
-.hand-banner-text {
-  font-family: var(--font-display);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--gold);
-}
-.hand-banner-btn {
-  font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #14100a;
-  background: var(--gold);
-  border: 1px solid var(--gold);
-  border-radius: 6px;
-  padding: 5px 12px;
-  cursor: pointer;
-}
-.hand-banner-btn:hover {
-  filter: brightness(1.08);
-}
-.hand-banner-btn.ghosted {
-  color: var(--gold);
-  background: none;
-  border-color: rgba(201, 169, 97, 0.55);
-}
-.hand-banner-btn.ghosted:hover {
-  background: rgba(201, 169, 97, 0.14);
-}
 /* A card already clicked into Farseers' discard pile. */
 .hand-card.picked {
   opacity: 0.45;

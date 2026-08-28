@@ -24,6 +24,7 @@ import type { Action, Continue, GameState, SystemInfo } from '@arcs/engine'
 import { useEffect, useRef, useState } from 'react'
 
 import { store, useBotUi } from '../store.js'
+import { modeOf } from './Hand.js'
 import { caption, derivePlacement, liveEvents } from '../bot-events.js'
 import type { BotEvent } from '../bot-events.js'
 import { colorOf, figureArt } from '../theme.js'
@@ -560,6 +561,14 @@ export function Board({ state, cont }: Props): JSX.Element {
     cont.kind === 'ask' && builds.size > 0
       ? cont.actions.find((a) => a.type === 'action/skip')
       : undefined
+  /*
+   * The hand-shaped asks (seize, the mulligan, Farseers). The cards live on the fan, but their
+   * prompt and every way out belong up here, in the hint bar — the fan is a field of costly
+   * click targets, and a button an inch from a card that seizes on contact was a misclick trap.
+   * A watcher's view has these asks' actions emptied, so the mode reads as plain and no hint
+   * (or hand information) renders for them.
+   */
+  const handMode = modeOf(cont)
   const pieceOut =
     cont.kind === 'ask' && piecePicks.length > 0
       ? cont.actions.find((a) => a.type === 'action/skip' || a.type === 'vox/done')
@@ -851,6 +860,37 @@ export function Board({ state, cont }: Props): JSX.Element {
               {String(moveOut['label'] ?? 'Cancel')}
             </button>
           ) : null}
+        </div>
+      ) : handMode.kind === 'seize' ? (
+        <div className="board-hint">
+          Seize the initiative — press Seize on a card below
+          {handMode.lattice !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(handMode.lattice!)}>
+              {String(handMode.lattice['label'] ?? 'Seize with Lattice Spies')}
+            </button>
+          ) : null}
+          {handMode.out !== undefined ? (
+            <button className="hint-out" onClick={() => store.apply(handMode.out!)}>
+              {String(handMode.out['label'] ?? 'Keep cards')}
+            </button>
+          ) : null}
+        </div>
+      ) : handMode.kind === 'mulligan' ? (
+        <div className="board-hint">
+          Keep this hand, or draw a new six?
+          <button className="hint-out" onClick={() => store.apply(handMode.draw)}>
+            Draw a new six
+          </button>
+          <button className="hint-out" onClick={() => store.apply(handMode.keep)}>
+            Keep this hand
+          </button>
+        </div>
+      ) : handMode.kind === 'farseers' ? (
+        <div className="board-hint">
+          Farseers — press Discard on cards below ({handMode.picked.length} picked)
+          <button className="hint-out" onClick={() => store.apply(handMode.done)}>
+            {String(handMode.done['label'] ?? 'Done')}
+          </button>
         </div>
       ) : battleSys.size > 0 ? (
         <div className="board-hint battle">

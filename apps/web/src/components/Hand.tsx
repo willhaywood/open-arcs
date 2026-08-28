@@ -2,11 +2,12 @@
  * Your hand, fanned along the bottom of the board. Cards are sorted by suit then strength;
  * hovering raises a card into full view; playing happens straight from here.
  *
- * The fan also answers every other ask about your own cards (Phase 3): seizing the initiative is
- * clicking the card you discard, Farseers' multi-discard is clicking cards into the pile, and
- * the two-player mulligan is a banner over the fan you are judging. Each mode reuses the play
- * machinery — the raised card shows one button naming the act — plus a banner carrying the
- * prompt and the way out.
+ * The fan also answers every other ask about your own cards (Phase 3): seize and Farseers put a
+ * **Seize** or **Discard** button on the raised card, reusing the play machinery. Deliberately, the
+ * card body does *not* act in those modes — seizing costs a card, and a stray click on the fan
+ * must never pay it; the explicit button on the raised card is the only trigger. The prompt and
+ * every way out (Keep cards, the mulligan's two answers, Farseers' Done, Lattice Spies) live in
+ * the board's hint bar, rendered by `Board` from the same ask — well clear of the cards.
  *
  * "Yours" means the current player in a hotseat game and your own seat in a joined one — see the
  * note in the body, which is where the hidden-information boundary is actually drawn.
@@ -35,14 +36,14 @@ const PLAY_LABEL: Record<string, string> = {
   'turn/farseers-pick': 'Discard',
 }
 
-/** What the fan is being asked, beyond ordinary card plays. */
-type HandMode =
+/** What the fan is being asked, beyond ordinary card plays. Read by `Board` for the hint bar. */
+export type HandMode =
   | { kind: 'plays' }
   | { kind: 'seize'; lattice: Action | undefined; out: Action | undefined }
   | { kind: 'mulligan'; draw: Action; keep: Action }
   | { kind: 'farseers'; done: Action; picked: readonly string[] }
 
-function modeOf(cont: Continue): HandMode {
+export function modeOf(cont: Continue): HandMode {
   if (cont.kind !== 'ask') return { kind: 'plays' }
   const find = (t: string): Action | undefined => cont.actions.find((a) => a.type === t)
   if (find('turn/seize') !== undefined || find('turn/lattice-seize') !== undefined) {
@@ -85,9 +86,9 @@ export function Hand({ state, cont }: Props): JSX.Element | null {
 
   const hand = contentsOf(state.cards, CardLocation.hand(faction))
   const mode: HandMode = yourTurn ? modeOf(cont) : { kind: 'plays' }
-  // A mode ask can outlive the cards it is about (Lattice Spies with an empty hand, Farseers
-  // after picking everything) — the banner still has to render, or the game stops.
-  if (hand.length === 0 && mode.kind === 'plays') return null
+  // A mode ask can outlive its cards (Lattice Spies with an empty hand, Farseers after picking
+  // everything); the hint bar carries those exits, so an empty fan simply is not drawn.
+  if (hand.length === 0) return null
 
   /*
    * Which cards act right now, and how. Ordinary plays and the mode picks share one pipeline:
@@ -113,47 +114,8 @@ export function Hand({ state, cont }: Props): JSX.Element | null {
   const spread = Math.min(n * 7, 34) // total fan angle
   const step = n > 1 ? spread / (n - 1) : 0
 
-  const banner =
-    mode.kind === 'plays' ? null : (
-      <div className="hand-banner">
-        <span className="hand-banner-text">
-          {mode.kind === 'seize'
-            ? 'Seize the initiative — click a card to discard'
-            : mode.kind === 'mulligan'
-              ? 'Keep this hand, or draw a new six?'
-              : `Farseers — click cards to discard (${mode.picked.length} picked)`}
-        </span>
-        {mode.kind === 'seize' && mode.lattice !== undefined ? (
-          <button className="hand-banner-btn" onClick={() => store.apply(mode.lattice!)}>
-            {String(mode.lattice['label'] ?? 'Seize with Lattice Spies')}
-          </button>
-        ) : null}
-        {mode.kind === 'seize' && mode.out !== undefined ? (
-          <button className="hand-banner-btn ghosted" onClick={() => store.apply(mode.out!)}>
-            {String(mode.out['label'] ?? 'Keep cards')}
-          </button>
-        ) : null}
-        {mode.kind === 'mulligan' ? (
-          <>
-            <button className="hand-banner-btn" onClick={() => store.apply(mode.draw)}>
-              Draw a new six
-            </button>
-            <button className="hand-banner-btn ghosted" onClick={() => store.apply(mode.keep)}>
-              Keep this hand
-            </button>
-          </>
-        ) : null}
-        {mode.kind === 'farseers' ? (
-          <button className="hand-banner-btn" onClick={() => store.apply(mode.done)}>
-            {String(mode.done['label'] ?? 'Done')}
-          </button>
-        ) : null}
-      </div>
-    )
-
   return (
     <div className="hand">
-      {banner}
       {cards.map((cardId, i) => {
         const mid = (n - 1) / 2
         const rot = (i - mid) * step
@@ -176,7 +138,12 @@ export function Hand({ state, cont }: Props): JSX.Element | null {
               } as CSSProperties
             }
             onClick={() => {
-              if (plays.length === 1) store.apply(plays[0]!)
+              /*
+               * Only an ordinary play applies from the card body. A seize or Farseers discard
+               * costs the card, so it takes the explicit button on the raised card — a stray
+               * click on the fan must never pay a cost.
+               */
+              if (plays.length === 1 && PLAY_TYPES.includes(plays[0]!.type)) store.apply(plays[0]!)
             }}
           >
             <CardFace cardId={cardId} />
