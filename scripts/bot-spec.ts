@@ -15,6 +15,7 @@ import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, ea
 import type { Bot, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
+import { declarerBot } from '@arcs/engine'
 
 /** Where `npm run fit` writes, and what `heuristic:fitted` reads. */
 const FITTED = 'packages/engine/src/ai/fitted-weights.json'
@@ -31,6 +32,7 @@ export type BotSpec =
   | { readonly kind: 'cost' }
   | { readonly kind: 'standard' }
   | { readonly kind: 'mobile' }
+  | { readonly kind: 'declarer' }
   | { readonly kind: 'rival' }
   | { readonly kind: 'weapon' }
   | { readonly kind: 'easy' }
@@ -78,6 +80,8 @@ export function buildBot(spec: BotSpec): Bot {
       return standardBot
     case 'mobile':
       return mobileBot
+    case 'declarer':
+      return declarerBot
     case 'rival':
       return rivalBot
     case 'weapon':
@@ -132,6 +136,7 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'cost') return { kind: 'cost' }
   if (kind === 'standard') return { kind: 'standard' }
   if (kind === 'mobile') return { kind: 'mobile' }
+  if (kind === 'declarer') return { kind: 'declarer' }
   if (kind === 'rival') return { kind: 'rival' }
   if (kind === 'weapon') return { kind: 'weapon' }
   if (kind === 'easy') return { kind: 'easy' }

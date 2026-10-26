@@ -286,6 +286,8 @@ function settle(
   faction: FactionId,
   reg: RuleRegistry,
   resolve: (result: RuleResult, actions: readonly Action[]) => Action,
+  /** `Bot.settleDeclares`: resolve the declare prompt instead of declining it. */
+  resolveDeclares = false,
 ): RuleResult {
   let current = result
   /*
@@ -302,6 +304,21 @@ function settle(
     if (pipsAhead(c, faction) > 0) return current
     if (c.prompt !== undefined && visited.has(c.prompt)) return current
     if (c.prompt !== undefined) visited.add(c.prompt)
+
+    /*
+     * `Bot.settleDeclares`. The declare prompt is resolved by the bot's own one-ply judgement, so a
+     * card is valued at the better of declining and its best declaration — the probe sees the
+     * marker the card would win, not only `declareReadiness`'s charge for holding it. Farseers'
+     * look, which follows a declaration, is still declined: it lists a rival's real hand, which a
+     * probe on the true state must not read.
+     */
+    if (resolveDeclares) {
+      const skip = c.actions.find((a) => a.type === 'ambition/farseers-skip')
+      if (skip !== undefined || c.actions.some((a) => a.type === 'ambition/declare')) {
+        current = advance(current.state, skip ?? resolve(current, c.actions), reg)
+        continue
+      }
+    }
 
     /*
      * Decline optional steps, resolve mandatory ones.
@@ -354,6 +371,7 @@ function settledSamples(
   faction: FactionId,
   reg: RuleRegistry,
   resolve: (result: RuleResult, actions: readonly Action[]) => Action,
+  resolveDeclares = false,
 ): readonly ObservedState[] {
   const base = probeFrom(state, 0)
   const first = advance(base, action, reg)
@@ -361,7 +379,7 @@ function settledSamples(
   const out: ObservedState[] = []
   for (let i = 1; i < SAMPLES; i++) {
     try {
-      const settled = settle(advance(probeFrom(state, i), action, reg), faction, reg, resolve)
+      const settled = settle(advance(probeFrom(state, i), action, reg), faction, reg, resolve, resolveDeclares)
       out.push(observe(settled.state, faction))
     } catch {
       // As above: a failed sample is one fewer opinion, not a reason to discard the candidate.
@@ -780,7 +798,7 @@ export function stepBot(
        * re-entry it exists to catch. The value is read after settling, because that is the horizon
        * candidates have to share to be comparable.
        */
-      const settled = settle(next, faction, reg, resolve)
+      const settled = settle(next, faction, reg, resolve, bot.settleDeclares === true)
       /*
        * `repeats` and `actionsAhead` come from the first sample alone: both are questions about the
        * shape of the game — which question comes next, how many pips are left — and neither is
@@ -790,7 +808,7 @@ export function stepBot(
         observed: observe(settled.state, faction),
         samples: [
           observe(settled.state, faction),
-          ...settledSamples(result.state, action, faction, reg, resolve),
+          ...settledSamples(result.state, action, faction, reg, resolve, bot.settleDeclares === true),
         ],
         repeats: at !== undefined && at >= depth,
         undoes:
