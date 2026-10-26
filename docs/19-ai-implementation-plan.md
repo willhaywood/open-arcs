@@ -70,6 +70,16 @@ The arena's noise floor, measured directly by twinning a bot against itself:
 about 40 minutes rather than the hours it once implied. There is no longer an excuse for running a
 comparison without its twin.
 
+> **Corrected (section 22).** The 2 points in that table is the *expected size of the gap between
+> identical bots* at 1,000 three-player games, not the smallest difference such a run can detect.
+> A 999-game three-player run resolves about **6 points** (the 95% interval on a gap between two
+> seats is about ±4.4), and detecting 2 points with 80% power takes about 9,800 games. Most evaluator
+> changes since section 4 measured inside ±3 points, so a null there is a null at that resolution
+> only. And at two players the twin is no floor at all: with the seed held across the rotation, both
+> games of a seed are the same deterministic game with the seats relabelled, so twins tie exactly by
+> construction. The arena now refuses `--noise` at two seats and prints a 95% interval over seed
+> units on every win rate.
+
 ### Measurement traps already paid for
 
 - **Always run a noise floor.** `npm run arena -- --noise` duplicates a seat's bot under a second
@@ -923,6 +933,15 @@ out. The honest read is that the bot now converts an advantage it already had.
 
 The cost is ~3.5x per decision. Acceptable for the arena and invisible at UI pacing, but it is the
 budget V2's rollouts would want, so the two will have to be sized against each other.
+
+> **Corrected (section 22): the fix never reached the pip menu.** `settle` returns as soon as the
+> position shows pips still to spend, and every sub-ask reached from the pip menu carries a `then`
+> back to `turn/pips` — so for Move, Build, Tax, Influence, Secure and Battle bought with a pip, the
+> resolution described above is never reached. The `then` shapes were already in place when this
+> landed. In instrumented games 97-98% of pip menus still go to the first offer at an exact tie, and
+> Secure is never chosen from one. The secures this section counted came through the Relic Prelude
+> spend, whose sub-flow has no pip continuation and *is* resolved. The arena test written to guard
+> this fix passes for the same reason, and now says so.
 
 ## 2k. The bot could see the dice
 
@@ -2430,6 +2449,14 @@ decision about what the game is rather than an engineering one.
 Levels no longer promise a saved game keeps the opponent it started against: a game saved against
 the old `hard` now loads against the new one. That promise is worth less than a correct ladder.
 
+> **Corrected (section 22): `reply:1:1` was the v3 beam.** With one root, only the beam's own winner
+> is reply-checked and the final pick must come from the checked set, so the winner is always the
+> plain beam's argmax. The 63%-37% above is therefore the v3 beam's two-player number — which also
+> undoes "the v3 beam is not a rung": it was not a rung at *three* players (section 13), and it was
+> the rung at two. Hard now drops the inert replies (60 games byte-identical, 1.3-1.7x faster), and
+> every number in this table predates #27-#51 and was measured against `standardBot` with a
+> `STANDARD_WEIGHTS` delegate.
+
 ## 15. Hand quality — measurably worse, and the lesson is about expiry
 
 The largest piece of legal, unpriced information left: `observed.hand` carries suit, strength and
@@ -2775,3 +2802,107 @@ same strength, a quarter of the thinking time. The register's one remaining big 
 the fitting attempts lacked (17), the value it must learn includes exactly the cross-round dynamics
 no static feature can express (19), and search cannot substitute for it on any measured axis
 (7, 14, 20).
+
+## 21. Purposeful movement — the move-reversal penalty (#50)
+
+**The report was right, and measurable:** under the shipped bot 14% of all moves (88 of 615 in eight
+probe games) were same-round A-to-B-to-A reversals, and every sampled catapult chain returned to its
+own origin. The mechanism: no feature reads where a ship stands, so every Move candidate scores
+identically, the strictly-greater tie-break keeps the earliest offer, and the board's adjacency
+lists are 2-cycles. The prompt-keyed repeat guard only blocks the third leg, because the fleet-size
+prompt names the destination — so the shape was always a round trip.
+
+**What shipped:** `AskedThisTurn` carries the turn's movement legs, `Probe.undoes` marks a leg that
+exactly reverses one already made, and the heuristic charges it through a `moveReversal` weight —
+zero in the baseline and in standard, so both are byte-identical, and 1 in `mobileBot`, which became
+`normal`. Probe games: reversals 14% to zero. Arena, 240 three-player games with a twin: mobile 33%,
+twin 31%, standard 35% — parity, to about ±9 points at that size.
+
+**What was measured and parked:** positional pull (`gatesHeld` for catapult blocking, a graded
+per-ship proximity field toward rivals and unexploited resources, with the probe peeking through the
+fleet-size step so destinations could differ) lost: 28% against standard's 43%, with 41 of 240 games
+unfinished, cause never found. The features stay in `value.ts` at weight zero. That measurement was
+taken with section 22's harness defect in place — Move's value is invisible at the pip menu — so it
+says positional pull does not help *that* harness, not that it cannot help a better one.
+
+## 22. The one-ply harness is the binding limit — a review of everything above
+
+A full review of the register, the code and live games (October 2026) found that the harness every
+bot shares has two defects that bound most of what this document measured. It also found the arena
+measuring less precisely than section 0 claimed. Numbers marked *scratch* are single unregistered
+runs, mostly without twin controls and on a loaded machine — hypotheses, under the section 4 rule.
+
+### What the harness cannot see
+
+1. **What a pip-funded action does.** `settle` stops at the first ask that still has pips ahead of
+   it (`play.ts`), and every sub-ask reached from the pip menu carries `then` back to `turn/pips`. So
+   Move, Build, Tax, Influence, Secure and Battle are all scored on the unchanged board at the pip
+   menu, and the first offer wins 97-98% of the time (1,207 of 1,228 menus in one census). Secure is
+   never taken from a pip menu; every secure comes through the Relic Prelude. Section 2j's fix never
+   reached this case (its correction note has the detail). A second defect sits beside it:
+   `pipsAhead` counts `total - done + 1`, crediting a phantom half-point to staying inside a
+   sub-flow.
+2. **The ambition a card would declare.** `settle` declines every declare prompt (`DECLINE`), so a
+   card play is charged by `declareReadiness` for holding a declaring card but never credited with
+   the marker it would win. Letting the probe resolve the declaration changes about a quarter of
+   two-player card plays.
+
+This one-ply machinery makes every decision for easy and normal and 86-88% of hard's (the beam runs
+only at card plays). **So the search-side nulls (sections 7, 14, 20) and the "losses are variance"
+verdict (section 16) were all measured between bots that share these blind spots.** They say more
+search or better weights do not help *this harness*; they do not bound what a harness that can see
+the action's outcome would do.
+
+### Smaller findings
+
+- **Hard's replies were inert** (section 14's correction). Dropped; 60 games byte-identical.
+- **Ties fall to offer order everywhere,** not only at the pip menu: move destinations tie 99.6% of
+  the time, and three-leg move loops still occur after #50.
+- **Nothing reads the initiative or outrage.** No AI file references `seized` or `outrage`; seize is
+  taken about once in 500 offers.
+- **Livelocks remain.** The easy mirror loops between Prelude Arrange and Done on three-player
+  seed 126 (about 2% of easy games). The web store had no stuck cap, so such a game never ended; it
+  now has one (`BOT_TURN_CAP`, 200 decisions in a turn against a measured maximum of 36, then the
+  turn takes its exits).
+- **Hidden information leaks to probes**: the court deck's true order through `observe()`, and
+  face-down copy cards through `roundPlays` and the log. Measured effect on play: none found. But
+  rollout oracles run on the true state, which inflates their labels — section 18 and 20's 12-0
+  adjudications and the search-rounds test's re-derived pin used such oracles. With rival hands
+  re-dealt, the pinned game-41 position is no longer decided.
+- **Easy reads as broken rather than weak**: about eight forfeited pips per game against normal's one,
+  and it burns cards seizing the initiative, because its fumble applies at every ask.
+- **Seat advantage depends heavily on the board.** In normal-mirror games the first seat wins 37-50%
+  on Board2Frontiers and 91-98% on Board2MixUp2 (scratch). The arena used one board per player
+  count; it now rotates boards with `--board all` and breaks results down per board and per seat.
+
+### What the harness fixes are worth (scratch)
+
+- **Declare-aware settle** (resolve the declare prompt in the probe): 141 of 205 two-player games
+  against normal on Board2Frontiers, 55.9% ± 2.9 pooled over all four two-player boards; three
+  players untested beyond a 1v2 protocol, four players untested.
+- **Pip-menu horizon** (keep resolving a pip-funded sub-flow to the next pip menu): 70 of 80
+  two-player games against normal, against shipped hard's 45 of 80 on the same games — with three
+  known pricing defects still in the patch.
+
+These are the largest effects ever recorded here, which is why they need registering properly
+before anything ships: per board, per player count, with intervals.
+
+### What changed with this section
+
+Decision-identical work only: hard drops its replies, the arena reports 95% intervals over seed
+units, per-seat and per-board breakdowns and which seat stalled, refuses `--noise` at two seats, and
+takes `level:` and `search:...:mobile` specs so shipped bots can be measured by name; the web store
+has a stuck cap; the comments and notes that claimed otherwise are corrected.
+
+### Next, in order
+
+1. **Declare-aware settle** as a new opt-in bot — cheapest, and the only direction every reviewer
+   supported.
+2. **Pip-menu horizon** as a new opt-in bot, after fixing its three pricing defects (the phantom pip,
+   Prelude Arrange's flat underpricing, one-sample battle probes).
+3. **Easy that fumbles only at card plays**, so it misplays like a novice instead of wasting pips.
+4. **Re-baseline the ladder** per board and per player count, four players first — the web default,
+   and never measured.
+
+Re-proposing anything in the register's null list on the *current* harness still needs the usual
+argument. Re-testing it on a harness with these defects fixed does not.

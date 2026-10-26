@@ -16,7 +16,19 @@
  *   - **Mean power** — the only one with a floor that means something. A bot that scores nothing
  *     scores nothing whether it "wins" or not, and that is exactly the state V1 is in.
  *
- * Everything is reported per **bot id**, aggregated across the seats it played.
+ * Everything is reported per **bot id**, aggregated across the seats it played, and broken down
+ * per seat and per board — seat advantage in Arcs depends heavily on the board (on one two-player
+ * setup the first seat wins over 90% of mirror games), so a single aggregate can hide it.
+ *
+ * ## Intervals, and why they are clustered by seed
+ *
+ * A win rate without its uncertainty is not a measurement, and the twin seat this report used to
+ * lean on is a noisy, single-draw estimate of it — at two players a twin is worse than noisy: both
+ * games of a seed are the *same* deterministic game with the labels swapped, so the twin gap is
+ * zero by construction and says nothing. So every rate carries a 95% interval computed over **seed
+ * units**: the games of one seed share a starting position and are correlated, so treating them as
+ * independent would understate the error. Read a candidate's own rate against the chance line
+ * (1 / seats) and its interval; a twin is no longer required.
  *
  * ## Two ways this could lie, both handled here
  *
@@ -32,7 +44,7 @@
  */
 
 import { defaultRegistry, startGame } from '../index.js'
-import { botFor, runBots } from './play.js'
+import { BotStuckError, botFor, runBots } from './play.js'
 import type { BotSeats } from './play.js'
 import type { Bot } from './bot.js'
 import type { FactionId } from '../ids.js'
@@ -61,6 +73,10 @@ export interface GameOutcome {
   /** Decisions taken. Near-zero means the bots passed rather than played. */
   readonly actions: number
   readonly ms: number
+  /** The board it was played on. */
+  readonly board?: string
+  /** For a game that hit the stuck cap: the seat that was acting when it gave up. */
+  readonly stalled?: FactionId
 }
 
 export interface ArenaGame {
@@ -111,7 +127,7 @@ export function playGame(game: ArenaGame, registry?: RuleRegistry): GameOutcome 
   const seats: Partial<Record<FactionId, string>> = {}
   for (const f of factions) seats[f] = botFor(game.seats, f).id
 
-  let outcome: { finished: boolean; reason: string; winner?: FactionId; power: Readonly<Partial<Record<FactionId, number>>>; chapters: number; actions: number }
+  let outcome: { finished: boolean; reason: string; winner?: FactionId; power: Readonly<Partial<Record<FactionId, number>>>; chapters: number; actions: number; stalled?: FactionId }
   try {
     const out = runBots(
       startGame(options, reg),
@@ -142,6 +158,7 @@ export function playGame(game: ArenaGame, registry?: RuleRegistry): GameOutcome 
       power: {},
       chapters: 0,
       actions: 0,
+      ...(e instanceof BotStuckError && e.faction !== undefined ? { stalled: e.faction } : {}),
     }
   }
 
@@ -156,6 +173,7 @@ export function playGame(game: ArenaGame, registry?: RuleRegistry): GameOutcome 
     ...outcome,
     tied,
     ms: Date.now() - started,
+    board: options.board,
   }
 }
 
@@ -171,6 +189,11 @@ export interface ArenaConfig {
   /** Game `i` uses `seed + i`, so a whole run is reproducible from one number. */
   readonly seed?: number
   readonly board?: string
+  /**
+   * Boards to rotate through, one per seed (`boardForGame`). Overrides `board`. Seat advantage
+   * varies so much by board that a single board measures that board as much as the bots.
+   */
+  readonly boards?: readonly string[]
   readonly factions?: readonly FactionId[]
   readonly leadersAndLore?: NewGameOptions['leadersAndLore']
   /** Decisions before a game is called stuck; lower it to make a loop fail fast. */
@@ -188,6 +211,19 @@ export interface BotRecord {
   /** 1 is best. Ties share a rank, so four scoreless bots all rank 1. */
   readonly meanRank: number
   readonly meanPower: number
+  /** Half-width of the 95% interval on the win rate, over seed units, as a fraction. */
+  readonly winCI95: number
+  /** Standard error of mean power, over seed units. */
+  readonly powerSE: number
+  /** Unfinished games in which this bot was the seat acting when the stuck cap fired. */
+  readonly stalled: number
+}
+
+/** One bot's results within a slice of the run — one seat, or one board. */
+export interface BreakdownCell {
+  readonly games: number
+  readonly wins: number
+  readonly meanPower: number
 }
 
 export interface ArenaReport {
@@ -201,6 +237,12 @@ export interface ArenaReport {
   /** Power scored by everyone, per game. Zero is the loudest number this report can print. */
   readonly meanTotalPower: number
   readonly ms: number
+  /** Seats per game; the chance line for a win rate is one over this. */
+  readonly seatCount: number
+  /** Bot id -> seat -> results from that seat. */
+  readonly bySeat: Readonly<Record<string, Readonly<Partial<Record<FactionId, BreakdownCell>>>>>
+  /** Bot id -> board -> results on that board. */
+  readonly byBoard: Readonly<Record<string, Readonly<Record<string, BreakdownCell>>>>
 }
 
 /** Rank within a game, 1 = best, ties sharing a rank. */
@@ -251,6 +293,36 @@ export function seatsForGame<T>(
 export const seedForGame = (base: number | undefined, index: number, seats: number): number =>
   (base ?? 1) + Math.floor(index / Math.max(1, seats))
 
+/**
+ * The board for game `i` when a run rotates boards: one board per seed, cycling, so a seed's whole
+ * seat rotation is played on the same board and every board gets an equal share of seeds. Shared
+ * with the parallel runner for the same reason as `seedForGame`.
+ */
+export const boardForGame = (boards: readonly string[], index: number, seats: number): string => {
+  if (boards.length === 0) throw new Error('boardForGame: no boards to rotate through')
+  return boards[Math.floor(index / Math.max(1, seats)) % boards.length]!
+}
+
+/**
+ * The mean of a per-game quantity and its standard error, from per-cluster totals.
+ *
+ * `x` is a cluster's sum of the quantity and `n` its game count; the estimate is the ratio of the
+ * sums and the error is the cluster-robust (linearized ratio) one, with the small-sample factor
+ * `S / (S - 1)`. Fewer than two clusters give an error of zero, which the report prints as "—".
+ */
+export function clusteredMean(clusters: readonly { readonly x: number; readonly n: number }[]): {
+  mean: number
+  se: number
+} {
+  const n = clusters.reduce((t, c) => t + c.n, 0)
+  if (n === 0) return { mean: 0, se: 0 }
+  const mean = clusters.reduce((t, c) => t + c.x, 0) / n
+  const s = clusters.filter((c) => c.n > 0).length
+  if (s < 2) return { mean, se: 0 }
+  const ss = clusters.reduce((t, c) => t + (c.x - mean * c.n) ** 2, 0)
+  return { mean, se: Math.sqrt((s / (s - 1)) * ss) / n }
+}
+
 /** Play one game of a run by its index, without needing the whole run. */
 export function playGameAt(
   bots: readonly Bot[],
@@ -259,11 +331,15 @@ export function playGameAt(
   registry?: RuleRegistry,
 ): GameOutcome {
   const factions = config.factions ?? DEFAULT_FACTIONS
+  const board =
+    config.boards !== undefined && config.boards.length > 0
+      ? boardForGame(config.boards, index, factions.length)
+      : config.board
   return playGame(
     {
       seats: seatsForGame(bots, factions, index),
       seed: seedForGame(config.seed, index, factions.length),
-      ...(config.board === undefined ? {} : { board: config.board }),
+      ...(board === undefined ? {} : { board }),
       factions,
       ...(config.leadersAndLore === undefined ? {} : { leadersAndLore: config.leadersAndLore }),
       ...(config.stuckAfter === undefined ? {} : { stuckAfter: config.stuckAfter }),
@@ -289,24 +365,48 @@ export function reportFrom(
   // Only finished games are averaged; a stall says nothing about who plays better.
   const scored = outcomes.filter((o) => o.finished)
   const ids = [...new Set(botIds)]
+  const cell = (): { games: number; wins: number; power: number } => ({ games: 0, wins: 0, power: 0 })
+  const bySeat: Record<string, Partial<Record<FactionId, BreakdownCell>>> = {}
+  const byBoard: Record<string, Record<string, BreakdownCell>> = {}
   const records: BotRecord[] = ids.map((id) => {
     let games = 0
     let wins = 0
     let outrightWins = 0
     let rank = 0
     let power = 0
+    const seeds = new Map<number, { wins: number; power: number; n: number }>()
+    const seatCells = new Map<FactionId, ReturnType<typeof cell>>()
+    const boardCells = new Map<string, ReturnType<typeof cell>>()
     for (const o of scored) {
       for (const f of factions) {
         if (o.seats[f] !== id) continue
+        const won = o.winner === f ? 1 : 0
+        const p = o.power[f] ?? 0
         games++
-        power += o.power[f] ?? 0
+        power += p
         rank += rankOf(o.power, factions, f)
-        if (o.winner === f) {
-          wins++
-          if (!o.tied) outrightWins++
+        wins += won
+        if (won === 1 && !o.tied) outrightWins++
+        const unit = seeds.get(o.seed) ?? { wins: 0, power: 0, n: 0 }
+        seeds.set(o.seed, { wins: unit.wins + won, power: unit.power + p, n: unit.n + 1 })
+        for (const [map, key] of [[seatCells, f], [boardCells, o.board ?? '?']] as const) {
+          const c = (map as Map<string, ReturnType<typeof cell>>).get(key) ?? cell()
+          ;(map as Map<string, ReturnType<typeof cell>>).set(key, {
+            games: c.games + 1,
+            wins: c.wins + won,
+            power: c.power + p,
+          })
         }
       }
     }
+    const finish = (c: ReturnType<typeof cell>): BreakdownCell => ({
+      games: c.games,
+      wins: c.wins,
+      meanPower: c.games === 0 ? 0 : c.power / c.games,
+    })
+    bySeat[id] = Object.fromEntries([...seatCells].map(([k, c]) => [k, finish(c)]))
+    byBoard[id] = Object.fromEntries([...boardCells].map(([k, c]) => [k, finish(c)]))
+    const units = [...seeds.values()]
     return {
       id,
       games,
@@ -314,6 +414,10 @@ export function reportFrom(
       outrightWins,
       meanRank: games === 0 ? 0 : rank / games,
       meanPower: games === 0 ? 0 : power / games,
+      winCI95: 1.96 * clusteredMean(units.map((u) => ({ x: u.wins, n: u.n }))).se,
+      powerSE: clusteredMean(units.map((u) => ({ x: u.power, n: u.n }))).se,
+      stalled: outcomes.filter((o) => !o.finished && o.stalled !== undefined && o.seats[o.stalled] === id)
+        .length,
     }
   })
 
@@ -330,6 +434,9 @@ export function reportFrom(
     meanActions: scored.length === 0 ? 0 : scored.reduce((n, o) => n + o.actions, 0) / scored.length,
     meanTotalPower: scored.length === 0 ? 0 : totalPower / scored.length,
     ms,
+    seatCount: factions.length,
+    bySeat,
+    byBoard,
   }
 }
 
@@ -364,25 +471,64 @@ export function runArena(config: ArenaConfig, registry?: RuleRegistry): ArenaRep
  */
 export function formatReport(report: ArenaReport): string {
   const lines: string[] = []
+  const pct1 = (n: number, of: number): string => (of === 0 ? '—' : `${((n / of) * 100).toFixed(1)}%`)
   const pct = (n: number, of: number): string => (of === 0 ? '  —' : `${Math.round((n / of) * 100)}%`)
+  const pm = (half: number): string => (half === 0 ? '—' : half.toFixed(1))
 
   lines.push(
     `${report.games.length} games, ${report.finished} finished, ${(report.ms / 1000).toFixed(1)}s`,
   )
+  lines.push(
+    `chance line ${pct1(1, report.seatCount)}; ± is a 95% interval over seed units (points of win rate)`,
+  )
   lines.push('')
-  lines.push('bot                  games   wins  outright   rank   power')
+  lines.push('bot                  games    wins   ±95%  outright   rank   power    ±se  stalled')
   for (const r of report.records) {
     lines.push(
       [
         r.id.padEnd(20),
         String(r.games).padStart(5),
-        pct(r.wins, r.games).padStart(7),
+        pct1(r.wins, r.games).padStart(8),
+        pm(r.winCI95 * 100).padStart(7),
         pct(r.outrightWins, r.games).padStart(10),
         r.meanRank.toFixed(2).padStart(7),
         r.meanPower.toFixed(1).padStart(8),
+        pm(r.powerSE).padStart(7),
+        String(r.stalled).padStart(9),
       ].join(''),
     )
   }
+
+  /*
+   * Breakdowns: win rate (games) per seat, then per board when the run rotated boards. A seat or
+   * board effect larger than the bots' gap is the first thing to rule out before reading the
+   * aggregate as a difference between bots.
+   */
+  const breakdown = (title: string, keys: readonly string[], cells: (id: string) => Readonly<Record<string, BreakdownCell | undefined>>): void => {
+    lines.push('')
+    lines.push(`${title.padEnd(20)}${keys.map((k) => k.padStart(18)).join('')}`)
+    for (const r of report.records) {
+      const row = cells(r.id)
+      lines.push(
+        r.id.padEnd(20) +
+          keys
+            .map((k) => {
+              const c = row[k]
+              return (c === undefined ? '—' : `${pct1(c.wins, c.games)} (${c.games})`).padStart(18)
+            })
+            .join(''),
+      )
+    }
+  }
+  const seatKeys = [...new Set(report.records.flatMap((r) => Object.keys(report.bySeat[r.id] ?? {})))]
+  if (seatKeys.length > 0) {
+    const order = ['red', 'yellow', 'blue', 'white']
+    seatKeys.sort((a, b) => order.indexOf(a) - order.indexOf(b))
+    breakdown('win rate by seat', seatKeys, (id) => report.bySeat[id] ?? {})
+  }
+  const boardKeys = [...new Set(report.records.flatMap((r) => Object.keys(report.byBoard[r.id] ?? {})))].sort()
+  if (boardKeys.length > 1) breakdown('win rate by board', boardKeys, (id) => report.byBoard[id] ?? {})
+
   lines.push('')
   lines.push(`mean decisions per game: ${report.meanActions.toFixed(0)}`)
   lines.push(`mean power scored by everyone: ${report.meanTotalPower.toFixed(1)}`)
@@ -392,7 +538,11 @@ export function formatReport(report: ArenaReport): string {
     warnings.push('games is not a multiple of the seat count — seats were not played equally')
   }
   if (report.finished < report.games.length) {
-    warnings.push(`${report.games.length - report.finished} games did not finish`)
+    const stalls = report.records.filter((r) => r.stalled > 0).map((r) => `${r.id} x${r.stalled}`)
+    warnings.push(
+      `${report.games.length - report.finished} games did not finish` +
+        (stalls.length > 0 ? ` — stuck seat: ${stalls.join(', ')}` : ''),
+    )
   }
   if (report.meanTotalPower === 0 && report.finished > 0) {
     warnings.push('nobody scored in any game — the wins below are all faction-order tie-breaks')

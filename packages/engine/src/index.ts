@@ -109,10 +109,11 @@ export interface NewGameOptions {
    */
   readonly bots?: readonly FactionId[]
   /**
-   * How strongly the bot seats play. Absent means 'normal' — the bot the game always shipped — so
-   * every save made before levels existed loads and plays identically. One level for the whole
-   * game rather than per seat: the mapping lives in `ai/levels.ts`, and the journal is unaffected
-   * either way, since it records actions rather than who chose them.
+   * How strongly the bot seats play. Absent means 'normal', so every save made before levels
+   * existed loads and replays identically; its bot seats then play on as today's normal, which is
+   * not the bot they started against. One level for the whole game rather than per seat: the
+   * mapping lives in `ai/levels.ts`, and the journal is unaffected either way, since it records
+   * actions rather than who chose them.
    */
   readonly botLevel?: BotLevel
 }

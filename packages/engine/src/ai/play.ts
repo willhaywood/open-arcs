@@ -122,7 +122,7 @@ export const NO_ASKS: AskedThisTurn = { turn: '', prompts: new Map(), moves: [] 
  * Act, chapter, round and whose turn it is — the four things that change exactly when a turn does
  * and never during one.
  */
-function turnKey(state: GameState): string {
+export function turnKey(state: GameState): string {
   return `${state.act}:${state.chapter}:${state.round}:${state.current ?? '-'}`
 }
 
@@ -313,6 +313,14 @@ function settle(
      * score identically. All of them lead to a sub-ask before the board has moved, so they tied and
      * offer order decided: the bot battled because Battle was listed first and never once secured a
      * court card, though it was offered 15 times a game.
+     *
+     * **For pip-funded actions this never runs.** Every sub-ask reached from the pip menu carries
+     * `then` -> `turn/pips`, so the `pipsAhead` check above returns before this line, and Move,
+     * Build, Tax, Influence, Secure and Battle still tie at the pip menu — the first offer wins about
+     * 98% of the time. What reaches the resolution below is sub-asks with no pip continuation, such
+     * as a Prelude spend's. Section 2j's secures came through that route. Changing it changes every
+     * bot that shares this harness, the frozen baseline included, so the fix belongs in an opt-in
+     * bot (docs/19 section 22).
      */
     const decline = c.actions.find((a) => DECLINE.includes(a.type))
     current = advance(current.state, decline ?? resolve(current, c.actions), reg)
@@ -856,9 +864,22 @@ export function runBots(
     asked = step.asked
     decisions.push(step.decision)
   }
-  throw new Error(
-    `runBots: ${stuckAfter} consecutive bot actions without reaching a human — the bot is stuck`,
-  )
+  throw new BotStuckError(stuckAfter, botToAct(current, bots))
+}
+
+/**
+ * `runBots` gave up: the bots took `stuckAfter` decisions without the game ending or reaching a
+ * human. Carries the seat that was acting when it gave up, so an arena can say *which* bot looped
+ * rather than only that a game did not finish.
+ */
+export class BotStuckError extends Error {
+  constructor(
+    readonly decisions: number,
+    readonly faction: FactionId | undefined,
+  ) {
+    super(`runBots: ${decisions} consecutive bot actions without reaching a human — the bot is stuck`)
+    this.name = 'BotStuckError'
+  }
 }
 
 /**

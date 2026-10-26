@@ -10,6 +10,8 @@
  *   npm run arena -- --seats heuristic,rollout:4:2,trivial
  *   npm run arena -- --games 60 --noise            # add a twin of seat 1 to measure the noise floor
  *   npm run arena -- --seed 500 --verbose
+ *   npm run arena -- --seats level:hard,level:normal --board all --games 400
+ *                                                  # rotate every 2p board, one per seed
  *
  * `--seats` takes bot ids in seat order and the arena rotates them between games, so every bot plays
  * every seat. Repeats are the point — three trivial against one heuristic is the baseline question.
@@ -32,7 +34,7 @@
 import { spawn } from 'node:child_process'
 import { availableParallelism } from 'node:os'
 
-import { defaultRegistry, formatReport, playGameAt, reportFrom } from '@arcs/engine'
+import { boardsFor, defaultRegistry, formatReport, playGameAt, reportFrom } from '@arcs/engine'
 import type { FactionId, GameOutcome } from '@arcs/engine'
 
 import { buildBot, parseSpec } from './bot-spec.js'
@@ -62,7 +64,20 @@ const DEFAULT_BOARD: Readonly<Record<number, string>> = {
   3: 'Board3Frontiers',
   4: 'Board4MixUp1',
 }
-const board = flag('board') ?? DEFAULT_BOARD[specs.length] ?? 'Board4MixUp1'
+/*
+ * `--board all` rotates every board for the seat count, one board per seed; a comma list rotates
+ * those. Seat advantage differs so much between boards that a single-board run measures that
+ * board as much as the bots, and the report breaks results down per board when there is more than
+ * one.
+ */
+const boardFlag = flag('board')
+const boards: readonly string[] =
+  boardFlag === 'all'
+    ? boardsFor(specs.length).map((b) => b.name)
+    : boardFlag !== undefined
+      ? boardFlag.split(',')
+      : [DEFAULT_BOARD[specs.length] ?? 'Board4MixUp1']
+const board = boards.join(',')
 
 /*
  * Leaders and lore, off by default.
@@ -84,6 +99,19 @@ const factions = (['red', 'yellow', 'blue', 'white'] as FactionId[]).slice(0, sp
  * board. Measuring the noise floor costs you an opponent, which is the honest trade.
  */
 if (noise) specs[specs.length - 1] = specs[0]!
+/*
+ * Refused at two seats: the twin would replace the only opponent, and with the seed held across
+ * the rotation both games of a seed are then the *same* deterministic game with the labels
+ * swapped. The twins tie exactly, every time, and the "zero floor" that prints is no measurement.
+ * Read the candidate against the chance line and its interval instead.
+ */
+if (noise && specs.length === 2) {
+  console.error(
+    '--noise needs at least three seats: at two, the twin is the only opponent and every pair of ' +
+      'games is one game with the seats relabelled. Use the 95% interval and the 50% chance line.',
+  )
+  process.exit(2)
+}
 
 const bots = specs.map(buildBot)
 /*
@@ -166,7 +194,7 @@ if (jobs === 1) {
     const o = playGameAt(
       labelled,
       i,
-      { seed, board, factions, ...(leadersAndLore === undefined ? {} : { leadersAndLore }) },
+      { seed, boards, factions, ...(leadersAndLore === undefined ? {} : { leadersAndLore }) },
       registry,
     )
     outcomes.push(o)
@@ -199,7 +227,7 @@ if (jobs === 1) {
       ids,
       games,
       seed,
-      board,
+      boards,
       factions,
       shard,
       jobs,

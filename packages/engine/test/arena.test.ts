@@ -18,6 +18,8 @@ import { describe, expect, it } from 'vitest'
 import {
   NO_ASKS,
   advance,
+  boardForGame,
+  clusteredMean,
   defaultRegistry,
   formatReport,
   heuristicBot,
@@ -145,16 +147,20 @@ describe('the arena', () => {
     expect(count('battle/roll')).toBe(count('battle/system'))
   })
 
-  it('chooses between standard actions on merit, not on offer order', () => {
+  it('secures court cards at all — through the Prelude, not the pip menu', () => {
     /*
      * Battle, Move, Build and Secure all lead to a *sub-ask* — which system, which ships, which card
      * — where the board has not moved. Scored there they came out identical, to three decimal
      * places, and offer order decided: the bot battled because Battle was listed first and secured
      * nothing all game, though Secure was offered fifteen times.
      *
-     * Asserted on securing because it is the action that was never reachable by offer order. It is a
-     * proxy for the fix rather than the fix itself, but it is the behaviour that was missing, and it
-     * fails when `settle` stops at the sub-ask instead of resolving it.
+     * This test was written to pin the fix for that (docs/19 section 2j), and it passes for a
+     * different reason. At the pip menu `settle` still stops at the sub-ask — every pip-funded
+     * sub-ask continues to `turn/pips`, which is `settle`'s horizon — so Secure still ties with its
+     * siblings there and is still never chosen. The secures counted here come through the Relic
+     * Prelude spend, whose sub-flow has no pip continuation and is resolved (docs/19 section 22).
+     * Kept because "never secures at all" is still worth failing on; it does not show that the pip
+     * menu chooses on merit.
      */
     const three: readonly FactionId[] = ['red', 'yellow', 'blue']
     const out = runBots(
@@ -528,19 +534,77 @@ describe('the arena', () => {
       ms: 0,
     }
     const text = formatReport({
-      records: [{ id: 'a', games: 1, wins: 1, outrightWins: 0, meanRank: 1, meanPower: 0 }],
+      records: [
+        { id: 'a', games: 1, wins: 1, outrightWins: 0, meanRank: 1, meanPower: 0, winCI95: 0, powerSE: 0, stalled: 0 },
+      ],
       games: [scoreless],
       finished: 1,
       balanced: true,
       meanActions: 4,
       meanTotalPower: 0,
       ms: 0,
+      seatCount: 4,
+      bySeat: {},
+      byBoard: {},
     })
     expect(text).toContain('nobody scored')
   })
 
   it('refuses a bot list that does not fill the seats', () => {
     expect(() => runArena({ bots: [trivialBot], games: 1 }, registry)).toThrow(/seats/)
+  })
+
+  it('clusters the interval by seed, so correlated games are not counted as independent', () => {
+    /*
+     * Two seeds, each a full rotation. If every seed splits its games the same way there is no
+     * between-seed variation and the interval is zero; if one seed is all wins and the other all
+     * losses, the games inside a seed are perfectly correlated and the error must reflect two
+     * observations, not eight.
+     */
+    expect(clusteredMean([{ x: 2, n: 4 }, { x: 2, n: 4 }])).toEqual({ mean: 0.5, se: 0 })
+    const split = clusteredMean([{ x: 4, n: 4 }, { x: 0, n: 4 }])
+    expect(split.mean).toBe(0.5)
+    // sqrt(2/1 * (2^2 + 2^2)) / 8 = 0.5: the error of two coin flips, not of eight.
+    expect(split.se).toBeCloseTo(0.5, 10)
+    // One cluster carries no error estimate at all.
+    expect(clusteredMean([{ x: 1, n: 3 }]).se).toBe(0)
+  })
+
+  it('rotates boards one per seed, so each seed is played on one board', () => {
+    const boards = ['A', 'B']
+    expect([0, 1, 2, 3, 4, 5, 6].map((i) => boardForGame(boards, i, 3))).toEqual([
+      'A', 'A', 'A', 'B', 'B', 'B', 'A',
+    ])
+    expect(() => boardForGame([], 0, 3)).toThrow(/no boards/)
+  })
+
+  it('breaks results down by seat and by board', () => {
+    const three: readonly FactionId[] = ['red', 'yellow', 'blue']
+    const report = runArena(
+      {
+        bots: [trivialBot, { ...trivialBot, id: 'other' }, { ...trivialBot, id: 'third' }],
+        games: 6,
+        seed: 1,
+        factions: three,
+        boards: ['Board3Frontiers', 'Board3MixUp'],
+      },
+      registry,
+    )
+    expect(report.games.map((g) => g.board)).toEqual([
+      'Board3Frontiers', 'Board3Frontiers', 'Board3Frontiers', 'Board3MixUp', 'Board3MixUp', 'Board3MixUp',
+    ])
+    const boards = report.byBoard[trivialBot.id] ?? {}
+    expect(Object.keys(boards).sort()).toEqual(['Board3Frontiers', 'Board3MixUp'])
+    expect(boards['Board3MixUp']?.games).toBe(3)
+    expect(Object.keys(report.bySeat[trivialBot.id] ?? {}).sort()).toEqual(['blue', 'red', 'yellow'])
+    expect(formatReport(report)).toContain('win rate by board')
+  })
+
+  it('names the seat that was stuck when a game hits the cap', () => {
+    const out = playGame({ seats: seatsAll(trivialBot), seed: 1, stuckAfter: 5 }, registry)
+    expect(out.finished).toBe(false)
+    expect(out.stalled).toBeDefined()
+    expect(FOUR).toContain(out.stalled)
   })
 })
 

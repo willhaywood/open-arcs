@@ -10,9 +10,9 @@
  * measuring one thing and printing another, and nothing downstream could tell.
  */
 
-import { baselineBot, contestBot, declareBot, feasibilityBot, declareCostBot, easyBot, goalBot, handBot, threatBot, standardBot,
+import { BOT_LEVELS, MOBILE_WEIGHTS, baselineBot, botForLevel, contestBot, declareBot, feasibilityBot, declareCostBot, easyBot, goalBot, handBot, threatBot, standardBot,
   mobileBot, guardBot, loreBot, heuristicBot, heuristicBotWith, rivalBot, rolloutBot, searchBot, trivialBot, weaponBot } from '@arcs/engine'
-import type { Bot, Weights } from '@arcs/engine'
+import type { Bot, BotLevel, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
 
@@ -36,6 +36,8 @@ export type BotSpec =
   | { readonly kind: 'easy' }
   | { readonly kind: 'hand' }
   | { readonly kind: 'threat' }
+  /** A ladder rung by name, so the arena measures exactly what the app ships. */
+  | { readonly kind: 'level'; readonly level: BotLevel }
   | {
       readonly kind: 'heuristic'
       /** Evaluator weights; omitted means the hand-set ones. Sent as data so a shard can rebuild it. */
@@ -47,6 +49,8 @@ export type BotSpec =
       readonly depth: number
       readonly rivalIntent?: boolean
       readonly replies?: { readonly roots: number; readonly deals: number }
+      /** Named weight set for the delegate and line scores; omitted means `STANDARD_WEIGHTS`. */
+      readonly weights?: 'mobile'
     }
   | {
       readonly kind: 'rollout'
@@ -90,6 +94,8 @@ export function buildBot(spec: BotSpec): Bot {
       return threatBot
     case 'trivial':
       return trivialBot
+    case 'level':
+      return botForLevel(spec.level)
     case 'heuristic':
       return spec.weights === undefined
         ? heuristicBot
@@ -100,6 +106,7 @@ export function buildBot(spec: BotSpec): Bot {
         depth: spec.depth,
         ...(spec.rivalIntent === true ? { rivalIntent: true } : {}),
         ...(spec.replies === undefined ? {} : { replies: spec.replies }),
+        ...(spec.weights === 'mobile' ? { weights: MOBILE_WEIGHTS, weightsLabel: 'mobile' } : {}),
       })
     case 'rollout':
       return rolloutBot({
@@ -137,6 +144,14 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'easy') return { kind: 'easy' }
   if (kind === 'hand') return { kind: 'hand' }
   if (kind === 'threat') return { kind: 'threat' }
+  if (kind === 'level') {
+    // `level:hard` — whatever the app's ladder names today, under its own id.
+    const level = rest[0] as BotLevel
+    if (!(BOT_LEVELS as readonly string[]).includes(level)) {
+      throw new Error(`Unknown level "${rest[0] ?? ''}" — known: ${BOT_LEVELS.join(', ')}`)
+    }
+    return { kind: 'level', level }
+  }
   if (kind === 'heuristic') {
     // `heuristic:fitted` plays the weights `npm run fit` last wrote.
     if (rest[0] !== 'fitted') return { kind: 'heuristic' }
@@ -156,19 +171,24 @@ export function parseSpec(name: string): BotSpec {
   }
   if (kind === 'search') {
     // `search:3:14` sets width and depth; `:rival` scores rivals under their own intent;
+    // `:mobile` puts the search over `MOBILE_WEIGHTS`, as shipped `hard` does;
     // `:reply[:roots:deals]` re-ranks the strongest lines by the rivals' foreseen replies.
+    // The two flags may appear anywhere; the rest are positional.
+    const flags = ['rival', 'mobile']
+    const pos = rest.filter((t) => !flags.includes(t))
     const spec: BotSpec = {
       kind: 'search',
-      width: Number(rest[0] ?? 3),
-      depth: Number(rest[1] ?? 14),
+      width: Number(pos[0] ?? 3),
+      depth: Number(pos[1] ?? 14),
       ...(rest.includes('rival') ? { rivalIntent: true } : {}),
-      ...(rest[2] === 'reply'
+      ...(rest.includes('mobile') ? { weights: 'mobile' as const } : {}),
+      ...(pos[2] === 'reply'
         ? {
             replies: {
-              roots: Number(rest[3] ?? 3),
-              deals: Number(rest[4] ?? 2),
+              roots: Number(pos[3] ?? 3),
+              deals: Number(pos[4] ?? 2),
               // `search:3:14:reply:1:1:2` — a trailing rounds crosses into the actor's next turn.
-              ...(rest[5] !== undefined ? { rounds: Number(rest[5]) } : {}),
+              ...(pos[5] !== undefined ? { rounds: Number(pos[5]) } : {}),
             },
           }
         : {}),
@@ -187,8 +207,9 @@ export function parseSpec(name: string): BotSpec {
     }
   }
   throw new Error(
-    `Unknown bot "${name}" — known: standard, rival, weapon, baseline, goal, feasible, declare, contest, ` +
-      `guard, lore, cost, trivial, heuristic, rollout[:samples:turns], search[:width:depth]`,
+    `Unknown bot "${name}" — known: level:<easy|normal|hard>, standard, mobile, rival, weapon, baseline, ` +
+      `goal, feasible, declare, contest, guard, lore, cost, easy, hand, threat, trivial, heuristic, ` +
+      `rollout[:samples:turns], search[:width:depth][:mobile]`,
   )
 }
 
@@ -211,7 +232,8 @@ export interface ArenaJob {
   readonly ids: readonly string[]
   readonly games: number
   readonly seed: number
-  readonly board: string
+  /** Boards to rotate through, one per seed (`boardForGame`); a single board is a list of one. */
+  readonly boards: readonly string[]
   readonly factions: readonly string[]
   readonly stuckAfter?: number
   /**

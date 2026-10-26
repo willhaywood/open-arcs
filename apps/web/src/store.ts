@@ -18,6 +18,7 @@ import {
   startGame,
   botForLevel,
   stepBot,
+  turnKey,
   undo as engineUndo,
 } from '@arcs/engine'
 import type {
@@ -54,6 +55,43 @@ export type Interlude =
 
 /** Milliseconds between bot actions — slow enough that each on-board event reads. */
 const BOT_PACE = 1500
+
+/**
+ * Decisions a bot seat may take in one turn before the store stops trusting it.
+ *
+ * Some bot configurations can livelock: the easy mirror on three-player seed 126 bounces between
+ * the Prelude's Arrange and the arrange board's Done forever, and the arena has caught catapult
+ * loops in standard play. `runBots` has a stuck cap; the store had none, so in a browser such a
+ * game simply never ended. The longest real turn measured is 36 decisions (26 games, every level,
+ * two to four players), so 200 cannot fire on legitimate play.
+ */
+export const BOT_TURN_CAP = 200
+
+/**
+ * The exits a capped turn takes, in order — each one ends the step it is offered at without
+ * choosing anything new. Once a turn passes the cap every later ask in it takes an exit when one is
+ * offered, so a loop with several entry points still drains to the end of the turn.
+ */
+const STUCK_EXITS = [
+  'turn/prelude-done',
+  'resources/arrange-done',
+  'action/skip',
+  'battle/cancel',
+  'ambition/skip-declare',
+  'turn/end',
+  'turn/pass',
+]
+
+/** The exit a capped bot turn should take at this ask, if it offers one. */
+export function stuckExit(result: RuleResult): Action | undefined {
+  const c = result.continue
+  if (c.kind !== 'ask') return undefined
+  for (const type of STUCK_EXITS) {
+    const exit = c.actions.find((a) => a.type === type)
+    if (exit !== undefined) return exit
+  }
+  return undefined
+}
 
 class GameStore {
   private result: RuleResult | null = null
@@ -113,7 +151,11 @@ class GameStore {
 
   private forgetBotTurn(): void {
     this.botAsked = NO_ASKS
+    this.botTurnSteps = { turn: '', steps: 0 }
   }
+
+  /** Bot decisions taken in the current turn, for `BOT_TURN_CAP`. */
+  private botTurnSteps = { turn: '', steps: 0 }
 
   /**
    * Bumped whenever bot *presentation* state changes — the event feed the surfaces draw.
@@ -254,16 +296,30 @@ class GameStore {
     const prev = this.result
     // The log lines appended by this one action are the event's own narration (bot-events.ts).
     const logBefore = prev.state.log.length
-    const out = stepBot(prev, botForLevel(this.options?.botLevel), faction, this.registry, this.botAsked)
-    this.result = out.result
-    this.botAsked = out.asked
+    const turn = turnKey(prev.state)
+    const steps = this.botTurnSteps.turn === turn ? this.botTurnSteps.steps + 1 : 1
+    this.botTurnSteps = { turn, steps }
+    const exit = steps > BOT_TURN_CAP ? stuckExit(prev) : undefined
+    let action: Action
+    if (exit === undefined) {
+      const out = stepBot(prev, botForLevel(this.options?.botLevel), faction, this.registry, this.botAsked)
+      this.result = out.result
+      this.botAsked = out.asked
+      action = out.decision.action
+    } else {
+      if (steps === BOT_TURN_CAP + 1) {
+        console.warn(`${faction}'s bot took ${BOT_TURN_CAP} decisions in one turn; taking exits until it ends`)
+      }
+      this.result = applyExternal(prev, exit, this.registry)
+      action = exit
+    }
     this.botEvents = [
       ...this.botEvents.slice(-7),
       {
         id: this.nextEventId++,
         faction,
-        action: out.decision.action,
-        lines: out.result.state.log.slice(logBefore),
+        action,
+        lines: this.result.state.log.slice(logBefore),
         at: performance.now(),
       },
     ]
