@@ -16,8 +16,8 @@ import { store } from '../src/store.js'
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
-/** One bot step under a level, read back through the journal in the save file. */
-function firstBotAction(botLevel?: 'easy' | 'normal' | 'hard' | 'brutal'): string {
+/** The opening bot actions under a level, read back through the journal in the save file. */
+function openingUnder(botLevel?: 'easy' | 'normal' | 'hard' | 'brutal'): string[] {
   store.start({
     board: 'Board3Frontiers',
     factions: ['red', 'yellow', 'blue'],
@@ -25,25 +25,25 @@ function firstBotAction(botLevel?: 'easy' | 'normal' | 'hard' | 'brutal'): strin
     bots: ['red', 'yellow', 'blue'],
     ...(botLevel === undefined ? {} : { botLevel }),
   })
-  store.stepBotOnce()
+  for (let i = 0; i < 60; i++) store.stepBotOnce()
   const json = store.toJSON()
   expect(json).not.toBeNull()
   const journal = (JSON.parse(json!) as { journal: string[] }).journal
-  expect(journal.length, 'the bot took exactly one action').toBe(1)
-  return journal[0]!
+  expect(journal.length, 'the bots took exactly sixty actions').toBe(60)
+  return journal
 }
 
 describe('store.stepBotOnce', () => {
   it('plays the level the game was started with', () => {
     /*
-     * Seed 3's opening card play is the established discriminator (levels.test.ts): normal and
-     * hard choose different cards there. If the store ignored botLevel these would be equal —
-     * the exact regression of hard-coding standardBot.
+     * Seed 3 is the established discriminator (levels.test.ts): normal and hard first choose
+     * differently at decision 51. If the store ignored botLevel these would be equal — the exact
+     * regression of hard-coding standardBot.
      */
-    const normal = firstBotAction()
-    const hard = firstBotAction('hard')
-    expect(hard).not.toBe(normal)
+    const normal = openingUnder()
+    const hard = openingUnder('hard')
+    expect(hard).not.toEqual(normal)
     // And absent means normal, byte for byte — old saves play as they always did.
-    expect(firstBotAction('normal')).toBe(normal)
+    expect(openingUnder('normal')).toEqual(normal)
   })
 })

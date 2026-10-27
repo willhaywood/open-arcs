@@ -2906,3 +2906,74 @@ has a stuck cap; the comments and notes that claimed otherwise are corrected.
 
 Re-proposing anything in the register's null list on the *current* harness still needs the usual
 argument. Re-testing it on a harness with these defects fixed does not.
+
+## 23. The declarer takes hard, and the beam leaves the ladder (#54)
+
+**Section 22's first fix shipped as `declarerBot`** (#54): `mobileBot` with `Bot.settleDeclares`,
+so the probe resolves the declare prompt through the bot's own one-ply choice instead of declining
+it, and a lead is valued at the better of declining and its best declaration. Farseers' look, which
+follows a declaration and lists a rival's real hand, stays declined; a test records every action the
+probes perform and fails if one looks. Only leads change: 14 of 77 three-player leads over eight
+probe games, and no other decision.
+
+Gated one declarer seat against mobile, seats rotated, over every board of the player count:
+
+| players | games | declarer | chance | power, declarer v mobile |
+| --- | --- | --- | --- | --- |
+| 2 | 250 a board | Frontiers 71.2 ± 5.4, Homelands 56.0 ± 5.7, MixUp1 50.8 ± 4.2, MixUp2 49.6 ± 3.9 | 50 | +4.2 a game, pooled |
+| 3 | 999 | 45.8 ± 2.7, ahead on every board and from every seat | 33.3 | 22.3 v 18.0 |
+| 4 | 600 | 40.5 ± 3.2, ahead on every board and from every seat | 25 | 18.0 v 12.0 |
+
+Against the beam at two players, 400 games over the four boards: 58.0 ± 4.3, ahead on every board.
+In three-player self-play (`ambition-audit.ts`, 40 games) it declares 8.6 times a game to mobile's
+5.9 and wins 64% of what it declares to mobile's 62%. A lead decision costs a median 7-14 ms against
+2-5. No game stalled.
+
+What the gates did not cover: the two MixUp boards miss section 22's per-board bar (lower bounds
+−3.4 and −4.3 points against −3), at parity on boards where the first seat wins 83-89% whichever bot
+sits there; the three-player run with two declarers was not played; the combination with the
+pip-menu horizon cannot be, until that bot exists; the audit is three-player only.
+
+**The ladder, measured before it changed.** The first plan moved every rung down one: easy to
+mobile, normal to the beam, hard to the declarer, `easyBot` off the ladder. Measured on every board
+of each player count — the beam against mobile alone at two players, and all the candidates at one
+table at three and four:
+
+| players | games | declarer | beam | mobile | `easyBot` | chance |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2 | 400 | — | 54.8 ± 4.3, power 27.0 | 45.3 ± 4.3, power 25.9 | — | 50 |
+| 3 | 999 | 45.7 ± 2.9, power 23.6 | 26.9 ± 2.6, power 19.4 | 27.3 ± 2.7, power 19.2 | — | 33.3 |
+| 4 | 599 of 600 | 32.6 ± 3.3, power 17.7 | 34.4 ± 3.6, power 17.7 | 27.9 ± 3.2, power 16.8 | 5.2 ± 1.8, power 7.0 | 25 |
+
+At two players the beam's edge is mostly one board: 64.0% on Frontiers, 51-52% on the other three.
+At three, beam and mobile are the same opponent, by wins, power and mean rank (2.08 each) — section
+13's three-player finding, on current main. At four the beam is level with the declarer.
+
+So the plan would have shipped a ladder with a tie at three players and another at four. **What
+shipped instead keeps easy and normal and replaces only hard**: easy `easyBot`, normal mobile, hard
+the declarer. Every step holds at every count: the declarer is above mobile at two (56.9% pooled,
+one seat against mobile), three (45.7 to 27.3 at one table) and four (32.6 to 27.9 at one table;
+40.5 ± 3.2 against a 25% line one seat against mobile), and `easyBot` is far below mobile at four
+(5.2 to 27.9). That last pair has not been re-measured at two or three players since #27-#51, and
+the four-player table carries a seat that hands out wins, which blurs the three above it. Hard also
+gets cheaper: a median 7-14 ms a lead for the declarer, against the beam's 0.11, 0.18 and 0.26
+seconds a card play at two, three and four players.
+
+**The one unfinished game is a catapult loop, and it is mobile's.** Four-player seed 77 on
+Board4MixUp1: the declarer's seat continued a catapult chain from 4-Gate to 2-Gate and back until
+`runBots` gave up. Mobile and standard choose the same legs at that ask — the declarer differs
+only at leads — so the loop is in the shared delegate. `AskedThisTurn` records only
+`action/move-pick` legs, so `moveReversal` never sees a catapult leg undo the one before it. In
+the browser the per-turn cap ends such a turn after 200 decisions through Stop here
+(`action/skip`, one of the cap's exits).
+
+**Section 22's next steps, revised.**
+
+1. Declare-aware settle — this section.
+2. **Pip-menu horizon** as a new opt-in bot, after its three pricing defects. Its bar is now the
+   declarer, since that is hard.
+3. **Easy that fumbles only at card plays** — unchanged, and sharper: `easyBot` won 5.2% at four
+   players against a 25% line.
+4. **Re-baselining the ladder** is done for normal and hard at every count, and for easy at four.
+5. **Catapult legs in the move-reversal memory**, so a chain cannot bounce between two gates
+   (above).
