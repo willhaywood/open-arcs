@@ -292,6 +292,14 @@ export type Rollout = (action: Action, options: RolloutOptions) => readonly Obse
 export interface Bot {
   readonly id: string
   /**
+   * Let the harness resolve the declare prompt while scoring a card play, instead of declining it.
+   *
+   * Off for every bot unless set, because the harness is shared with the frozen baseline. Without
+   * it a lead is scored with the declaration declined, so `declareReadiness` charges for holding a
+   * card that could declare while nothing credits the marker it would win (docs/19 section 22).
+   */
+  readonly settleDeclares?: boolean
+  /**
    * `lookahead` is absent for callers that cannot supply it. A bot that needs it must degrade
    * rather than throw: an evaluator with no lookahead is a worse bot, not a broken game.
    */
