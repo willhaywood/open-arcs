@@ -14,6 +14,7 @@ import {
   serializeGame,
   botForLevel,
   botToAct,
+  declarerBot,
   defaultRegistry,
   easyBot,
   playGameAt,
@@ -36,22 +37,37 @@ describe('the ladder', () => {
     expect(botForLevel(undefined)).toBe(botForLevel('normal'))
     // Normal is standard plus the move-reversal penalty — the anti-circling rung (mobile.ts).
     expect(botForLevel('normal')).toBe(mobileBot)
+    // Hard is normal seeing the ambition its lead would declare (declarer.ts).
+    expect(botForLevel('hard')).toBe(declarerBot)
   })
 
-  it('adjacent levels are different opponents on a real position', () => {
+  it('adjacent levels are different opponents in a real game', () => {
     /*
-     * Seed 3's opening card play is the established discriminator: standard leads Construction-2,
-     * the search bot leads Mobilization-4 (`search.test.ts`), and easy shrugs among the close
-     * calls. Asserting pairwise difference of the *chosen actions* here rather than bot identity,
-     * because identity cannot catch a mapping that returns different objects wrapping the same
-     * play.
+     * Each level plays seed 3 against itself. Easy parts from normal at the first decision — it
+     * leads Administration-3 where normal leads Construction-2 — but hard is normal everywhere
+     * except a lead where the ambition counts, so the opening card play no longer tells them
+     * apart; their first difference is decision 51, yellow leading Aggression-6 where normal
+     * leads Mobilization-2. Asserting difference of the *chosen actions* rather than bot
+     * identity, because identity cannot catch a mapping that returns different objects wrapping
+     * the same play.
      */
-    const cur = startGame({ board: 'Board3Frontiers', factions: [...THREE], seed: 3 }, registry)
-    const f = botToAct(cur, THREE)!
-    const at = (level: Parameters<typeof botForLevel>[0]): string =>
-      JSON.stringify(stepBot(cur, botForLevel(level), f, registry, NO_ASKS).decision.action)
-    expect(at('normal')).not.toBe(at('hard'))
-    expect(at('easy')).not.toBe(at('normal'))
+    const opening = (level: Parameters<typeof botForLevel>[0]): string[] => {
+      let cur: RuleResult = startGame(
+        { board: 'Board3Frontiers', factions: [...THREE], seed: 3 },
+        registry,
+      )
+      let asked: AskedThisTurn = NO_ASKS
+      const played: string[] = []
+      for (let i = 0; i < 60; i++) {
+        const step = stepBot(cur, botForLevel(level), botToAct(cur, THREE)!, registry, asked)
+        played.push(JSON.stringify(step.decision.action))
+        cur = step.result
+        asked = step.asked
+      }
+      return played
+    }
+    expect(opening('normal')).not.toEqual(opening('hard'))
+    expect(opening('easy')).not.toEqual(opening('normal'))
   })
 })
 

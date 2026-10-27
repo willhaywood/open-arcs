@@ -176,7 +176,7 @@ export function parseSpec(name: string): BotSpec {
   }
   if (kind === 'search') {
     // `search:3:14` sets width and depth; `:rival` scores rivals under their own intent;
-    // `:mobile` puts the search over `MOBILE_WEIGHTS`, as shipped `hard` does;
+    // `:mobile` puts the search over `MOBILE_WEIGHTS`, as the beam did when it was `hard`;
     // `:reply[:roots:deals]` re-ranks the strongest lines by the rivals' foreseen replies.
     // The two flags may appear anywhere; the rest are positional.
     const flags = ['rival', 'mobile']

@@ -13,7 +13,7 @@
  * and its best declaration. Farseers' look, which follows a declaration, stays declined — it lists
  * a rival's real hand.
  *
- * Only lead decisions change: a follower is never asked to declare, and hard's beam already
+ * Only lead decisions change: a follower is never asked to declare, and the v3 beam already
  * expands the declaration at the card plays it searches. Over eight three-player probe games, 14
  * of 77 leads changed and no other decision did.
  *
@@ -31,16 +31,17 @@
  *
  * At three and four players that is one seat against copies of a single bot, the protocol docs/19
  * section 0 warns flatters the odd one out; runs with more than one declarer have not been played.
- * Against shipped hard at two players, 400 games over the four boards: 58.0% ± 4.3, ahead on every
- * board.
+ * Against the v3 beam, then hard, at two players, 400 games over the four boards: 58.0% ± 4.3,
+ * ahead on every board.
  *
  * It declares more without converting worse. In three-player self-play (40 games) it declares 8.6
  * times a game to normal's 5.9 and wins 64% of what it declares to normal's 62%. A lead decision
  * costs 2.5-2.9x normal's, a median 7-14 ms against 2-5 ms, beside a 1.5 s bot pace. No game
- * stalled.
+ * stalled. One did later, in docs/19 section 23's four-player table: a catapult loop it shares with
+ * normal, since only its leads differ.
  *
- * An opt-in bot, not a ladder rung: these numbers put it at or above hard at two players, and what
- * the ladder should become is docs/19 section 22's question, not this file's.
+ * It is `hard` (`levels.ts`), replacing the beam: section 23 measured it above normal at two, three
+ * and four players, where the beam was level with normal at three.
  */
 
 import type { Bot } from './bot.js'

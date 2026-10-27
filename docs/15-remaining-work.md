@@ -222,9 +222,10 @@ one invariant still worth adding.
 
 - **AI — built.** docs/03 is no longer a plan waiting on code: `packages/engine/src/ai/` holds the
   evaluator, the bots and the measurement arena, and the web app plays the three-rung ladder in
-  `ai/levels.ts` (easy, normal = `mobileBot`, hard = the v3 beam). docs/19 is the implementation
-  record, including a register of measured dead ends so they are not retried; section 22 records
-  the harness defects that put a caveat on several of those dead ends.
+  `ai/levels.ts` (easy, normal = `mobileBot`, hard = `declarerBot`). docs/19 is the
+  implementation record, including a register of measured dead ends so they are not retried;
+  section 22 records the harness defects that put a caveat on several of those dead ends, and
+  section 23 the first fix to one of them, which took hard from the v3 beam.
 
   What is genuinely left here is narrower than "AI": the token-pricing feature in `ai/value.ts`
   counts resource *tokens* only and ignores Guild-card icons, while `courtSecured` counts the cards

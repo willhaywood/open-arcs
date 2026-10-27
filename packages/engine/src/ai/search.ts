@@ -102,7 +102,7 @@ export interface SearchOptions {
   /**
    * Names `weights` in the bot's id. The id is otherwise built from width, depth and replies alone,
    * so two searches over different weight sets reported under one name, and the arena could not
-   * tell shipped `hard` from a standard-weights beam of the same shape.
+   * tell the beam that shipped as `hard` from a standard-weights beam of the same shape.
    */
   readonly weightsLabel?: string
 }
