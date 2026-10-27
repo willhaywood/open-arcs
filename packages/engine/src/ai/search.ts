@@ -20,10 +20,15 @@
  * ## Where the budget goes
  *
  * Only the card-play ask is searched (`isCardPlay`, the same trigger V2 used): it is the
- * highest-weight decision in the game (section 2d.1), ~10 per seat per game, and everything
- * downstream V1 already resolves acceptably (section 2j). Delegated asks go to the V1 machinery
- * with the same weights, so this bot differs from `rivalBot` by exactly the search and nothing
- * else — the arena attribution rule, once more.
+ * highest-weight decision in the game (section 2d.1), ~10 per seat per game. Delegated asks go to
+ * the V1 machinery with the same weights, so this bot differs from `rivalBot` by exactly the search
+ * and nothing else — the arena attribution rule, once more.
+ *
+ * That leaves 86-88% of this bot's decisions to the one-ply delegate, and **the delegate does not
+ * resolve pip-funded sub-flows**, whatever section 2j says: `settle` stops at their first sub-ask
+ * (docs/19 section 22), so Move, Build, Secure, Influence and Battle tie at the pip menu and offer
+ * order decides. An earlier version of this comment called the delegate's play "acceptable" on
+ * section 2j's authority; it was measured wrong.
  *
  * ## Determinism
  *
@@ -94,6 +99,12 @@ export interface SearchOptions {
    * can put a candidate weight set under the search without a parallel implementation.
    */
   readonly weights?: Weights
+  /**
+   * Names `weights` in the bot's id. The id is otherwise built from width, depth and replies alone,
+   * so two searches over different weight sets reported under one name, and the arena could not
+   * tell shipped `hard` from a standard-weights beam of the same shape.
+   */
+  readonly weightsLabel?: string
 }
 
 export const DEFAULT_SEARCH: SearchOptions = { width: 3, depth: 14 }
@@ -125,12 +136,13 @@ export function searchBot(options: SearchOptions = DEFAULT_SEARCH): Bot {
   const useRival = options.rivalIntent === true
   const r = options.replies
   const rounds = r?.rounds ?? 1
+  const tags = `${useRival ? ',rival' : ''}${options.weightsLabel === undefined ? '' : `,${options.weightsLabel}`}`
   const id =
     r === undefined
-      ? `search-v3(${options.width}x${options.depth}${useRival ? ',rival' : ''})`
+      ? `search-v3(${options.width}x${options.depth}${tags})`
       : rounds > 1
-        ? `search-v5(${options.width}x${options.depth},r${r.roots}x${r.deals},${rounds}r${useRival ? ',rival' : ''})`
-        : `search-v4(${options.width}x${options.depth},r${r.roots}x${r.deals}${useRival ? ',rival' : ''})`
+        ? `search-v5(${options.width}x${options.depth},r${r.roots}x${r.deals},${rounds}r${tags})`
+        : `search-v4(${options.width}x${options.depth},r${r.roots}x${r.deals}${tags})`
   /*
    * Everything that is not the card play. Same weights, same fitness, same rival scoring — so an
    * arena gap between this bot and `rivalBot` is attributable to the search alone.

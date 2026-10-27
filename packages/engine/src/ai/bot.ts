@@ -77,8 +77,11 @@ export interface BotDecision {
  * harness holds the continuation and the bot does not, so the harness is the only place that can
  * see it. That is the same reason `Lookahead` exists at all.
  *
- * This stays deterministic across clients: it is computed from the position, not from history, so
- * two clients running the bot still agree (docs/03 section 9a).
+ * This is deterministic only given the turn's question history (`AskedThisTurn`), which the caller
+ * threads: two clients agree when they thread the same history (docs/03 section 9a). An earlier
+ * version of this comment said it was computed from the position alone, which it is not — and the
+ * web store starts the history over on undo, load and restore, so a bot's next move there can
+ * differ from the one an uninterrupted game would make (docs/19 section 22).
  */
 export interface Probe {
   /** The first sample. Equivalent to `samples[0]`, kept for bots that do not average. */

@@ -31,6 +31,13 @@
  * arena games and found the pin in **game 41: step 283, chapter 3, the hard seat is yellow**
  * (seat rotation), where the menu splits cleanly at 48 salts — `Lead Construction-5` 40/48 and
  * `Pass` 40/48 against `Lead Aggression-6` and `Lead Aggression-4` at 3/48 each.
+ *
+ * **That oracle was not honest about hidden information** (docs/19 section 22): each rollout was
+ * re-salted dice on the *true* state, so the continuations knew the rivals' real hands and the
+ * court deck's real order. Re-run with rival hands re-dealt, the same position comes out
+ * Construction-5 5/16, Pass 3/16, Aggression-6 2/16 — no longer decided. So this is a regression
+ * floor for the search code — the shipped cross-round bot keeps choosing what it chose — and not
+ * evidence that the choice is right.
  */
 
 import { describe, expect, it } from 'vitest'
