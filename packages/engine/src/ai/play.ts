@@ -12,7 +12,7 @@
  */
 
 import { CardLocation, advance, applyExternal, defaultRegistry, encodeAction, rng } from '../index.js'
-import { contentsOf, moveAll } from '../tracker.js'
+import { contentsOf, locationOf, moveAll } from '../tracker.js'
 import { shuffle } from '../rng.js'
 import { observe } from '../observe.js'
 import { refuses } from './heuristic.js'
@@ -109,12 +109,37 @@ export interface AskedThisTurn {
   /**
    * Movement legs already taken this turn, oldest first. What a "don't undo your own move" term
    * reads: the prompts above encode which *questions* were asked, never which systems the fleet
-   * came from, and the circling bug lived exactly in that blindness.
+   * came from, and the circling bug lived exactly in that blindness. Catapult continuations are
+   * legs too (`legOf`).
    */
   readonly moves: readonly { from: string; to: string }[]
 }
 
 export const NO_ASKS: AskedThisTurn = { turn: '', prompts: new Map(), moves: [] }
+
+/**
+ * The movement leg an action chooses, or undefined: a Move's destination (`action/move-pick`) or a
+ * catapult continuation's (`action/move-more`). Each is the step that picks where the fleet goes —
+ * the fleet-size answer after it moves the same leg, so it is not counted again.
+ *
+ * **The catapult leg was missing, and a chain bounced between two gates for it.** Four-player
+ * seed 77 on Board4MixUp1 ran 2-Gate to 4-Gate and back until `runBots` gave up (docs/19 section
+ * 23): staying in the chain out-scores "Stop here" by the phantom pip, the 2-to-4 leg gained on
+ * position, and the 4-to-2 leg won its tie on offer order. The prompt-repeat guard cannot see it,
+ * because 4-to-2 lands on an *earlier* prompt — which is what unwinding looks like. A continuation
+ * names only its destination, so the origin is read from where the moving group stands; adding
+ * `from` to the action would change the journal's encoding.
+ */
+function legOf(state: GameState, action: Action): { from: string; to: string } | undefined {
+  if (action.type === 'action/move-pick') {
+    return { from: String(action['from']), to: String(action['to']) }
+  }
+  if (action.type !== 'action/move-more') return undefined
+  const first = (action['group'] as readonly string[] | undefined)?.[0]
+  const at = first === undefined ? undefined : locationOf(state.figures, first)
+  if (at === undefined || !at.startsWith('system:')) return undefined
+  return { from: at.slice('system:'.length), to: String(action['to']) }
+}
 
 /**
  * Which turn a position is in.
@@ -781,6 +806,7 @@ export function stepBot(
 
   const lookahead = (action: Action): Probe | undefined => {
     try {
+      const leg = legOf(result.state, action)
       const next = advance(probeFrom(result.state, 0), action, reg)
       const c = next.continue
       /*
@@ -820,9 +846,9 @@ export function stepBot(
         ],
         repeats: at !== undefined && at >= depth,
         undoes:
-          action.type === 'action/move-pick' &&
+          leg !== undefined &&
           history === asked.prompts &&
-          asked.moves.some((m) => m.from === action['to'] && m.to === action['from']),
+          asked.moves.some((m) => m.from === leg.to && m.to === leg.from),
         actionsAhead: pipsAhead(settled.continue, faction),
       }
     } catch {
@@ -838,17 +864,11 @@ export function stepBot(
     foresee,
   )
   const moves = asked.turn === turn ? asked.moves : []
+  const leg = legOf(result.state, decision.action)
   return {
     result: applyExternal(result, decision.action, registry),
     decision,
-    asked: {
-      turn,
-      prompts: seen,
-      moves:
-        decision.action.type === 'action/move-pick'
-          ? [...moves, { from: String(decision.action['from']), to: String(decision.action['to']) }]
-          : moves,
-    },
+    asked: { turn, prompts: seen, moves: leg === undefined ? moves : [...moves, leg] },
   }
 }
 

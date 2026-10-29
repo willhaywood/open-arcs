@@ -37,8 +37,8 @@
  * It declares more without converting worse. In three-player self-play (40 games) it declares 8.6
  * times a game to normal's 5.9 and wins 64% of what it declares to normal's 62%. A lead decision
  * costs 2.5-2.9x normal's, a median 7-14 ms against 2-5 ms, beside a 1.5 s bot pace. No game
- * stalled. One did later, in docs/19 section 23's four-player table: a catapult loop it shares with
- * normal, since only its leads differ.
+ * stalled. One did later, in docs/19 section 23's four-player table: a catapult loop it shared with
+ * normal, since only its leads differ, until the move memory recorded catapult legs.
  *
  * It is `hard` (`levels.ts`), replacing the beam: section 23 measured it above normal at two, three
  * and four players, where the beam was level with normal at three.
