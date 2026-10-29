@@ -2959,13 +2959,44 @@ the four-player table carries a seat that hands out wins, which blurs the three 
 gets cheaper: a median 7-14 ms a lead for the declarer, against the beam's 0.11, 0.18 and 0.26
 seconds a card play at two, three and four players.
 
-**The one unfinished game is a catapult loop, and it is mobile's.** Four-player seed 77 on
+**The one unfinished game was a catapult loop, and it was mobile's.** Four-player seed 77 on
 Board4MixUp1: the declarer's seat continued a catapult chain from 4-Gate to 2-Gate and back until
 `runBots` gave up. Mobile and standard choose the same legs at that ask — the declarer differs
-only at leads — so the loop is in the shared delegate. `AskedThisTurn` records only
-`action/move-pick` legs, so `moveReversal` never sees a catapult leg undo the one before it. In
-the browser the per-turn cap ends such a turn after 200 decisions through Stop here
-(`action/skip`, one of the cap's exits).
+only at leads — so the loop was in the shared delegate. Three things lined up. Staying in the
+chain out-scores Stop here by section 22's phantom pip. 2-Gate to 4-Gate gained `battleUnlocked`:
+4-Gate held two red and two blue ships, so nobody ruled it, the chain could pass, and arriving
+opened a battle. And 4-Gate to 2-Gate won its tie with 5-Gate on offer order. The prompt-repeat
+guard read the return to 2-Gate's earlier prompt as unwinding, and `moveReversal` never saw the
+leg, because `AskedThisTurn` recorded only `action/move-pick` legs. In the browser the per-turn
+cap would end such a turn after 200 decisions through Stop here (`action/skip`, one of the cap's
+exits) — five minutes of a bouncing ship at the bot pace.
+
+**Fixed: a catapult continuation is a leg.** `legOf` (`play.ts`) records `action/move-more` beside
+`action/move-pick`, so `Probe.undoes` sees a continuation reverse any leg made earlier in the turn.
+The action names only its destination, so the origin is read from where the moving group stands;
+adding `from` to the action would change the journal's encoding. Seed 77 now finishes in 909
+decisions: the ship laps the gate ring (1, 2, 4, 5, 6 and back to 1-Gate) and leaves the chain at
+1-Crescent. `mobile.test.ts` rebuilds that position — `standardBot`, with no reversal term, still
+bounces there, which keeps the test honest — and its reversal count now includes continuations,
+which two-player seed 1 broke twice under the old memory. Most continuations *were* reversals
+before: a Move into a gate and the chain straight back out, five of six in six four-player mobile
+games. Measured against the commit before the fix, so only the fix differs:
+
+- **Journals.** 145 games played on both — 48 at two players (mobile, declarer), 48 at three
+  (easy added), 49 at four (the table's seats above, seed 77 included), every board. The 86 with no
+  catapult ask are byte-identical. Of the 59 with one, 42 are identical and 17 diverge, each first
+  at a catapult ask. Easy and standard carry `moveReversal` 0, so their own choices never move.
+- **Arena, with a twin.** 240 four-player games over every board, seated mobile, the beam, the
+  declarer and a mobile twin, so every seat is a bot the fix reaches. Before and after: declarer
+  35.4 and 33.8, beam 29.2 and 29.6, mobile 19.6 and 20.8, twin 15.8 and 15.8, each ±4.4-5.6,
+  against twin gaps of 3.8 and 5.0. Every game finished both times. Paired by game, 209 ended with
+  the same winner after the same number of decisions; 31 changed, 12 of them in who won.
+
+The ladder tables above were measured before the fix. What it leaves: only exact reversals are
+charged, so a chain still runs while it has somewhere new to go — every gate leg out-scores Stop
+here by the phantom pip, which is why seed 77's ship laps the ring before it stops. That is section
+22's `pipsAhead` defect, for the pip-menu horizon (step 2 below). Sprinter Drives legs
+(`action/lore-sprint`) are not in the memory either; no arena run here deals lore.
 
 **Section 22's next steps, revised.**
 
@@ -2975,5 +3006,5 @@ the browser the per-turn cap ends such a turn after 200 decisions through Stop h
 3. **Easy that fumbles only at card plays** — unchanged, and sharper: `easyBot` won 5.2% at four
    players against a 25% line.
 4. **Re-baselining the ladder** is done for normal and hard at every count, and for easy at four.
-5. **Catapult legs in the move-reversal memory**, so a chain cannot bounce between two gates
-   (above).
+5. **Catapult legs in the move-reversal memory**, so a chain cannot bounce between two gates —
+   done, above.

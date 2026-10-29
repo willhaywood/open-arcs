@@ -14,6 +14,10 @@
  * moves to zero. Arena, 240 games against `standardBot` with a twin: 33/31/35 — parity against
  * a 2-point noise gap, so the cleanup costs nothing.
  *
+ * Those probe games counted Move legs only, and so did the memory: a catapult continuation could
+ * still carry a ship straight back to where its Move began, or bounce it between two gates until
+ * `runBots` gave up (docs/19 section 23). Continuations are legs now (`legOf` in `play.ts`).
+ *
  * The fuller idea — positional *pull* (gates held, a graded proximity field toward rivals and
  * unexploited resources) — was built and measured OFF: 28% wins against standard's 43%, plus
  * 41 unfinished games, and its probe machinery (a peek through the fleet-size step) let
