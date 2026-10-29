@@ -15,7 +15,7 @@ import { BOT_LEVELS, MOBILE_WEIGHTS, baselineBot, botForLevel, contestBot, decla
 import type { Bot, BotLevel, Weights } from '@arcs/engine'
 
 import { readFileSync } from 'node:fs'
-import { declarerBot } from '@arcs/engine'
+import { declarerBot, menuBot, menuDeclarerBot } from '@arcs/engine'
 
 /** Where `npm run fit` writes, and what `heuristic:fitted` reads. */
 const FITTED = 'packages/engine/src/ai/fitted-weights.json'
@@ -33,6 +33,8 @@ export type BotSpec =
   | { readonly kind: 'standard' }
   | { readonly kind: 'mobile' }
   | { readonly kind: 'declarer' }
+  | { readonly kind: 'menu' }
+  | { readonly kind: 'menu-declarer' }
   | { readonly kind: 'rival' }
   | { readonly kind: 'weapon' }
   | { readonly kind: 'easy' }
@@ -86,6 +88,10 @@ export function buildBot(spec: BotSpec): Bot {
       return mobileBot
     case 'declarer':
       return declarerBot
+    case 'menu':
+      return menuBot
+    case 'menu-declarer':
+      return menuDeclarerBot
     case 'rival':
       return rivalBot
     case 'weapon':
@@ -144,6 +150,8 @@ export function parseSpec(name: string): BotSpec {
   if (kind === 'standard') return { kind: 'standard' }
   if (kind === 'mobile') return { kind: 'mobile' }
   if (kind === 'declarer') return { kind: 'declarer' }
+  if (kind === 'menu') return { kind: 'menu' }
+  if (kind === 'menu-declarer') return { kind: 'menu-declarer' }
   if (kind === 'rival') return { kind: 'rival' }
   if (kind === 'weapon') return { kind: 'weapon' }
   if (kind === 'easy') return { kind: 'easy' }
@@ -212,7 +220,7 @@ export function parseSpec(name: string): BotSpec {
     }
   }
   throw new Error(
-    `Unknown bot "${name}" — known: level:<easy|normal|hard>, standard, mobile, rival, weapon, baseline, ` +
+    `Unknown bot "${name}" — known: level:<easy|normal|hard>, standard, mobile, declarer, menu, menu-declarer, rival, weapon, baseline, ` +
       `goal, feasible, declare, contest, guard, lore, cost, easy, hand, threat, trivial, heuristic, ` +
       `rollout[:samples:turns], search[:width:depth][:mobile]`,
   )

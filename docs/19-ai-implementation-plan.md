@@ -3002,9 +3002,159 @@ here by the phantom pip, which is why seed 77's ship laps the ring before it sto
 
 1. Declare-aware settle — this section.
 2. **Pip-menu horizon** as a new opt-in bot, after its three pricing defects. Its bar is now the
-   declarer, since that is hard.
+   declarer, since that is hard. Built, and not yet on the ladder — section 24.
 3. **Easy that fumbles only at card plays** — unchanged, and sharper: `easyBot` won 5.2% at four
    players against a 25% line.
 4. **Re-baselining the ladder** is done for normal and hard at every count, and for easy at four.
 5. **Catapult legs in the move-reversal memory**, so a chain cannot bounce between two gates —
    done, above.
+
+## 24. The pip-menu horizon — `menuBot` and `menuDeclarerBot` (#57)
+
+**Section 22's second fix, as an opt-in flag.** `Bot.settleActions` lets a probe play a pip-funded
+action's sub-flow through to the *next* pip menu, resolving each sub-ask by the bot's own one-ply
+choice, so Move, Build, Tax, Influence, Secure and Battle are each scored on the board they leave.
+`menuBot` is `mobileBot` with the flag; `menuDeclarerBot` adds the declarer's `settleDeclares`. The
+two flags touch different decisions — the declarer changes leads, this what follows them — and at a
+pip menu the two bots score every candidate the same (`menu.test.ts`). Neither is on the ladder.
+
+The review's scratch build of this had three pricing defects; building it properly found two more.
+All five are fixed under the flag, so every shipped bot — and the frozen baseline — keeps its
+arithmetic. Checked by playing the same 36 games on `main`'s engine and this one: three seeds on
+every board of each player count, normal and hard seated, easy added at three and four players —
+every action identical.
+
+1. **The horizon.** `settle` stopped at the first ask with pips ahead, which for an action bought
+   at the pip menu is its own first sub-ask. With the flag it plays on to an ask that offers
+   `turn/end`, the forfeit — the pip menu, and nothing else (`isPipMenu`).
+2. **The phantom half-pip.** A sub-ask's `then` carries the same `done` as the menu it came from, so
+   `pipsAhead` counted the pip being spent as still ahead: half a point for stopping inside a
+   sub-flow. Exact counting adds the `+ 1` only at the pip menu. The catapult chain shows it best:
+   at seed 2 step 72 mobile's every "Continue" out-scores "Stop here" by exactly 0.5; with the flag
+   every option counts the same pips.
+3. **The Prelude.** None of the card's pips is spent in the Prelude, so a probe that stopped there —
+   on the arrange board, say — counted none, and Arrange sat its card's pips × 0.5 below Begin.
+   Exact counting reads the `pips` the Prelude's actions and `turn/prelude` continuations carry.
+4. **One roll per Battle.** Sampling fired only if the candidate action itself moved the generator,
+   and a pip-menu Battle rolls three asks into its sub-flow, so it was judged on one imagined roll.
+   With the flag, whether to sample is read off the whole settled line: five rolls for a Battle, one
+   for the Move beside it.
+5. **Arrange decisions cost the square of their options.** Each swap's probe re-decided the arrange
+   board inside itself. `settle` now counts the question being decided as answered, and a line that
+   comes back to it stops there — so a swap's probe resolves nothing, and an arrange decision costs
+   a median 8-10 ms where the review's build took 3.1 s at four players.
+
+**And two livelocks the fixes made, both Arrange and `Done` forever.**
+
+- *Arrange tying a Begin that ends the game.* Begin ends the game on power in some Preludes. An
+  early build that played Arrange's line on through `Done` and Begin saw the game end there too, so
+  Arrange tied Begin and won on offer order — and the repeat gate could not stop it, because the
+  line had "gained" the win. Four games in twelve never finished. The fix is the stop in (5) read as
+  a repeat: a line that settles back at the question being decided `repeats`, and the gate rules it
+  out unless it gained something. With (3), an Arrange that does improve the board still prices at
+  Begin's pips and can win honestly.
+- *A Begin read as coming back.* The first gate run left 9 of 2,399 games unfinished, the new bot
+  stuck in every one. A seat with no legal action for its card's suit ends its turn at Begin (the
+  engine logs the pips as lost), and the same seat can be asked next — in game 291, red followed and
+  then led the next round. Begin's line played on into that seat's next turn, to a Prelude whose
+  prompt is the one being decided word for word, so the stop in (5) read Begin as a line back to its
+  own question. Every option was then a repeat that gained nothing, and with nothing eligible the
+  gate falls back to the best score: Arrange. All nine stuck games were this, at every player
+  count. Settling through actions now stops where the turn ends, by `turnKey`, even when the same
+  seat is asked next, and a line counts as back at its question only in the same turn. All nine
+  games finish.
+
+Both looping games are tests: two-player Board2Frontiers seed 1, and game 291 of the two-player
+gate.
+
+### Where the probes stop, and what they cost
+
+Over three menu-declarer self-play games, one at each player count (12,557 settled probes):
+
+| the probe stopped | share |
+| --- | --- |
+| at the end of the turn, another seat to play | 44.2% |
+| at the next pip menu | 43.4% |
+| back at the question being decided | 6.7% |
+| at the end of the turn, the same seat asked next | 3.7% |
+| at `SETTLE_LIMIT` | 0.74% |
+| at a rival's ask — only "keep this hand, or draw a new six?" as a chapter opens | 0.68% |
+| at the end of the game | 0.51% |
+
+No rival is asked anything mid-action, so the probes never decide for another seat.
+
+Decision time, each bot in self-play: four games at each player count, seeds 31 and 32 on two
+boards. Medians for menu-declarer, the declarer's in brackets:
+
+| players | pip menu | pip menu with Battle on it | card play | arrange |
+| --- | --- | --- | --- | --- |
+| 2 | 4 ms (1), max 80 ms | 49 ms (1), max 0.33 s | 5 ms (6) | 10 ms (10) |
+| 3 | 6 ms (2), max 116 ms | 97 ms (2), max 2.12 s | 10 ms (10) | 8 ms (28) |
+| 4 | 9 ms (3), max 200 ms | 162 ms (3), max 1.13 s | 17 ms (17) | 10 ms (12) |
+
+A pip menu with Battle on it is the cost: five sampled rolls, each settled to the next pip menu.
+Three of the 268 such decisions took over 1.5 s, all at three players. A card play costs what the
+declarer's does, and an arrange decision less — the declarer's reach 0.3-0.7 s at the 95th
+percentile. The slowest decisions are elsewhere and not this bot's: dice-pool choices of up to 20 s
+in these games, for both bots, with up to 226 options each sampled five times.
+
+### The census
+
+One menu seat against mobile, seats rotated — six seeds on Board2Frontiers, three on
+Board4Frontiers — counting each pip menu the bots met and what they bought there:
+
+| | players | pip menus | best option tied | Secure | Influence | Move | Tax |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| mobile | 2 | 639 | 69.8% | 0 | 28 | 254 | 177 |
+| menu | 2 | 641 | 15.9% | 62 | 178 | 92 | 116 |
+| mobile | 4 | 1,871 | 69.5% | 0 | 175 | 704 | 340 |
+| menu | 4 | 602 | 17.1% | 73 | 233 | 80 | 65 |
+
+Mobile still never Secures from a pip menu; menu does in about one menu in ten. The biggest shift is
+toward Influence: 4% and 9% of mobile's pip menus, 28% and 39% of menu's.
+
+### Measured
+
+First a sweep, one seat against copies of mobile, every board (scratch; 360 games, all finished):
+
+| bot | 2 players (80) | 3 players (60) | 4 players (40) |
+| --- | --- | --- | --- |
+| menu | 80.0 ± 8.5 | 65.0 ± 13.0 | 50.0 ± 10.3 |
+| menu-declarer | 81.3 ± 8.4 | 73.3 ± 12.2 | 75.0 ± 12.7 |
+
+against chance lines of 50, 33.3 and 25. One seat against copies flatters the odd one out, so the
+gates put hard — the declarer — at every table, one seat a bot, seats rotated, every board:
+
+| players | games | menu-declarer | menu | declarer | mobile | chance |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2 | 800 | 75.9 ± 2.7 | — | 24.1 ± 2.7 | — | 50 |
+| 3 | 999 | 68.6 ± 2.8 | — | 19.8 ± 2.3 | 11.6 ± 2.0 | 33.3 |
+| 4 | 600 | 44.8 ± 3.7 | 26.0 ± 3.1 | 22.0 ± 2.9 | 7.2 ± 1.9 | 25 |
+
+Power per game, in the same order: 36.8 v 22.1 at two players; 30.6, 18.5 and 15.2 at three; 21.6,
+17.1, 14.7 and 10.4 at four. Every game finished and no seat stalled. Menu-declarer leads on every
+board — 73.0-77.5% at two players, 61.0-73.9% at three, 40.1-47.3% at four — and from every seat:
+its weakest is yellow at two players (61.5%, against the declarer's best, 38.5% as red), blue at
+three (60.4%) and white at four (35.3%, where no other bot passes 16.7%). At four players menu,
+without the declarer's leads, also finishes above the declarer: 26.0 against 22.0 with the
+intervals overlapping, power 17.1 against 14.7, ahead on every board but by under two points on two
+of them.
+
+The first gate run, before the turn stop, is the one that found the second livelock; its finished
+games gave the same picture (76.5, 69.4 and 44.2% for menu-declarer).
+
+### What this does not cover
+
+- **The ladder.** Hard is still the declarer; whether menu-declarer replaces it is a separate change
+  to `levels.ts`.
+- **Menu on its own** met the declarer only at four players, so which of the two flags carries the
+  gain at two and three players is not measured.
+- **No twin run.** No gate seated a copy of a bot beside it, so the tables carry no measure of their
+  own seat noise beyond the intervals.
+- **Lore.** No arena run deals lore, so actions that lore extends — and Sprinter Drives legs, which
+  the move-reversal memory still does not see (section 23) — are not in these numbers.
+- **The census** is two boards, and what the remaining 16-17% of ties are between was not broken
+  down.
+- **`SETTLE_LIMIT`.** 0.74% of probes stop there and are scored mid-flow.
+- **Dice-pool choices** take up to 20 s, for the declarer too. That is older than this bot and a
+  separate fix.
