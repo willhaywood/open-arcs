@@ -200,24 +200,62 @@ const DECLINE = ['ambition/skip-declare', 'turn/prelude-done']
  * Aggression turn "Construction 2".
  *
  * `total - done + 1` because `then` describes the state *after* the pip about to be taken.
+ *
+ * **That `+ 1` is only right at the pip menu.** At a sub-ask of an action — "Move — choose a
+ * destination", a catapult's "continue?" — the pip is already being spent, yet the sub-ask's `then`
+ * carries the same `done`, so the count includes a pip that is gone: half a point at `PIP_VALUE`
+ * for stopping inside a sub-flow rather than finishing it. `exact` counts it honestly. Off for
+ * every bot but the ones that settle through actions (`Bot.settleActions`), because the phantom is
+ * part of every shipped bot's arithmetic and the frozen baseline's.
+ *
+ * `exact` also counts the Prelude, where none of the card's pips is spent yet and every option —
+ * or, on the arrange board and a resource spend's sub-asks, the `then` back to the Prelude —
+ * carries them. Uncounted, a probe that stops in the Prelude prices an Arrange at its card's pips x
+ * 0.5 below Begin, which the review found in every one of 116 Preludes it logged.
  */
-function pipsAhead(cont: Continue, faction: FactionId): number {
+function pipsAhead(cont: Continue, faction: FactionId, exact = false): number {
   if (cont.kind !== 'ask' || cont.faction !== faction) return 0
   const dig = (v: unknown, depth = 0): Record<string, unknown> | undefined => {
     if (depth > 6 || v === null || typeof v !== 'object') return undefined
     const o = v as Record<string, unknown>
-    if (o['type'] === 'turn/pips') return o
+    if (o['type'] === 'turn/pips' || (exact && o['type'] === 'turn/prelude')) return o
     return dig(o['then'], depth + 1)
   }
   for (const a of cont.actions) {
+    if (exact && a.type.startsWith('turn/prelude') && typeof a['pips'] === 'number') return a['pips']
     const hit = dig(a['then'])
     if (hit === undefined) continue
+    if (hit['type'] === 'turn/prelude') return Math.max(0, Number(hit['pips']) || 0)
     const done = Number(hit['done'])
     const total = Number(hit['total'])
     if (!Number.isFinite(done) || !Number.isFinite(total)) continue
-    return Math.max(0, total - done + 1)
+    return Math.max(0, total - done + (exact && !isPipMenu(cont) ? 0 : 1))
   }
   return 0
+}
+
+/**
+ * The ask that spends the next pip: the menu of actions the played card's suit can buy.
+ *
+ * Recognized by its forfeit, `turn/end` ("End turn (forfeit N)"), which the engine offers at that
+ * menu and at no other ask. The same knowing coupling to a type string as `DECLINE`, and degraded
+ * the same way: a renamed type makes `settle` play on past the menu until another exit stops it.
+ */
+function isPipMenu(cont: Continue): boolean {
+  return cont.kind === 'ask' && cont.actions.some((a) => a.type === 'turn/end')
+}
+
+/**
+ * Ways out of a sub-decision that finish it rather than abandon it: `Done` on the arrange board, the
+ * declines, a catapult's `Stop here`. Taken when `settle` comes back to a prompt it already
+ * answered, so a probe ends at the pip menu rather than mid-flow (`Bot.settleActions`).
+ */
+function finishes(action: Action): boolean {
+  return (
+    action.type === 'resources/arrange-done' ||
+    DECLINE.includes(action.type) ||
+    (action.type === 'action/skip' && !refuses(action))
+  )
 }
 
 /**
@@ -306,28 +344,72 @@ function probeFrom(state: GameState, salt: number): GameState {
   return { ...state, rng: rng((state.journal.length + 1) * 0x9e3779b1 + salt * 0x85ebca77) }
 }
 
+/** What a bot asks `settle` to resolve rather than decline or stop at. */
+interface SettleOptions {
+  /** `Bot.settleDeclares`: resolve the declare prompt instead of declining it. */
+  readonly declares?: boolean
+  /** `Bot.settleActions`: play a pip-funded action through to the next pip menu. */
+  readonly actions?: boolean
+  /** The prompt being decided, counted as already answered (`actions` only). */
+  readonly from?: string
+  /** The turn being decided (`turnKey`); a line stops where it ends (`actions` only). */
+  readonly turn?: string
+}
+
 function settle(
   result: RuleResult,
   faction: FactionId,
   reg: RuleRegistry,
   resolve: (result: RuleResult, actions: readonly Action[]) => Action,
-  /** `Bot.settleDeclares`: resolve the declare prompt instead of declining it. */
-  resolveDeclares = false,
+  opts: SettleOptions = {},
 ): RuleResult {
   let current = result
+  const through = opts.actions === true
   /*
    * Prompts already resolved inside this settle, so a sub-flow that can be re-entered — arranging
    * resource slots, which offers value-neutral swaps forever — costs one step rather than the whole
    * budget. `stepBot`'s own history cannot help here: none of this is happening in the real game.
+   *
+   * Settling through actions also counts the question being decided, and a line that comes back to
+   * it stops there: the candidate led back to its own question, which `stepBot` reports as a repeat
+   * so the gate can rule it out unless it gained something. Without the count every candidate at
+   * the arrange board re-decided that board inside its own probe, at a cost that grew with the
+   * square of the options — a median 3.1 s per four-player arrange decision in the review's
+   * scratch build. Without the stop, an Arrange from the Prelude played on through `Done` and Begin
+   * to exactly where Begin goes, tied it, and won on offer order — forever, where Begin itself ends
+   * the game (docs/19 section 24).
    */
-  const visited = new Set<string>()
+  const visited = new Set<string>(through && opts.from !== undefined ? [opts.from] : [])
 
   for (let i = 0; i < SETTLE_LIMIT; i++) {
     const c = current.continue
     if (c.kind !== 'ask' || c.faction !== faction) return current
-    // The horizon: the turn's actions are about to be spent, which is what candidates are compared at.
-    if (pipsAhead(c, faction) > 0) return current
-    if (c.prompt !== undefined && visited.has(c.prompt)) return current
+    /*
+     * Settling through actions, the turn is the outer horizon even when the same seat is asked
+     * next: a two-player follower who leads the next round, or a Begin that ends a turn with no
+     * legal action. Played on, such a line reached that seat's next Prelude, whose prompt is this
+     * one's word for word, and read as coming back here — so Begin was ruled out with the Arrange
+     * beside it, and the bot arranged and pressed Done for the rest of the game.
+     */
+    if (through && opts.turn !== undefined && turnKey(current.state) !== opts.turn) return current
+    /*
+     * The horizon: the turn's actions are about to be spent, which is what candidates are compared
+     * at. Settling through actions moves it to the *next* pip menu, so Move, Build, Tax, Influence,
+     * Secure and Battle are each scored on the board they leave instead of all tying on the board as
+     * it was (docs/19 section 24).
+     */
+    if (pipsAhead(c, faction) > 0 && (!through || isPipMenu(c))) return current
+    if (c.prompt !== undefined && visited.has(c.prompt)) {
+      /*
+       * Back at a question already answered: stop — or, settling through actions and anywhere but
+       * the question being decided, finish the sub-decision and carry on to the pip menu, so a swap
+       * on the arrange board is scored as that swap and then `Done`.
+       */
+      const exit = through && c.prompt !== opts.from ? c.actions.find(finishes) : undefined
+      if (exit === undefined) return current
+      current = advance(current.state, exit, reg)
+      continue
+    }
     if (c.prompt !== undefined) visited.add(c.prompt)
 
     /*
@@ -337,7 +419,7 @@ function settle(
      * look, which follows a declaration, is still declined: it lists a rival's real hand, which a
      * probe on the true state must not read.
      */
-    if (resolveDeclares) {
+    if (opts.declares === true) {
       const skip = c.actions.find((a) => a.type === 'ambition/farseers-skip')
       if (skip !== undefined || c.actions.some((a) => a.type === 'ambition/declare')) {
         current = advance(current.state, skip ?? resolve(current, c.actions), reg)
@@ -361,8 +443,8 @@ function settle(
      * Build, Tax, Influence, Secure and Battle still tie at the pip menu — the first offer wins about
      * 98% of the time. What reaches the resolution below is sub-asks with no pip continuation, such
      * as a Prelude spend's. Section 2j's secures came through that route. Changing it changes every
-     * bot that shares this harness, the frozen baseline included, so the fix belongs in an opt-in
-     * bot (docs/19 section 22).
+     * bot that shares this harness, the frozen baseline included, so the fix is an opt-in flag,
+     * `Bot.settleActions` (docs/19 sections 22 and 24).
      */
     const decline = c.actions.find((a) => DECLINE.includes(a.type))
     current = advance(current.state, decline ?? resolve(current, c.actions), reg)
@@ -397,22 +479,29 @@ function sampleOutcomes(
   return out
 }
 
-/** The extra settled samples for a random action, beyond the first the caller already has. */
+/**
+ * The extra settled samples for a random action, beyond the first the caller already has.
+ *
+ * `random` is the caller's reading of whether the first sample consumed randomness. For every
+ * shipped bot that is the candidate action alone moving the generator; settling through actions
+ * reads the whole settled line, because the dice of a pip-menu Battle are rolled three asks into
+ * its sub-flow. Reading only the first step, all 15 Battles among 188 logged pip-menu probes in the
+ * review were judged on a single imaginary roll.
+ */
 function settledSamples(
   state: GameState,
   action: Action,
   faction: FactionId,
   reg: RuleRegistry,
   resolve: (result: RuleResult, actions: readonly Action[]) => Action,
-  resolveDeclares = false,
+  opts: SettleOptions,
+  random: boolean,
 ): readonly ObservedState[] {
-  const base = probeFrom(state, 0)
-  const first = advance(base, action, reg)
-  if (first.state.rng.seed === base.rng.seed) return []
+  if (!random) return []
   const out: ObservedState[] = []
   for (let i = 1; i < SAMPLES; i++) {
     try {
-      const settled = settle(advance(probeFrom(state, i), action, reg), faction, reg, resolve, resolveDeclares)
+      const settled = settle(advance(probeFrom(state, i), action, reg), faction, reg, resolve, opts)
       out.push(observe(settled.state, faction))
     } catch {
       // As above: a failed sample is one fewer opinion, not a reason to discard the candidate.
@@ -590,6 +679,12 @@ export function stepBot(
    * sub-flow whose every candidate resolves a sub-flow, and the work would compound. One ply inside
    * the sub-flow is enough to tell a good target from a bad one, which is all this has to do.
    */
+  const through = bot.settleActions === true
+  const settling: SettleOptions = {
+    ...(bot.settleDeclares === true ? { declares: true } : {}),
+    ...(through ? { actions: true, turn } : {}),
+    ...(through && asking.prompt !== undefined ? { from: asking.prompt } : {}),
+  }
   const resolve = (at: RuleResult, options: readonly Action[]): Action => {
     const shallow = (action: Action): Probe | undefined => {
       try {
@@ -599,7 +694,9 @@ export function stepBot(
           observed: samples[0]!,
           samples,
           repeats: false,
-          actionsAhead: pipsAhead(after.continue, faction),
+          // Settling through actions, a catapult's "continue" no longer outscores its "Stop here"
+          // by the phantom half-pip alone (`pipsAhead`).
+          actionsAhead: pipsAhead(after.continue, faction, through),
         }
       } catch {
         return undefined
@@ -832,7 +929,18 @@ export function stepBot(
        * re-entry it exists to catch. The value is read after settling, because that is the horizon
        * candidates have to share to be comparable.
        */
-      const settled = settle(next, faction, reg, resolve, bot.settleDeclares === true)
+      const settled = settle(next, faction, reg, resolve, settling)
+      const unmoved = probeFrom(result.state, 0).rng.seed
+      const random = (through ? settled : next).state.rng.seed !== unmoved
+      // Settling through actions, a line that stops back at this question repeats it (`settle`) —
+      // in this turn: the next turn's Prelude carries the same prompt.
+      const home =
+        through &&
+        asking.prompt !== undefined &&
+        settled.continue.kind === 'ask' &&
+        settled.continue.faction === faction &&
+        settled.continue.prompt === asking.prompt &&
+        turnKey(settled.state) === turn
       /*
        * `repeats` and `actionsAhead` come from the first sample alone: both are questions about the
        * shape of the game — which question comes next, how many pips are left — and neither is
@@ -842,14 +950,14 @@ export function stepBot(
         observed: observe(settled.state, faction),
         samples: [
           observe(settled.state, faction),
-          ...settledSamples(result.state, action, faction, reg, resolve, bot.settleDeclares === true),
+          ...settledSamples(result.state, action, faction, reg, resolve, settling, random),
         ],
-        repeats: at !== undefined && at >= depth,
+        repeats: (at !== undefined && at >= depth) || home,
         undoes:
           leg !== undefined &&
           history === asked.prompts &&
           asked.moves.some((m) => m.from === leg.to && m.to === leg.from),
-        actionsAhead: pipsAhead(settled.continue, faction),
+        actionsAhead: pipsAhead(settled.continue, faction, through),
       }
     } catch {
       return undefined

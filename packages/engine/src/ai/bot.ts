@@ -300,6 +300,15 @@ export interface Bot {
    */
   readonly settleDeclares?: boolean
   /**
+   * Let the harness play a pip-funded action through to the next pip menu while scoring it.
+   *
+   * Off for every bot unless set, for the same reason. Without it a probe stops at the first ask
+   * with pips ahead, which for Move, Build, Tax, Influence, Secure and Battle is their own first
+   * sub-ask, before the board has moved: they tie, and the first offer wins about 98% of pip
+   * menus (docs/19 sections 22 and 24).
+   */
+  readonly settleActions?: boolean
+  /**
    * `lookahead` is absent for callers that cannot supply it. A bot that needs it must degrade
    * rather than throw: an evaluator with no lookahead is a worse bot, not a broken game.
    */
