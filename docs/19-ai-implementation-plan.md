@@ -3158,3 +3158,62 @@ games gave the same picture (76.5, 69.4 and 44.2% for menu-declarer).
 - **`SETTLE_LIMIT`.** 0.74% of probes stop there and are scored mid-flow.
 - **Dice-pool choices** take up to 20 s, for the declarer too. That is older than this bot and a
   separate fix.
+
+## 25. Every rung up one bot: mobile easy, the declarer normal, menu-declarer hard (#58)
+
+**The ladder now runs `mobileBot`, `declarerBot`, `menuDeclarerBot`**, and `easyBot` leaves it.
+Above easy each rung is the one below with one more of section 22's harness fixes: normal resolves
+the declaration a lead would make, hard also plays a pip-funded action through to the next pip
+menu.
+
+Measured on #57's code, every board of each player count, seats rotated; power a game in brackets:
+
+| players | games | table | hard | normal | easy | `easyBot` | chance |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2 | 800 | head to head | — | 57.8 ± 2.8 (28.6) | 42.3 (23.5) | — | 50 |
+| 2 | 800 | head to head | 75.9 ± 2.7 (36.8) | 24.1 (22.1) | — | — | 50 |
+| 2 | 800 | head to head | — | 83.5 ± 2.3 (32.9) | — | 16.5 (11.8) | 50 |
+| 3 | 999 | one table | 68.6 ± 2.8 (30.6) | 19.8 ± 2.3 (18.5) | 11.6 ± 2.0 (15.2) | — | 33.3 |
+| 3 | 998 of 999 | one table | 67.1 ± 2.8 (30.9) | 32.1 ± 2.7 (22.7) | — | 0.8 ± 0.5 (6.4) | 33.3 |
+| 4 | 600 | one table | 60.2 ± 3.5 (25.4) | 30.0 ± 3.6 (18.8) | 7.7 ± 2.0 (11.3) | 2.2 ± 1.1 (5.1) | 25 |
+
+The rows with a hard seat come from section 24's gates and from this section's ladder runs; the
+two-player declarer-against-mobile row is new, on current `main` — section 23's 56.9% predates
+#56, which changed both bots' catapult choices. Every game finished but one, below, and no other
+seat stalled.
+
+**Why mobile for easy, not `easyBot`.** With `easyBot` kept, the step from easy to normal is the
+largest on the ladder: 83.5% head to head at two players, and `easyBot` wins 0.8% and 2.2% at the
+three- and four-player tables. It also still loops in a Prelude — Arrange, Done, Arrange — which
+the three-player ladder run hit once in 999 games (Board3Frontiers seed 46, `easyBot` as red). The
+same position loops on `main`'s engine with `main`'s `easyBot`, so it is section 22's livelock, not
+this change; the web store's turn cap ends it after 200 decisions, about five minutes at the bot
+pace. No level on the new ladder has been seen to loop, so the cap's test (`bot-stuck-cap.test.ts`),
+which reached that loop through the easy level, now hands the store `easyBot` itself.
+
+**The steps are not even.** Easy to normal is the small one at two and three players: 57.8% head
+to head at two — 70.0% on Board2Frontiers, 56.5% on Board2Homelands, 54.0% on Board2MixUp2 and
+50.5% on Board2MixUp1, where the first seat wins most games whichever bot sits there — and 19.8% to
+11.6% at three, power 18.5 to 15.2. Normal to hard is large everywhere: 75.9% head to head, then
+68.6% to 19.8% and 60.2% to 30.0%. Only at four players are the power steps close: 7.5 and 6.6. The
+alternative kept `easyBot` as easy, normal and hard as here, and would have had the large step at
+the bottom instead.
+
+**What a player meets.** A saved game loads against the bot its level names today: a normal game,
+which stores no level, as saves from before levels do, now plays the declarer where it played
+mobile; `levels.ts` already says a level is not a promise about which bot a save keeps. Hard thinks
+longest at a pip menu with Battle on it: a median 49-162 ms, up to 2.1 s (section 24). The slowest
+decisions are older than this change and on every level: choosing battle dice, each option rolled
+five times. In mobile's own four-player self-play one such choice, 287 options, took 73.5 s; the
+declarer's and hard's took up to 20 s in section 24's games. The web app decides on the page's main
+thread, so a choice like that freezes the page.
+
+### What this does not cover
+
+- **No twin run**, as in section 24.
+- **No three-player table with all three rungs and `easyBot`.** The three-player rows are two
+  tables; the four-player one seats all four.
+- **Bot against bot.** These say which level beats which; how large each step feels to a person is
+  not measured.
+- **Lore** is not dealt in any run here.
+- **The dice choice** above is not fixed here.
