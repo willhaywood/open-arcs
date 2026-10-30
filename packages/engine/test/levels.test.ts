@@ -2,8 +2,11 @@
  * The difficulty ladder (`levels.ts`) and the easy bot (`easy.ts`).
  *
  * The ladder's contract is small and worth pinning exactly: every level resolves to a bot, absent
- * means normal (old saves must play as they always did), and the levels genuinely differ — a
- * selector whose options all resolve to the same opponent is decoration.
+ * means normal (a save from before levels existed still loads), and the levels genuinely differ —
+ * a selector whose options all resolve to the same opponent is decoration.
+ *
+ * `easyBot` left the ladder in docs/19 section 25 and keeps its tests here: it is still a bot the
+ * arena seats, and its fixes are still worth pinning.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -17,6 +20,7 @@ import {
   declarerBot,
   defaultRegistry,
   easyBot,
+  menuDeclarerBot,
   playGameAt,
   standardBot,
   mobileBot,
@@ -35,21 +39,22 @@ describe('the ladder', () => {
       expect(typeof botForLevel(level).decide, `${level} resolves`).toBe('function')
     }
     expect(botForLevel(undefined)).toBe(botForLevel('normal'))
-    // Normal is standard plus the move-reversal penalty — the anti-circling rung (mobile.ts).
-    expect(botForLevel('normal')).toBe(mobileBot)
-    // Hard is normal seeing the ambition its lead would declare (declarer.ts).
-    expect(botForLevel('hard')).toBe(declarerBot)
+    // Easy is standard plus the move-reversal penalty — the anti-circling bot (mobile.ts).
+    expect(botForLevel('easy')).toBe(mobileBot)
+    // Normal is easy seeing the ambition its lead would declare (declarer.ts).
+    expect(botForLevel('normal')).toBe(declarerBot)
+    // Hard is normal seeing what a pip-funded action does (menu.ts).
+    expect(botForLevel('hard')).toBe(menuDeclarerBot)
   })
 
   it('adjacent levels are different opponents in a real game', () => {
     /*
-     * Each level plays seed 3 against itself. Easy parts from normal at the first decision — it
-     * leads Administration-3 where normal leads Construction-2 — but hard is normal everywhere
-     * except a lead where the ambition counts, so the opening card play no longer tells them
-     * apart; their first difference is decision 51, yellow leading Aggression-6 where normal
-     * leads Mobilization-2. Asserting difference of the *chosen actions* rather than bot
-     * identity, because identity cannot catch a mapping that returns different objects wrapping
-     * the same play.
+     * Each level plays seed 3 against itself. Normal is easy everywhere except a lead where the
+     * ambition counts, so the opening card play does not tell them apart; their first difference
+     * is decision 51, yellow leading Aggression-6 where easy leads Mobilization-2. Hard parts from
+     * normal at decision 24, blue spending an Administration pip on Influence where normal Taxes.
+     * Asserting difference of the *chosen actions* rather than bot identity, because identity
+     * cannot catch a mapping that returns different objects wrapping the same play.
      */
     const opening = (level: Parameters<typeof botForLevel>[0]): string[] => {
       let cur: RuleResult = startGame(
