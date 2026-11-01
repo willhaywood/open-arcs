@@ -19,8 +19,8 @@
  * forever (docs/19 section 24).
  *
  * `menuDeclarerBot` adds the declarer's `settleDeclares` (`declarer.ts`). The two flags touch
- * different decisions — the declarer changes only leads, this only what follows them — so the
- * combination is the bot to measure against `hard`.
+ * different decisions — the declarer changes only leads, this only what follows them — and the
+ * combination is `hard` (`levels.ts`).
  */
 
 import type { Bot } from './bot.js'

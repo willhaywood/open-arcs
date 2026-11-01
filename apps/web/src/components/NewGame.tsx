@@ -37,7 +37,7 @@ import { asset } from '../assets.js'
  * The levels the menu offers, in play order — every rung the engine has, since the ladder was cut
  * to the three that measure apart (docs/19 section 14). It was four, and `brutal` went when the
  * reply search it named became `hard`; `hard` has since passed from that search to the declarer
- * (section 23).
+ * (section 23), and every rung has moved up one bot (section 25).
  *
  * The engine's mapping (`botForLevel`) remains the single source of what each name resolves to, so
  * this list is a presentation order and nothing more.

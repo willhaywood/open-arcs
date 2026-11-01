@@ -37,13 +37,13 @@ describe('store.stepBotOnce', () => {
   it('plays the level the game was started with', () => {
     /*
      * Seed 3 is the established discriminator (levels.test.ts): normal and hard first choose
-     * differently at decision 51. If the store ignored botLevel these would be equal — the exact
+     * differently at decision 24. If the store ignored botLevel these would be equal — the exact
      * regression of hard-coding standardBot.
      */
     const normal = openingUnder()
     const hard = openingUnder('hard')
     expect(hard).not.toEqual(normal)
-    // And absent means normal, byte for byte — old saves play as they always did.
+    // And absent means normal, byte for byte — a save with no level plays today's normal.
     expect(openingUnder('normal')).toEqual(normal)
   })
 })

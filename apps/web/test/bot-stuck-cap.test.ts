@@ -1,15 +1,24 @@
 /**
  * The store's per-turn stuck cap (`BOT_TURN_CAP`).
  *
- * The easy mirror on three-player seed 126 livelocks: in chapter 5 red's bot bounces between the
- * Prelude's Arrange and the arrange board's Done, because both score the same and neither writes to
- * the log, so the same pick comes back forever. In the arena `runBots` gives up; in the browser,
- * before the cap, the game simply never ended. Driven through the real store and the real loop.
+ * The `easyBot` mirror on three-player seed 126 livelocks: in chapter 5 red's bot bounces between
+ * the Prelude's Arrange and the arrange board's Done, because both score the same and neither
+ * writes to the log, so the same pick comes back forever. In the arena `runBots` gives up; in the
+ * browser, before the cap, the game simply never ended. Driven through the real store and the real
+ * loop.
+ *
+ * `easyBot` left the ladder in docs/19 section 25, and no level has been seen to livelock since, so
+ * the store is handed it through `botForLevel` here. The cap is for whatever livelocks next.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BOT_TURN_CAP, store, stuckExit } from '../src/store.js'
+
+vi.mock('@arcs/engine', async (importOriginal) => {
+  const engine = await importOriginal<typeof import('@arcs/engine')>()
+  return { ...engine, botForLevel: () => engine.easyBot }
+})
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
@@ -22,9 +31,8 @@ describe('the bot stuck cap', () => {
       factions: ['red', 'yellow', 'blue'],
       seed: 126,
       bots: ['red', 'yellow', 'blue'],
-      botLevel: 'easy',
     })
-    // A finished easy game here takes about 500 decisions; the loop adds the cap and its exit.
+    // A finished `easyBot` game here takes about 500 decisions; the loop adds the cap and its exit.
     for (let i = 0; i < 3_000 && store.getSnapshot()?.state.isOver !== true; i++) store.stepBotOnce()
     expect(store.getSnapshot()?.state.isOver).toBe(true)
     // It finished because the cap fired, not because the loop went away.
