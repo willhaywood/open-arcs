@@ -226,7 +226,8 @@ one invariant still worth adding.
   is the implementation record, including a register of measured dead ends so they are not retried;
   section 22 records the harness defects that put a caveat on several of those dead ends, and
   section 23 the first fix to one of them, which took hard from the v3 beam, and section 24 the
-  second; section 25 builds the ladder from the two.
+  second; section 25 builds the ladder from the two, and section 26 makes the dice menu fast
+  without changing a decision.
 
   What is genuinely left here is narrower than "AI": the token-pricing feature in `ai/value.ts`
   counts resource *tokens* only and ignores Guild-card icons, while `courtSecured` counts the cards

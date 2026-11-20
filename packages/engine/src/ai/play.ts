@@ -344,6 +344,106 @@ function probeFrom(state: GameState, salt: number): GameState {
   return { ...state, rng: rng((state.journal.length + 1) * 0x9e3779b1 + salt * 0x85ebca77) }
 }
 
+/**
+ * A battle's resolution as already decided at one decision, shared by every probe that rolls there.
+ *
+ * **Why the dice menu was slow.** Every pool on offer is probed `SAMPLES` times, and every sample
+ * is settled: the roll's hits are assigned one at a time, then its raid keys spent and any stolen
+ * resource made room for, each through the bot's own one-ply judgement. A 226-pool menu is 1,130
+ * settled rolls of up to ten asks each: tens of seconds for one decision, against a 1.5 s bot pace.
+ *
+ * **Why an answer can be shared without changing it.** Every sampled roll at a decision starts from
+ * the decision's own board and differs only in the generator, the dice shown (`lastRoll`), the text
+ * of what the roll logged, and the counts the faces produced. Two probes that then take the same
+ * path hold the same state but for those, so the bot's answer depends on the path, the options
+ * offered and, once the hits are placed, the raid keys left — and on nothing else:
+ *
+ *   - **Not the hit counts.** They decide only which ask comes next (`offerAssign`). A hit probe
+ *     moves the board the same way whatever remains to assign, and lands on another hit ask or
+ *     the confirm, no pips ahead.
+ *   - **Not the generator.** The probes reseed it (`probeFrom`).
+ *   - **Not the dice or the log's text**, which no bot reads. `easyBot` hashes the log's *length*,
+ *     and the path fixes that, since every step on it logs the same lines.
+ *
+ * So the answer is keyed on those (`optionKey`), and another pool, another sample, or a larger roll
+ * still placing its first hits reuses it.
+ *
+ * Kept exact by declining what that argument does not cover. The first shared ask must be the
+ * battle's first resolution ask, on the decision's own board with nothing but log lines added
+ * (`rolledFrom`): one for the roll and one more for each reroll before it. The count goes on the
+ * path, since the log's length is read. A roll that also changed something else, such as
+ * Irregular's Weapon discard, settles alone. Sharing stops the moment the generator moves: past a
+ * draw, the path no longer says what the state holds. Scoped to one decision, like `exploreCache`.
+ *
+ * **Measured** in docs/19 section 26: the same journals with and without it, and what stays slow.
+ */
+interface BattleMemo {
+  /** The position being decided, which every probe's roll starts from. */
+  readonly root: GameState
+  /** The path and the options as `optionKey` sees them, to the index chosen. */
+  readonly chosen: Map<string, number>
+}
+
+/** Asks inside a battle's resolution, whose options all carry the battle's context as `ctx`. */
+const RESOLUTION = new Set(['battle/hit', 'battle/finish', 'battle/raid-take', 'battle/settle'])
+
+/**
+ * How many log lines past the memo's position `state` is, when a roll is all that happened to it:
+ * the same board, object for object. One line for the roll, one more for each reroll before it.
+ * `undefined` when anything else moved.
+ */
+function rolledFrom(state: GameState, root: GameState): number | undefined {
+  const lines = state.log.length - root.log.length
+  if (lines < 1) return undefined
+  const keys = new Set([...Object.keys(state), ...Object.keys(root)] as (keyof GameState)[])
+  for (const key of keys) {
+    if (key === 'rng' || key === 'lastRoll' || key === 'log') continue
+    if (state[key] !== root[key]) return undefined
+  }
+  return lines
+}
+
+/** Which battle a shared path belongs to: its context, less everything the roll decides. */
+const battleKey = (ctx: Record<string, unknown>): string =>
+  JSON.stringify(
+    ['faction', 'system', 'enemy', 'razed', 'tookTrophies', 'rifles', 'railgun', 'then'].map(
+      (k) => ctx[k],
+    ),
+  )
+
+/** What nothing after the hits reads in the battle's context: the faces and the hit counts. */
+const UNREAD = new Set(['dice', 'intercepted', 'self', 'ships', 'buildings'])
+
+/**
+ * An option as the memo sees it. A hit's battle context is dropped whole — the path carries the
+ * battle, and none of the rest matters to a hit. Anywhere else the context stays, wherever it is
+ * nested, less `UNREAD`: the raid keys and the turn to return to are what the later asks read.
+ */
+const optionKey = (action: Action, hit: boolean): string =>
+  JSON.stringify(action, (k, v: unknown) => {
+    if (k !== 'ctx') return v
+    if (hit) return undefined
+    return Object.fromEntries(Object.entries(v as object).filter(([f]) => !UNREAD.has(f)))
+  })
+
+/** The bot's answer on a shared path, from the memo when it has been decided before. */
+function sharedChoice(
+  memo: BattleMemo,
+  path: readonly string[],
+  at: RuleResult,
+  options: readonly Action[],
+  resolve: (result: RuleResult, actions: readonly Action[]) => Action,
+): Action {
+  const hit = options.every((a) => a.type === 'battle/hit')
+  const key = [...path, '|', ...options.map((a) => optionKey(a, hit))].join('\n')
+  const known = memo.chosen.get(key)
+  if (known !== undefined) return options[known]!
+  const action = resolve(at, options)
+  const i = options.indexOf(action)
+  if (i !== -1) memo.chosen.set(key, i)
+  return action
+}
+
 /** What a bot asks `settle` to resolve rather than decline or stop at. */
 interface SettleOptions {
   /** `Bot.settleDeclares`: resolve the declare prompt instead of declining it. */
@@ -362,6 +462,7 @@ function settle(
   reg: RuleRegistry,
   resolve: (result: RuleResult, actions: readonly Action[]) => Action,
   opts: SettleOptions = {},
+  battles?: BattleMemo,
 ): RuleResult {
   let current = result
   const through = opts.actions === true
@@ -380,6 +481,11 @@ function settle(
    * the game (docs/19 section 24).
    */
   const visited = new Set<string>(through && opts.from !== undefined ? [opts.from] : [])
+  /*
+   * This settle's path since a battle's resolution began, while it can share it (`BattleMemo`):
+   * `undefined` before the first resolution ask, `null` once it cannot.
+   */
+  let shared: { readonly path: string[]; readonly rng: GameState['rng'] } | null | undefined
 
   for (let i = 0; i < SETTLE_LIMIT; i++) {
     const c = current.continue
@@ -399,6 +505,33 @@ function settle(
      * it was (docs/19 section 24).
      */
     if (pipsAhead(c, faction) > 0 && (!through || isPipMenu(c))) return current
+
+    /*
+     * Sharing (`BattleMemo`) starts at a battle's first resolution ask and lasts while the
+     * generator stands still. Every step from there goes onto the path — the answers `choose`
+     * gives, the declines, and the exit a repeated prompt takes below — so a shared path is the
+     * settle's own, step for step.
+     */
+    const resolution = c.actions.every((a) => RESOLUTION.has(a.type))
+    if (battles !== undefined && shared === undefined && resolution) {
+      const ctx = c.actions[0]!['ctx'] as Record<string, unknown>
+      const start = current.state
+      const lines = rolledFrom(start, battles.root)
+      shared = lines === undefined ? null : { path: [battleKey(ctx), `+${lines}`], rng: start.rng }
+    } else if (shared !== undefined && shared !== null && shared.rng !== current.state.rng) {
+      shared = null
+    }
+    const at = current
+    const path = shared?.path
+    const choose = (options: readonly Action[]): Action =>
+      battles === undefined || path === undefined
+        ? resolve(at, options)
+        : sharedChoice(battles, path, at, options, resolve)
+    const take = (action: Action): void => {
+      path?.push(optionKey(action, action.type === 'battle/hit'))
+      current = advance(at.state, action, reg)
+    }
+
     if (c.prompt !== undefined && visited.has(c.prompt)) {
       /*
        * Back at a question already answered: stop — or, settling through actions and anywhere but
@@ -407,7 +540,7 @@ function settle(
        */
       const exit = through && c.prompt !== opts.from ? c.actions.find(finishes) : undefined
       if (exit === undefined) return current
-      current = advance(current.state, exit, reg)
+      take(exit)
       continue
     }
     if (c.prompt !== undefined) visited.add(c.prompt)
@@ -422,7 +555,7 @@ function settle(
     if (opts.declares === true) {
       const skip = c.actions.find((a) => a.type === 'ambition/farseers-skip')
       if (skip !== undefined || c.actions.some((a) => a.type === 'ambition/declare')) {
-        current = advance(current.state, skip ?? resolve(current, c.actions), reg)
+        take(skip ?? choose(c.actions))
         continue
       }
     }
@@ -446,8 +579,7 @@ function settle(
      * bot that shares this harness, the frozen baseline included, so the fix is an opt-in flag,
      * `Bot.settleActions` (docs/19 sections 22 and 24).
      */
-    const decline = c.actions.find((a) => DECLINE.includes(a.type))
-    current = advance(current.state, decline ?? resolve(current, c.actions), reg)
+    take(c.actions.find((a) => DECLINE.includes(a.type)) ?? choose(c.actions))
   }
   return current
 }
@@ -496,13 +628,14 @@ function settledSamples(
   resolve: (result: RuleResult, actions: readonly Action[]) => Action,
   opts: SettleOptions,
   random: boolean,
+  battles?: BattleMemo,
 ): readonly ObservedState[] {
   if (!random) return []
   const out: ObservedState[] = []
   for (let i = 1; i < SAMPLES; i++) {
     try {
-      const settled = settle(advance(probeFrom(state, i), action, reg), faction, reg, resolve, opts)
-      out.push(observe(settled.state, faction))
+      const sample = advance(probeFrom(state, i), action, reg)
+      out.push(observe(settle(sample, faction, reg, resolve, opts, battles).state, faction))
     } catch {
       // As above: a failed sample is one fewer opinion, not a reason to discard the candidate.
     }
@@ -686,6 +819,12 @@ export function stepBot(
     ...(through && asking.prompt !== undefined ? { from: asking.prompt } : {}),
   }
   const resolve = (at: RuleResult, options: readonly Action[]): Action => {
+    /*
+     * A lone option is the answer whatever the bot thinks of it, and only the answer is kept here.
+     * Every settled roll ends on one, "confirm the damage", so asking the bot cost a probe and two
+     * evaluations per sample of every pool.
+     */
+    if (options.length === 1) return options[0]!
     const shallow = (action: Action): Probe | undefined => {
       try {
         const samples = sampleOutcomes(at.state, action, reg, faction)
@@ -901,6 +1040,8 @@ export function stepBot(
     return out
   }
 
+  // Shared by every settled probe at this decision; see `BattleMemo`.
+  const battles: BattleMemo = { root: result.state, chosen: new Map() }
   const lookahead = (action: Action): Probe | undefined => {
     try {
       const leg = legOf(result.state, action)
@@ -929,7 +1070,7 @@ export function stepBot(
        * re-entry it exists to catch. The value is read after settling, because that is the horizon
        * candidates have to share to be comparable.
        */
-      const settled = settle(next, faction, reg, resolve, settling)
+      const settled = settle(next, faction, reg, resolve, settling, battles)
       const unmoved = probeFrom(result.state, 0).rng.seed
       const random = (through ? settled : next).state.rng.seed !== unmoved
       // Settling through actions, a line that stops back at this question repeats it (`settle`) —
@@ -950,7 +1091,7 @@ export function stepBot(
         observed: observe(settled.state, faction),
         samples: [
           observe(settled.state, faction),
-          ...settledSamples(result.state, action, faction, reg, resolve, settling, random),
+          ...settledSamples(result.state, action, faction, reg, resolve, settling, random, battles),
         ],
         repeats: (at !== undefined && at >= depth) || home,
         undoes:
