@@ -3217,3 +3217,104 @@ thread, so a choice like that freezes the page.
   not measured.
 - **Lore** is not dealt in any run here.
 - **The dice choice** above is not fixed here.
+
+## 26. The dice menu: one battle's answers shared between its rolls (#59)
+
+**Choosing battle dice took up to 75 s on every level and now takes about a second, and no decision
+changed.** The choice section 25 reported — mobile, four players, 287 pools, 73.5 s — was re-timed
+at 75.4 s on `main` and takes 0.8 s here, picking the same pool.
+
+### What was slow
+
+Every pool on a dice menu is probed `SAMPLES` times, and every sample is settled: the roll's hits
+are assigned one at a time, its raid keys spent and any stolen resource made room for, each through
+the bot's own one-ply judgement. A 287-pool menu is 1,435 settled rolls of up to ten asks each.
+
+### What changed
+
+- **Answers are shared within one decision** (`BattleMemo`, `play.ts`). Every sampled roll starts
+  from the decision's own board and differs only in the generator, the dice shown, the log's text
+  and the counts the faces produced. Two probes that have then taken the same steps hold the same
+  board, so the bot's answer depends on the steps, the options offered and the raid keys left. It is
+  stored under those and reused by another pool, another sample, or a larger roll still placing its
+  first hits.
+- **Sharing declines what that argument does not cover.** It starts at the battle's first
+  resolution ask, and only when the state there is the decision's own, object for object, with
+  nothing but log lines added: one for the roll, one for each reroll before it, the count kept in
+  the key. A roll that changed anything else — Irregular's Weapon discard — settles alone, and
+  sharing ends when the generator moves.
+- **A lone option is answered without asking the bot.** Every settled roll ends on one, "confirm
+  the damage".
+- **`parseFigureId` keeps what it has parsed** (`ids.ts`), frozen: the evaluator parses every figure
+  on the board for every position it scores.
+
+The change was first built on #55's base and is carried here over #56-#58. Settling through actions
+(section 24) takes a finishing exit at a repeated prompt, which that build did not have; the exit
+goes on the shared path with every other step. Rerolled rolls were added to what is shared after
+the comparison below showed them as the slowest menus left.
+
+### Measured
+
+**Decisions.** 120 games were played on `main`'s engine and on this one and their journals
+compared: 84 base games and 36 with leaders and one lore card each, at two, three and four players
+on every board, three seeds a table, seating hard, normal, easy, `menuBot`, `easyBot` and
+`standardBot` between them. All 120 journals are byte-identical — 76,659 decisions — and every game
+finished. Twelve games ran at once, so the times in this table are under load:
+
+| set | players | games | decisions | compute, s | dice menus of 1 s or more |
+| --- | --- | --- | --- | --- | --- |
+| base | 2 | 36 | 15,412 | 236 → 94 | 18 → 0 |
+| base | 3 | 24 | 15,031 | 810 → 148 | 64 → 1 |
+| base | 4 | 24 | 19,153 | 865 → 259 | 105 → 1 |
+| lore | 2 | 12 | 5,710 | 149 → 71 | 9 → 1 |
+| lore | 3 | 12 | 9,889 | 432 → 113 | 48 → 2 |
+| lore | 4 | 12 | 11,464 | 767 → 255 | 67 → 6 |
+
+**The slowest menus, one at a time.** Each decision alone on an idle machine, once on each engine;
+the pool chosen is the same in every row:
+
+| position | bot | pools | `main` | here |
+| --- | --- | --- | --- | --- |
+| Board4MixUp1, seed 32, step 921 (mobile in every seat; section 25's) | mobile | 287 | 75.4 s | 0.8 s |
+| Board3CoreConflict, seed 31, step 426 | normal | 226 | 35.0 s | 0.4 s |
+| Board4MixUp2, seed 32, step 536 | `standardBot` | 153 | 20.1 s | 0.8 s |
+| Board3Frontiers, seed 11, step 566, lore | easy | 226 | 26.2 s | 0.5 s |
+| Board4MixUp3, seed 11, step 787, lore | `menuBot` | 117 | 28.9 s | 4.5 s |
+| Board4MixUp1, seed 11, step 894, lore | `menuBot` | 153 | 28.8 s | 8.7 s |
+| Board3CoreConflict, seed 33, step 565 | `menuBot` | 46 | 5.2 s | 1.5 s |
+
+### What stays slow
+
+- **A reroll in the hand of a bot that settles through actions** — hard and `menuBot`. Skirmishers
+  (in the base court deck), Seeker Torpedoes, Tricky and Empath's Vision put a reroll ask between
+  the roll and its hits, and `settle` answers it by one-ply probes in every sample: about 26,000 of
+  them at step 744 of the Board4MixUp1 lore game above, another 153-pool menu. The last three rows
+  of the table are this case. Sharing reaches the hits after the reroll and not the reroll
+  question, whose options name the faces rolled.
+- **Those probes are also blind.** Each lands before any hit is placed, on the board as it was, so
+  the reroll inside a probe is chosen on nothing. A bot that does not settle through actions — easy
+  and normal — stops its probe at the reroll ask instead, because the ask's options carry the
+  turn's pips, which is `settle`'s horizon: put in `menuBot`'s seat at step 744, normal performed no
+  `battle/reroll` at all, not even the one that keeps the dice. So a pool its holder could reroll is
+  scored before a hit lands. Both are older than this change and both are about play, not only
+  time. The fix — keep the dice inside a probe, as `settle` declines the other optional steps —
+  changes decisions, so it is not made here.
+- **Decisions that are not dice.** With twelve games at once, hard's moves and its pip menus in the
+  lore games took up to 3.9 s (6.4 s on `main`) and an arrange decision 1.4 s.
+- **The page's main thread.** The web app still decides there, so whatever is slow still freezes
+  the page. A Worker is a separate change.
+
+### What this does not cover
+
+- **No arena run.** The journals are identical, so the arena has nothing to measure; the claim that
+  play is unchanged rests on those 120 games.
+- **The new unit test covers less than the comparison.** `battle-dice.test.ts` asserts that one
+  55-pool menu scores the same with sharing on and off, and it fails when a stored answer is wrong.
+  It still passes with the key made too coarse in two ways: the path left out, and the battle
+  context dropped from every option. The 120 games are what cover the key — with the path left out
+  of it, 14 of their journals differ from `main`'s.
+- **Lore** is one card a player, and every table is three seeds.
+- **Each one-at-a-time timing is a single run.**
+- **A raid that steals into full slots** was the slowest menu left when this was first built on
+  #55's base, at 3.6 s: each probe arranges the slots on its own board, which sharing cannot reach.
+  It was not looked for again here.

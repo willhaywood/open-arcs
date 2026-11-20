@@ -56,13 +56,30 @@ export function figureId(color: ColorId, piece: Piece, index: number): FigureId 
   return `${color}/${piece}/${index}`
 }
 
-export function parseFigureId(id: FigureId): { color: ColorId; piece: Piece; index: number } {
+export type ParsedFigure = Readonly<{ color: ColorId; piece: Piece; index: number }>
+
+/*
+ * Parsed once per id. The evaluator parses every figure on the board for every position it scores,
+ * and a bot decision scores thousands: splitting the string was a quarter of a dice-menu decision's
+ * time. Bounded by the pieces in the box, and frozen because every caller shares the one object.
+ */
+const parsedFigures = new Map<FigureId, ParsedFigure>()
+
+export function parseFigureId(id: FigureId): ParsedFigure {
+  const known = parsedFigures.get(id)
+  if (known !== undefined) return known
   const parts = id.split('/')
   const [color, piece, index] = parts
   if (parts.length !== 3 || color === undefined || piece === undefined || index === undefined) {
     throw new Error(`malformed figure id: ${id}`)
   }
-  return { color: color as ColorId, piece: piece as Piece, index: Number(index) }
+  const parsed = Object.freeze({
+    color: color as ColorId,
+    piece: piece as Piece,
+    index: Number(index),
+  })
+  parsedFigures.set(id, parsed)
+  return parsed
 }
 
 // --- Locations -------------------------------------------------------------
